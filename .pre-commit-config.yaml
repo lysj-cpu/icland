@@ -1,0 +1,26 @@
+repos:
+  # pre-commit-hooks not yet in ruff: https://github.com/astral-sh/ruff/issues/4073
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: check-ast
+      - id: trailing-whitespace
+      - id: pretty-format-json
+        args:
+          - "--autofix"
+
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.5.8
+    hooks:
+      - id: uv-lock
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.1
+    hooks:
+      # Run the linter.
+      - id: ruff
+        args: [ --fix ]
+      # Run the formatter.
+      - id: ruff-format
