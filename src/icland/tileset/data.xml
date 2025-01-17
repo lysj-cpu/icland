@@ -1,0 +1,55 @@
+<set size="26" unique="True">
+    <tiles>
+        <tile name="ramp_1_2" symmetry="T"/>
+        <tile name="ramp_2_3" symmetry="T"/>
+        <tile name="ramp_3_4" symmetry="T"/>
+        <tile name="ramp_4_5" symmetry="T"/>
+        <tile name="ramp_5_6" symmetry="T"/>
+
+        <tile name="vramp_1_2" symmetry="L"/>
+        <tile name="vramp_1_3" symmetry="L"/>
+        <tile name="vramp_1_4" symmetry="L"/>
+        <tile name="vramp_1_5" symmetry="L"/>
+        <tile name="vramp_1_6" symmetry="L"/>
+        <tile name="vramp_2_3" symmetry="L"/>
+        <tile name="vramp_2_4" symmetry="L"/>
+        <tile name="vramp_2_5" symmetry="L"/>
+        <tile name="vramp_2_6" symmetry="L"/>
+        <tile name="vramp_3_4" symmetry="L"/>
+        <tile name="vramp_3_5" symmetry="L"/>
+        <tile name="vramp_3_6" symmetry="L"/>
+        <tile name="vramp_4_5" symmetry="L"/>
+        <tile name="vramp_4_6" symmetry="L"/>
+        <tile name="vramp_5_6" symmetry="L"/>
+
+        <tile name="square_1" symmetry="X"/>
+        <tile name="square_2" symmetry="X"/>
+        <tile name="square_3" symmetry="X"/>
+        <tile name="square_4" symmetry="X"/>
+        <tile name="square_5" symmetry="X"/>
+        <tile name="square_6" symmetry="X"/>
+    </tiles>
+    <neighbors>
+        <neighbor left="square_1 0" right="square_1 0"/>
+        <neighbor left="square_1 0" right="ramp_1_2"/>
+        <neighbor left="square_1 0" right="vramp_1_2"/>
+        <neighbor left="square_1 0" right="vramp_1_3"/>
+        <neighbor left="square_1 0" right="vramp_1_4"/>
+        <neighbor left="square_1 0" right="vramp_1_5"/>
+        <neighbor left="square_1 0" right="vramp_1_6"/>
+
+        <neighbor left="square_2 0" right="square_2 0"/>
+        <neighbor left="square_2 0" right="ramp_2_3"/>
+
+        <neighbor left="square_3 0" right="square_3 0"/>
+        <neighbor left="square_3 0" right="ramp_3_4"/>
+
+        <neighbor left="square_4 0" right="square_4 0"/>
+        <neighbor left="square_4 0" right="ramp_4_5"/>
+
+        <neighbor left="square_5 0" right="square_5 0"/>
+        <neighbor left="square_5 0" right="ramp_5_6"/>
+
+        <neighbor left="square_6 0" right="square_6 0"/>
+    </neighbors>
+
