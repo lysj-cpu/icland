@@ -1,4 +1,4 @@
-# XLand
+# ICLand
 
 ## Development Instructions
 
