@@ -1,3 +1,4 @@
+"""Main entry point for the world generation program."""
 import os
 import glob
 import time
@@ -13,7 +14,9 @@ import SimpleTiledModel
 #
 # If you used different module or class names, adjust as necessary.
 
+
 def main():
+    """Main entry point for the world generation program."""
     start = time.time()  # Start measuring elapsed time
 
     # Create "output" directory and delete existing files there.
@@ -45,7 +48,7 @@ def main():
 
     for xelem in elements:
         # Tag will be "overlapping" or "simpletiled"
-        is_overlapping = (xelem.tag == "overlapping")
+        is_overlapping = xelem.tag == "overlapping"
 
         # Retrieve some common attributes
         name = xelem.get("name", "")
@@ -57,7 +60,7 @@ def main():
         size = int(xelem.get("size", default_size))
         width = int(xelem.get("width", size))
         height = int(xelem.get("height", size))
-        periodic = (xelem.get("periodic", "false").lower() == "true")
+        periodic = xelem.get("periodic", "false").lower() == "true"
 
         heuristic_string = xelem.get("heuristic", "Entropy")
         heuristic = parse_heuristic(heuristic_string)
@@ -78,11 +81,10 @@ def main():
         else:
             # SimpleTiledModel-specific parameters
             subset = xelem.get("subset")  # can be None
-            black_background = (xelem.get("blackBackground", "false").lower() == "true")
+            black_background = xelem.get("blackBackground", "false").lower() == "true"
 
             model = SimpleTiledModel.SimpleTiledModel(
-                name, subset, width, height,
-                periodic, black_background, heuristic
+                name, subset, width, height, periodic, black_background, heuristic
             )
 
         # Number of screenshots to generate
@@ -104,8 +106,13 @@ def main():
 
                     # If it's a SimpleTiledModel and user wants text output
                     # Check if xelem.Get("textOutput", false) => see if "textOutput" is true
-                    text_output_flag = (xelem.get("textOutput", "false").lower() == "true")
-                    if isinstance(model, SimpleTiledModel.SimpleTiledModel) and text_output_flag:
+                    text_output_flag = (
+                        xelem.get("textOutput", "false").lower() == "true"
+                    )
+                    if (
+                        isinstance(model, SimpleTiledModel.SimpleTiledModel)
+                        and text_output_flag
+                    ):
                         txt = model.text_output()
                         out_txt_path = os.path.join(out_dir, f"{name} {seed}.txt")
                         with open(out_txt_path, "w", encoding="utf-8") as f:
