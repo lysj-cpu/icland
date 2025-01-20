@@ -6,7 +6,7 @@ import numpy as np
 # PACKAGE PRIVATE FUNCTIONS
 
 # Package private helper function for making a cube by defining its faces
-def ___make_block_mesh():
+def __make_block_mesh():
   # Initialize the cube data with 12 triangles (2 triangles per face)
   cube_data = np.zeros(12, dtype=mesh.Mesh.dtype)
 
@@ -164,18 +164,12 @@ def _make_block(x, y, level) -> mesh.Mesh:
   assert __block_assertions(x, y, level, 0)
   
   # Create a block
-  cube = ___make_block_mesh()
+  cube = __make_block_mesh()
   
   # Move to designated X Y and Z coordinates
-  _translate(cube, x, y, level - 1)
+  cube.translate(np.array([x, y, level - 1]))
   
   return cube
-
-# Helper function to translate the mesh by x, y, z in the corresponding directions
-def _translate(mesh, x, y, z) -> None:
-  mesh.x += x
-  mesh.y += y
-  mesh.z += z  
 
 # PUBLIC FUNCTIONS
 
@@ -216,7 +210,7 @@ def make_vramp(x, y, from_level, to_level, rotation=0) -> mesh.Mesh:
     vramp.y += 0.5
     vramp.z += 0.5
   
-    _translate(vramp, x, y, l - 1)
+    vramp.translate(np.array([x, y, l - 1]))
     block_column.append(vramp.data.copy())
   
   # Append cube blocks below
@@ -242,7 +236,7 @@ def make_ramp(x, y, level, rotation=0) -> mesh.Mesh:
   ramp.y += 0.5
   
   # Move to designated X Y and Z coordinates
-  _translate(ramp, x, y, level - 1)
+  ramp.translate(np.array([x, y, level - 1]))
   
   block_column = [ramp.data.copy()]
   
