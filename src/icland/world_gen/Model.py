@@ -1,14 +1,14 @@
+"""This file contains the base Model class for WaveFunctionCollapse and helper functions."""
+
 import math
 import random
 from enum import Enum
 
-# You might want this function to emulate the "distribution.Random(randValue)" call
-# which selects an index t with probability distribution[t].
 def random_index_from_distribution(distribution, rand_value):
-    """
-    Select an index from 'distribution' proportionally to the values in 'distribution'.
-    'rand_value' is a random float in [0,1).
+    """Select an index from 'distribution' proportionally to the values in 'distribution'.
     
+    'rand_value' is a random float in [0,1).
+
     Returns:
         index (int) chosen according to the weights in 'distribution'.
         If the sum of 'distribution' is 0, returns -1 as an error code.
@@ -25,18 +25,14 @@ def random_index_from_distribution(distribution, rand_value):
 
 
 class Heuristic(Enum):
-    """
-    Equivalent to the public enum Heuristic { Entropy, MRV, Scanline } in C#.
-    """
+    """Enum for the heuristic selection in WaveFunctionCollapse."""
     ENTROPY = 1
     MRV = 2
     SCANLINE = 3
 
 
 class Model:
-    """
-    Python translation of the C# abstract class 'Model' with added comments.
-    """
+    """Base Model class for WaveFunctionCollapse algorithm."""
 
     # Class-wide (static) arrays, analogous to the protected static int[] in C#
     dx = [-1, 0, 1, 0]
@@ -44,58 +40,49 @@ class Model:
     opposite = [2, 3, 0, 1]  # Opposite directions for 0->2, 1->3, 2->0, 3->1
 
     def __init__(self, width, height, N, periodic, heuristic):
-        """
-        Translated constructor from C#:
-        protected Model(int width, int height, int N, bool periodic, Heuristic heuristic)
-        """
-        self.MX = width
-        self.MY = height
-        self.N = N
-        self.periodic = periodic
+        """Constructor for the Model class."""
         self.heuristic = heuristic
 
-        # Additional fields based on the original code (some remain uninitialized here until init())
         self.wave = None
-        self.compatible = None
+
         self.propagator = None
-        self.weights = None
-        self.weightLogWeights = None
-        self.distribution = None
+        self.compatible = None
         self.observed = None
+
         self.stack = None
         self.stacksize = 0
         self.observedSoFar = 0
 
-        self.T = 0       # number of possible tile/pattern indices (must be set by child or otherwise)
+        self.MX = width
+        self.MY = height
+        self.T = 0      # number of possible tile/pattern indices
+        self.N = N
+
+        self.periodic = periodic
         self.ground = False
+
+        self.weights = None
+        self.weightLogWeights = None
+        self.distribution = None
 
         self.sumsOfOnes = None
         self.sumsOfWeights = None
         self.sumsOfWeightLogWeights = None
-        self.entropies = None
+        self.startingEntropy = 0.0
 
         self.sumOfWeights = 0.0
         self.sumOfWeightLogWeights = 0.0
-        self.startingEntropy = 0.0
+        self.entropies = None
 
     def init(self):
-        """
-        Equivalent to the void Init() method in the C# code.
-        Initializes arrays and precomputes weight sums/log sums.
-        """
-        # 'wave' is a 2D array [MX*MY][T] in C#
+        """Initialise variables."""
         self.wave = [[False] * self.T for _ in range(self.MX * self.MY)]
-        # 'compatible' is a 3D array [MX*MY][T][4]
         self.compatible = [[[0]*4 for _ in range(self.T)] for _ in range(self.MX * self.MY)]
         
-        # fill 'compatible' with 0 for now; it gets updated in 'Clear'
-        # 'distribution' is for storing weights of active patterns in observe()
         self.distribution = [0.0] * self.T
 
-        # 'observed' is the final chosen pattern index at each cell
         self.observed = [-1] * (self.MX * self.MY)
 
-        # Precompute weightLogWeights, sumOfWeights, sumOfWeightLogWeights
         self.weightLogWeights = [0.0] * self.T
         self.sumOfWeights = 0.0
         self.sumOfWeightLogWeights = 0.0
@@ -107,51 +94,36 @@ class Model:
 
         self.startingEntropy = math.log(self.sumOfWeights) - (self.sumOfWeightLogWeights / self.sumOfWeights)
 
-        # sumsOfOnes, sumsOfWeights, sumsOfWeightLogWeights, entropies track wave state
         self.sumsOfOnes = [0] * (self.MX * self.MY)
         self.sumsOfWeights = [0.0] * (self.MX * self.MY)
         self.sumsOfWeightLogWeights = [0.0] * (self.MX * self.MY)
         self.entropies = [0.0] * (self.MX * self.MY)
 
-        # stack is an array of (int i, int t)
-        # In Python, we can just keep a list of tuples.
         self.stack = []
         self.stacksize = 0
 
     def run(self, seed, limit):
-        """
-        Translated from public bool Run(int seed, int limit).
-        Attempts to observe and propagate patterns up to 'limit' iterations (or indefinitely if limit < 0).
-        
-        Returns:
-            True if a valid tiling is completed or still uncontradicted after limit steps.
-            False if a contradiction is found (propagation fails).
-        """
+        """Run the WaveFunctionCollapse algorithm with the given seed and iteration limit."""
         if self.wave is None:
             self.init()
 
-        self.clear()  # Reset wave, etc.
+        self.clear()
         
-        rng = random.Random(seed)  # The C# code uses 'new Random(seed)'
+        rng = random.Random(seed)
 
-        # For loop for up to 'limit' steps, or infinite if limit < 0
         steps = 0
         while True:
             if limit >= 0 and steps >= limit:
-                # If we've reached the limit, just return True
-                # (the original code says "for (int l=0; l<limit || limit<0; l++)")
                 break
             steps += 1
 
             node = self.next_unobserved_node(rng)
             if node >= 0:
-                # There's an unobserved node, so observe and propagate
                 self.observe(node, rng)
                 success = self.propagate()
                 if not success:
                     return False
             else:
-                # No unobserved node found => wave is fully observed
                 for i in range(len(self.wave)):
                     for t in range(self.T):
                         if self.wave[i][t]:
@@ -159,13 +131,10 @@ class Model:
                             break
                 return True
         
-        # If we exit the loop (limit reached without contradiction), return True
         return True
 
     def next_unobserved_node(self, rng):
-        """
-        Translated from int NextUnobservedNode(Random random).
-        Selects the next cell to observe according to the chosen heuristic (Scanline, Entropy, or MRV).
+        """Selects the next cell to observe according to the chosen heuristic (Scanline, Entropy, or MRV).
         
         Returns:
             index (int) of the chosen cell in [0, MX*MY), or -1 if all cells are determined.
@@ -206,9 +175,8 @@ class Model:
         return argmin
 
     def observe(self, node, rng):
-        """
-        Translated from void Observe(int node, Random random).
-        Collapses the wave at 'node' by picking a pattern index according to weights distribution.
+        """Collapses the wave at 'node' by picking a pattern index according to weights distribution.
+
         Then bans all other patterns at that node.
         """
         w = self.wave[node]
@@ -226,9 +194,8 @@ class Model:
                 self.ban(node, t)
 
     def propagate(self):
-        """
-        Translated from bool Propagate().
-        
+        """Propagate the wave function collapse constraints.
+
         Returns:
             True if propagation completed successfully (no contradictions found).
             (In the original snippet, it returns sumsOfOnes[0] > 0, which is suspicious,
@@ -276,10 +243,7 @@ class Model:
         return self.sumsOfOnes[0] > 0
 
     def ban(self, i, t):
-        """
-        Translated from void Ban(int i, int t).
-        Bans pattern t at cell i. Updates wave, compatibility, sumsOfOnes, entropies, and stack.
-        """
+        """Bans pattern t at cell i. Updates wave, compatibility, sumsOfOnes, entropies, and stack."""
         # If wave[i][t] is already false, do nothing
         if not self.wave[i][t]:
             return
@@ -307,11 +271,7 @@ class Model:
         self.entropies[i] = math.log(sum_w) - (self.sumsOfWeightLogWeights[i] / sum_w) if sum_w > 0 else 0.0
 
     def clear(self):
-        """
-        Translated from void Clear().
-        Resets wave and compatibility to allow all patterns at all cells,
-        then optionally applies 'ground' constraints.
-        """
+        """Resets wave and compatibility to allow all patterns at all cells, then optionally applies 'ground' constraints."""
         for i in range(len(self.wave)):
             for t in range(self.T):
                 self.wave[i][t] = True
@@ -345,8 +305,5 @@ class Model:
             self.propagate()
 
     def save(self, filename):
-        """
-        Translated from the abstract public void Save(string filename).
-        Since this is an abstract class in C#, we simply raise NotImplementedError in Python.
-        """
+        """Raises NotImplementedError to ensure its subclass will provide an implementation."""
         raise NotImplementedError("Must be implemented in a subclass.")

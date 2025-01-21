@@ -1,16 +1,12 @@
-import math
-import xml.etree.ElementTree as ET
+"""Provides implementation of the Simple Tiled Model and relevant functions."""
 import os
-from collections import defaultdict
-from enum import Enum
+import xml.etree.ElementTree as ET
 from Model import Model
-
 from PIL import Image
 
 def load_bitmap(filepath):
-    """
-    Loads an image file (e.g., PNG) into a list of ARGB-encoded 32-bit integers.
-    
+    """Loads an image file (e.g., PNG) into a list of ARGB-encoded 32-bit integers.
+
     Returns:
         (pixels, width, height)
           pixels: a list of length (width*height), each an integer 0xAARRGGBB
@@ -20,49 +16,50 @@ def load_bitmap(filepath):
         # Convert the image to RGBA so we have consistent 4-channel data
         img = img.convert("RGBA")
         width, height = img.size
-        
+
         # Retrieve pixel data in (R, G, B, A) tuples
         pixel_data = list(img.getdata())
 
         # Convert each RGBA tuple into a single ARGB integer
         # A in bits 24..31, R in bits 16..23, G in bits 8..15, B in bits 0..7
         result = []
-        for (r, g, b, a) in pixel_data:
+        for r, g, b, a in pixel_data:
             argb = (a << 24) | (r << 16) | (g << 8) | b
             result.append(argb)
-        
+
     return (result, width, height)
 
 
 def save_bitmap(data, width, height, filename):
-    """
-    Saves a list of ARGB-encoded 32-bit integers as an image file (e.g., PNG).
-    
+    """Saves a list of ARGB-encoded 32-bit integers as an image file (e.g., PNG).
+
     Arguments:
         data: a list of length width*height containing 0xAARRGGBB pixels
-        width, height: image dimensions
+        width: image width
+        height: image height
         filename: path to save the resulting image file
     """
     # Create a new RGBA image
     img = Image.new("RGBA", (width, height))
-    
+
     # Convert each ARGB int back into an (R, G, B, A) tuple
     rgba_pixels = []
     for argb in data:
         a = (argb >> 24) & 0xFF
         r = (argb >> 16) & 0xFF
-        g = (argb >> 8)  & 0xFF
-        b = (argb >> 0)  & 0xFF
+        g = (argb >> 8) & 0xFF
+        b = (argb >> 0) & 0xFF
         rgba_pixels.append((r, g, b, a))
-    
+
     # Put these pixels into the image and save
     img.putdata(rgba_pixels)
     img.save(filename, format="PNG")
 
+
 # Helper to get XML attribute with a default (similar to xelem.Get<T>(...))
 def get_xml_attribute(xelem, attribute, default=None, cast_type=None):
-    """
-    Returns the value of 'attribute' from the XML element xelem.
+    """Returns the value of 'attribute' from the XML element xelem.
+
     If the attribute is not present, returns 'default'.
     If cast_type is not None, attempts to cast the attribute's string value to that type.
     """
@@ -82,25 +79,19 @@ def get_xml_attribute(xelem, attribute, default=None, cast_type=None):
             return cast_type(val)
     return val
 
-
 class SimpleTiledModel(Model):
-    """
-    Python translation of the C# SimpleTiledModel class which inherits from Model.
-    """
+    """Python translation of the C# SimpleTiledModel class which inherits from Model."""
 
-    def __init__(self, name, subsetName, width, height, periodic, blackBackground, heuristic):
-        """
-        Constructor, translated from:
-          public SimpleTiledModel(string name, string subsetName, int width, int height,
-                                  bool periodic, bool blackBackground, Heuristic heuristic)
-        Calls the base Model constructor with N=1 (since SimpleTiledModel is typically single-tile WFC).
-        """
+    def __init__(
+        self, name, subsetName, width, height, periodic, blackBackground, heuristic
+    ):
+        """Constructor uses the base Model constructor with N=1 (since SimpleTiledModel is typically single-tile WFC)."""
         super().__init__(width, height, N=1, periodic=periodic, heuristic=heuristic)
 
         self.blackBackground = blackBackground
-        self.tiles = []         # Will hold arrays of pixel data for each tile variant
-        self.tilenames = []     # Will hold tile names (including variants)
-        self.tilesize = 0       # Size (width==height) of each tile in pixels
+        self.tiles = []  # Will hold arrays of pixel data for each tile variant
+        self.tilenames = []  # Will hold tile names (including variants)
+        self.tilesize = 0  # Size (width==height) of each tile in pixels
 
         # Load XML file: "tilesets/<name>.xml"
         xml_path = os.path.join("images/samples", name, "data.xml")
@@ -138,9 +129,7 @@ class SimpleTiledModel(Model):
 
         # Local helper functions to rotate and reflect pixel arrays
         def tile(f, size):
-            """
-            Creates a flat list of length size*size by calling f(x,y) for each pixel.
-            """
+            """Creates a flat list of length size*size by calling f(x,y) for each pixel."""
             result = [0] * (size * size)
             for y in range(size):
                 for x in range(size):
@@ -148,15 +137,15 @@ class SimpleTiledModel(Model):
             return result
 
         def rotate(array, size):
-            """
-            Rotates the array by 90 degrees clockwise.
+            """Rotates the array by 90 degrees clockwise.
+
             The function is: new[x,y] = old[size-1-y, x].
             """
             return tile(lambda x, y: array[size - 1 - y + x * size], size)
 
         def reflect(array, size):
-            """
-            Reflects (mirror) the array horizontally.
+            """Reflects (mirror) the array horizontally.
+
             The function is: new[x,y] = old[size-1-x, y].
             """
             return tile(lambda x, y: array[size - 1 - x + y * size], size)
@@ -184,27 +173,27 @@ class SimpleTiledModel(Model):
                 continue
 
             # Read tile's symmetry (default 'X' if not present)
-            sym = get_xml_attribute(xtile, "symmetry", default='X', cast_type=str)
+            sym = get_xml_attribute(xtile, "symmetry", default="X", cast_type=str)
             w = get_xml_attribute(xtile, "weight", default=1.0, cast_type=float)
 
             # Determine the group transformations: cardinality, rotation function 'a', reflection function 'b'
-            if sym == 'L':
+            if sym == "L":
                 cardinality = 4
                 a = lambda i: (i + 1) % 4
                 b = lambda i: i + 1 if (i % 2 == 0) else i - 1
-            elif sym == 'T':
+            elif sym == "T":
                 cardinality = 4
                 a = lambda i: (i + 1) % 4
                 b = lambda i: i if (i % 2 == 0) else 4 - i
-            elif sym == 'I':
+            elif sym == "I":
                 cardinality = 2
                 a = lambda i: 1 - i
                 b = lambda i: i
-            elif sym == '\\':
+            elif sym == "\\":
                 cardinality = 2
                 a = lambda i: 1 - i
                 b = lambda i: 1 - i
-            elif sym == 'F':
+            elif sym == "F":
                 cardinality = 8
                 a = lambda i: (i + 1) % 4 if i < 4 else 4 + ((i - 1) % 4)
                 b = lambda i: i + 4 if i < 4 else i - 4
@@ -256,7 +245,9 @@ class SimpleTiledModel(Model):
             if unique:
                 # Each orientation is stored in a separate file, e.g. "<tilename> 0.png", "<tilename> 1.png", etc.
                 for t in range(cardinality):
-                    bitmap, w_img, h_img = load_bitmap(os.path.join("images/samples", name, f"{tilename} {t}.png"))
+                    bitmap, w_img, h_img = load_bitmap(
+                        os.path.join("images/samples", name, f"{tilename} {t}.png")
+                    )
                     # Usually, w_img == h_img => tile is square
                     if self.tilesize == 0:
                         self.tilesize = w_img
@@ -264,7 +255,9 @@ class SimpleTiledModel(Model):
                     self.tilenames.append(f"{tilename} {t}")
             else:
                 # Single PNG for the base tile
-                bitmap, w_img, h_img = load_bitmap(os.path.join("images/samples", name, f"{tilename}.png"))
+                bitmap, w_img, h_img = load_bitmap(
+                    os.path.join("images/samples", name, f"{tilename}.png")
+                )
                 if self.tilesize == 0:
                     self.tilesize = w_img
                 base_idx = len(self.tiles)
@@ -281,7 +274,9 @@ class SimpleTiledModel(Model):
                     if t >= 4:
                         reflected = reflect(self.tiles[base_idx + t - 4], self.tilesize)
                         # Overwrite the just-added tile, or add a new entry
-                        self.tiles[-1] = reflected if t <= 3 else self.tiles[-1]  # Adjust if needed
+                        self.tiles[-1] = (
+                            reflected if t <= 3 else self.tiles[-1]
+                        )  # Adjust if needed
                         # Actually, we should do a separate entry:
                         self.tiles.append(reflected)
                     self.tilenames.append(f"{tilename} {t}")
@@ -302,7 +297,9 @@ class SimpleTiledModel(Model):
 
         # We'll build a "densePropagator[d][t1][t2] = True/False" for adjacency, then convert
         # to a sparse list of valid t2's for each t1.
-        densePropagator = [[[False for _ in range(self.T)] for _ in range(self.T)] for _ in range(4)]
+        densePropagator = [
+            [[False for _ in range(self.T)] for _ in range(self.T)] for _ in range(4)
+        ]
 
         # Parse neighbors from the <neighbors> section
         neighbors_elem = xroot.find("neighbors")
@@ -361,16 +358,14 @@ class SimpleTiledModel(Model):
                     if densePropagator[d][t1][t2]:
                         valid_t2s.append(t2)
                 if len(valid_t2s) == 0:
-                    print(f"ERROR: tile {self.tilenames[t1]} has no neighbors in direction {d}")
+                    print(
+                        f"ERROR: tile {self.tilenames[t1]} has no neighbors in direction {d}"
+                    )
 
                 self.propagator[d][t1] = valid_t2s
 
     def save(self, filename):
-        """
-        Override of the Model.save() method.
-        Translated from:
-          public override void Save(string filename)
-        """
+        """Override the save method from Model as it was not implemented."""
         # We'll create a pixel buffer for the entire output image:
         # (MX * tilesize) by (MY * tilesize).
         bitmapData = [0] * (self.MX * self.MY * self.tilesize * self.tilesize)
@@ -387,7 +382,9 @@ class SimpleTiledModel(Model):
                         for dx in range(self.tilesize):
                             sx = x * self.tilesize + dx
                             sy = y * self.tilesize + dy
-                            bitmapData[sx + sy * (self.MX * self.tilesize)] = tile_data[dx + dy * self.tilesize]
+                            bitmapData[sx + sy * (self.MX * self.tilesize)] = tile_data[
+                                dx + dy * self.tilesize
+                            ]
         else:
             # Not fully observed -> show "superposition" or black background
             for i in range(len(self.wave)):
@@ -400,10 +397,12 @@ class SimpleTiledModel(Model):
                         for xt in range(self.tilesize):
                             sx = x * self.tilesize + xt
                             sy = y * self.tilesize + yt
-                            bitmapData[sx + sy * (self.MX * self.tilesize)] = 0xff000000
+                            bitmapData[sx + sy * (self.MX * self.tilesize)] = 0xFF000000
                 else:
                     w = self.wave[i]
-                    normalization = 1.0 / self.sumsOfWeights[i] if self.sumsOfWeights[i] != 0 else 0
+                    normalization = (
+                        1.0 / self.sumsOfWeights[i] if self.sumsOfWeights[i] != 0 else 0
+                    )
                     for yt in range(self.tilesize):
                         for xt in range(self.tilesize):
                             sx = x * self.tilesize + xt
@@ -414,9 +413,9 @@ class SimpleTiledModel(Model):
                                 if w[t]:
                                     argb = self.tiles[t][xt + yt * self.tilesize]
                                     # ARGB channels
-                                    rr = (argb & 0xff0000) >> 16
-                                    gg = (argb & 0x00ff00) >> 8
-                                    bb = (argb & 0x0000ff)
+                                    rr = (argb & 0xFF0000) >> 16
+                                    gg = (argb & 0x00FF00) >> 8
+                                    bb = argb & 0x0000FF
                                     wgt = self.weights[t] * normalization
                                     r += rr * wgt
                                     g += gg * wgt
@@ -425,19 +424,17 @@ class SimpleTiledModel(Model):
                             R = int(r)
                             G = int(g)
                             B = int(b)
-                            A = 0xff << 24
+                            A = 0xFF << 24
                             pixel = A | (R << 16) | (G << 8) | B
                             bitmapData[sx + sy * (self.MX * self.tilesize)] = pixel
 
         # Finally, save the image
-        save_bitmap(bitmapData, self.MX * self.tilesize, self.MY * self.tilesize, filename)
+        save_bitmap(
+            bitmapData, self.MX * self.tilesize, self.MY * self.tilesize, filename
+        )
 
     def text_output(self):
-        """
-        Translated from:
-          public string TextOutput()
-        Returns a textual representation of the observed tilenames in each cell row-by-row.
-        """
+        """Returns a textual representation of the observed tilenames in each cell row-by-row."""
         # If `observed[x + y * MX]` is -1, that means unobserved or uncertain
         lines = []
         for y in range(self.MY):
