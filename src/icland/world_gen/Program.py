@@ -6,6 +6,7 @@ import random
 import xml.etree.ElementTree as ET
 import Model
 import SimpleTiledModel
+from JITModel import XMLReader
 
 # Assuming you've already implemented or imported the following from your translations:
 # from model import Model, Heuristic
@@ -31,6 +32,10 @@ def main():
     tree = ET.parse("samples_reference.xml")
     root = tree.getroot()
 
+    jit_model = XMLReader()
+    T, j_weights, j_propagator, tilecodes = jit_model.get_tilemap_data()
+    
+
     # Helper: parse string -> Model.Heuristic
     # (Adjust if your Heuristic enum has different names or structure.)
     def parse_heuristic(hstring):
@@ -43,20 +48,12 @@ def main():
             return Model.Heuristic.ENTROPY
 
     # We gather both <overlapping> and <simpletiled> elements:
-    elements = list(root.findall("overlapping")) + list(root.findall("simpletiled"))
+    elements = list(root.findall("simpletiled"))
     print(elements)
 
     for xelem in elements:
-        # Tag will be "overlapping" or "simpletiled"
-        is_overlapping = xelem.tag == "overlapping"
-
-        # Retrieve some common attributes
-        name = xelem.get("name", "")
-        print(f"< {name}")  # C# had Console.WriteLine($"< {name}")
-        print(f"is_overlapping = {is_overlapping}")
-
         # If "size" attribute missing, use 48 if overlapping, else 24
-        default_size = 48 if is_overlapping else 24
+        default_size = 24
         size = int(xelem.get("size", default_size))
         width = int(xelem.get("width", size))
         height = int(xelem.get("height", size))
@@ -64,28 +61,12 @@ def main():
 
         heuristic_string = xelem.get("heuristic", "Entropy")
         heuristic = parse_heuristic(heuristic_string)
+        
+        # SimpleTiledModel-specific parameters
+        subset = xelem.get("subset")  # can be None
+        black_background = xelem.get("blackBackground", "false").lower() == "true"
 
-        # Construct the right type of Model
-        if is_overlapping:
-            # OverlappingModel-specific parameters
-            continue
-            # N = int(xelem.get("N", "3"))
-            # periodic_input = (xelem.get("periodicInput", "true").lower() == "true")
-            # symmetry = int(xelem.get("symmetry", "8"))
-            # ground = (xelem.get("ground", "false").lower() == "true")
-
-            # model = OverlappingModel(
-            #     name, N, width, height,
-            #     periodic_input, periodic, symmetry, ground, heuristic
-            # )
-        else:
-            # SimpleTiledModel-specific parameters
-            subset = xelem.get("subset")  # can be None
-            black_background = xelem.get("blackBackground", "false").lower() == "true"
-
-            model = SimpleTiledModel.SimpleTiledModel(
-                name, subset, width, height, periodic, black_background, heuristic
-            )
+        model = SimpleTiledModel.SimpleTiledModel(width, height, T, j_weights, j_propagator, tilecodes)
 
         # Number of screenshots to generate
         screenshots = int(xelem.get("screenshots", "2"))

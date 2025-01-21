@@ -402,17 +402,13 @@ class XMLReader():
         padded_sequences = [pad_sequence(seq, max_len) for seq in self.propagator]
 
         # Convert the padded sequences into a JAX array
-        j_propagator = jnp.array(padded_sequences)
+        j_padded_seq = jnp.array(padded_sequences)
 
         # Now assign the padded sequences into the result array
-        result = j_prop_result.at[:, :, :].set(j_propagator)
+        self.j_propagator = j_prop_result.at[:, :, :].set(j_padded_seq)
 
         # Now handle weights conversion to a JAX array
-        j_weights = jnp.array(self.weights)
+        self.j_weights = jnp.array(self.weights)
 
-        # Output the final result
-        print("j_tile_codes:\n", self.tilecodes)
-        print("j_prop_result:\n", result)
-        print("\nj_weights:\n", j_weights)
-        
-model = XMLReader()
+    def get_tilemap_data(self):
+        return self.T, self.j_weights, self.j_propagator, self.tilecodes

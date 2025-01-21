@@ -1,4 +1,5 @@
 """Provides implementation of the Simple Tiled Model and relevant functions."""
+from flax import struct
 import os
 import xml.etree.ElementTree as ET
 from Model import Model
@@ -79,6 +80,7 @@ def get_xml_attribute(xelem, attribute, default=None, cast_type=None):
             return cast_type(val)
     return val
 
+@struct.dataclass
 class SimpleTiledModel(Model):
     """Python translation of the C# SimpleTiledModel class which inherits from Model."""
 
@@ -375,6 +377,7 @@ class SimpleTiledModel(Model):
             # For each cell (x,y), pick the corresponding tile's pixel data
             for y in range(self.MY):
                 for x in range(self.MX):
+                    # tile index !!
                     tile_index = self.observed[x + y * self.MX]
                     tile_data = self.tiles[tile_index]
 
@@ -385,48 +388,48 @@ class SimpleTiledModel(Model):
                             bitmapData[sx + sy * (self.MX * self.tilesize)] = tile_data[
                                 dx + dy * self.tilesize
                             ]
-        else:
-            # Not fully observed -> show "superposition" or black background
-            for i in range(len(self.wave)):
-                x = i % self.MX
-                y = i // self.MX
+        # else:
+        #     # Not fully observed -> show "superposition" or black background
+        #     for i in range(len(self.wave)):
+        #         x = i % self.MX
+        #         y = i // self.MX
 
-                if self.blackBackground and self.sumsOfOnes[i] == self.T:
-                    # Paint as black (255 << 24 => 0xff000000 in ARGB)
-                    for yt in range(self.tilesize):
-                        for xt in range(self.tilesize):
-                            sx = x * self.tilesize + xt
-                            sy = y * self.tilesize + yt
-                            bitmapData[sx + sy * (self.MX * self.tilesize)] = 0xFF000000
-                else:
-                    w = self.wave[i]
-                    normalization = (
-                        1.0 / self.sumsOfWeights[i] if self.sumsOfWeights[i] != 0 else 0
-                    )
-                    for yt in range(self.tilesize):
-                        for xt in range(self.tilesize):
-                            sx = x * self.tilesize + xt
-                            sy = y * self.tilesize + yt
+        #         if self.blackBackground and self.sumsOfOnes[i] == self.T:
+        #             # Paint as black (255 << 24 => 0xff000000 in ARGB)
+        #             for yt in range(self.tilesize):
+        #                 for xt in range(self.tilesize):
+        #                     sx = x * self.tilesize + xt
+        #                     sy = y * self.tilesize + yt
+        #                     bitmapData[sx + sy * (self.MX * self.tilesize)] = 0xFF000000
+        #         else:
+        #             w = self.wave[i]
+        #             normalization = (
+        #                 1.0 / self.sumsOfWeights[i] if self.sumsOfWeights[i] != 0 else 0
+        #             )
+        #             for yt in range(self.tilesize):
+        #                 for xt in range(self.tilesize):
+        #                     sx = x * self.tilesize + xt
+        #                     sy = y * self.tilesize + yt
 
-                            r = g = b = 0.0
-                            for t in range(self.T):
-                                if w[t]:
-                                    argb = self.tiles[t][xt + yt * self.tilesize]
-                                    # ARGB channels
-                                    rr = (argb & 0xFF0000) >> 16
-                                    gg = (argb & 0x00FF00) >> 8
-                                    bb = argb & 0x0000FF
-                                    wgt = self.weights[t] * normalization
-                                    r += rr * wgt
-                                    g += gg * wgt
-                                    b += bb * wgt
-                            # Combine into ARGB int, alpha=255
-                            R = int(r)
-                            G = int(g)
-                            B = int(b)
-                            A = 0xFF << 24
-                            pixel = A | (R << 16) | (G << 8) | B
-                            bitmapData[sx + sy * (self.MX * self.tilesize)] = pixel
+        #                     r = g = b = 0.0
+        #                     for t in range(self.T):
+        #                         if w[t]:
+        #                             argb = self.tiles[t][xt + yt * self.tilesize]
+        #                             # ARGB channels
+        #                             rr = (argb & 0xFF0000) >> 16
+        #                             gg = (argb & 0x00FF00) >> 8
+        #                             bb = argb & 0x0000FF
+        #                             wgt = self.weights[t] * normalization
+        #                             r += rr * wgt
+        #                             g += gg * wgt
+        #                             b += bb * wgt
+        #                     # Combine into ARGB int, alpha=255
+        #                     R = int(r)
+        #                     G = int(g)
+        #                     B = int(b)
+        #                     A = 0xFF << 24
+        #                     pixel = A | (R << 16) | (G << 8) | B
+        #                     bitmapData[sx + sy * (self.MX * self.tilesize)] = pixel
 
         # Finally, save the image
         save_bitmap(

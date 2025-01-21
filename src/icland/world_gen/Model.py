@@ -1,4 +1,5 @@
 """This file contains the base Model class for WaveFunctionCollapse and helper functions."""
+from flax import struct
 
 import math
 import random
@@ -30,7 +31,7 @@ class Heuristic(Enum):
     MRV = 2
     SCANLINE = 3
 
-
+@struct.dataclass
 class Model:
     """Base Model class for WaveFunctionCollapse algorithm."""
 
@@ -39,76 +40,24 @@ class Model:
     dy = [0, 1, 0, -1]
     opposite = [2, 3, 0, 1]  # Opposite directions for 0->2, 1->3, 2->0, 3->1
 
-    def __init__(self, width, height, N, periodic, heuristic):
+    def __init__(self, width, height, T, j_weights, j_propagator, tilecodes):
         """Constructor for the Model class."""
-        self.heuristic = heuristic
-
-        self.wave = None
-
-        self.propagator = None
-        self.compatible = None
-        self.observed = None
-
-        self.stack = None
-        self.stacksize = 0
-        self.observedSoFar = 0
-
         self.MX = width
         self.MY = height
-        self.T = 0      # number of possible tile/pattern indices
-        self.N = N
 
-        self.periodic = periodic
-        self.ground = False
+        self.T = T
+        self.j_weights = j_weights
+        self.j_propagator = j_propagator
+        self.tilecodes = tilecodes
 
-        self.weights = None
-        self.weightLogWeights = None
-        self.distribution = None
 
-        self.sumsOfOnes = None
-        self.sumsOfWeights = None
-        self.sumsOfWeightLogWeights = None
-        self.startingEntropy = 0.0
-
-        self.sumOfWeights = 0.0
-        self.sumOfWeightLogWeights = 0.0
-        self.entropies = None
-
-    def init(self):
-        """Initialise variables."""
-        self.wave = [[False] * self.T for _ in range(self.MX * self.MY)]
-        self.compatible = [[[0]*4 for _ in range(self.T)] for _ in range(self.MX * self.MY)]
-        
-        self.distribution = [0.0] * self.T
-
-        self.observed = [-1] * (self.MX * self.MY)
-
-        self.weightLogWeights = [0.0] * self.T
-        self.sumOfWeights = 0.0
-        self.sumOfWeightLogWeights = 0.0
-        
-        for t in range(self.T):
-            self.weightLogWeights[t] = self.weights[t] * math.log(self.weights[t])
-            self.sumOfWeights += self.weights[t]
-            self.sumOfWeightLogWeights += self.weightLogWeights[t]
-
-        self.startingEntropy = math.log(self.sumOfWeights) - (self.sumOfWeightLogWeights / self.sumOfWeights)
-
-        self.sumsOfOnes = [0] * (self.MX * self.MY)
-        self.sumsOfWeights = [0.0] * (self.MX * self.MY)
-        self.sumsOfWeightLogWeights = [0.0] * (self.MX * self.MY)
-        self.entropies = [0.0] * (self.MX * self.MY)
-
-        self.stack = []
-        self.stacksize = 0
-
-    def run(self, seed, limit):
+    def run(self, seed):
         """Run the WaveFunctionCollapse algorithm with the given seed and iteration limit."""
-        if self.wave is None:
-            self.init()
+        limit = 10000   # Arbitary number for now
 
         self.clear()
         
+        # TODO: use jit-able random number generator
         rng = random.Random(seed)
 
         steps = 0

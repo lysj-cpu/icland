@@ -1,277 +1,183 @@
-from stl import mesh
-from stl.base import RemoveDuplicates
-import math
+import jax
+import jax.numpy as jnp
+from jax import random, vmap
+from functools import partial
 import numpy as np
-
-# PACKAGE PRIVATE FUNCTIONS
-
-# Package private helper function for making a cube by defining its faces
-def __make_block_mesh():
-  # Initialize the cube data with 12 triangles (2 triangles per face)
-  cube_data = np.zeros(12, dtype=mesh.Mesh.dtype)
-
-  # Bottom face
-  cube_data["vectors"][0] = np.array([
-      [0, 0, 0],
-      [1, 0, 0],
-      [0, 1, 0]
-  ])
-  cube_data["vectors"][1] = np.array([
-      [1, 0, 0],
-      [1, 1, 0],
-      [0, 1, 0]
-  ])
-
-  # Top face
-  cube_data["vectors"][2] = np.array([
-      [0, 0, 1],
-      [0, 1, 1],
-      [1, 0, 1]
-  ])
-  cube_data["vectors"][3] = np.array([
-      [1, 0, 1],
-      [0, 1, 1],
-      [1, 1, 1]
-  ])
-
-  # Front face
-  cube_data["vectors"][4] = np.array([
-      [0, 0, 0],
-      [0, 0, 1],
-      [1, 0, 0]
-  ])
-  cube_data["vectors"][5] = np.array([
-      [1, 0, 0],
-      [0, 0, 1],
-      [1, 0, 1]
-  ])
-
-  # Back face
-  cube_data["vectors"][6] = np.array([
-      [0, 1, 0],
-      [1, 1, 0],
-      [0, 1, 1]
-  ])
-  cube_data["vectors"][7] = np.array([
-      [1, 1, 0],
-      [1, 1, 1],
-      [0, 1, 1]
-  ])
-
-  # Left face
-  cube_data["vectors"][8] = np.array([
-      [0, 0, 0],
-      [0, 1, 0],
-      [0, 0, 1]
-  ])
-  cube_data["vectors"][9] = np.array([
-      [0, 1, 0],
-      [0, 1, 1],
-      [0, 0, 1]
-  ])
-
-  # Right face
-  cube_data["vectors"][10] = np.array([
-      [1, 0, 0],
-      [1, 0, 1],
-      [1, 1, 0]
-  ])
-  cube_data["vectors"][11] = np.array([
-      [1, 1, 0],
-      [1, 0, 1],
-      [1, 1, 1]
-  ])
-
-  # Create the cube mesh
-  cube = mesh.Mesh(cube_data.copy())
-            
-  return cube
-
-# Package private helper function for making a ramp mesh
-def __make_ramp_mesh():
-  r_data = np.zeros(8, dtype=mesh.Mesh.dtype)
-
-  # Bottom face
-  r_data["vectors"][0] = np.array([
-    [1, 0, 0],
-    [0, 1, 0],
-    [0, 0, 0]
-  ])
-  r_data["vectors"][1] = np.array([
-    [0, 1, 0],
-    [1, 0, 0],
-    [1, 1, 0]
-  ])
-
-  # Side face
-  r_data["vectors"][2] = np.array([
-    [0, 1, 1],
-    [0, 0, 0],
-    [0, 1, 0]
-  ])
-  r_data["vectors"][3] = np.array([
-    [0, 0, 0],
-    [0, 1, 1],
-    [0, 0, 1]
-  ])
-
-  # Right side
-  r_data["vectors"][4] = np.array([
-    [0, 0, 1],
-    [1, 0, 0],
-    [0, 0, 0]
-  ])
-
-  # Left side
-  r_data["vectors"][5] = np.array([
-    [1, 1, 0],
-    [0, 1, 1],
-    [0, 1, 0]
-  ])
-
-  # Top ramp face
-  r_data["vectors"][6] = np.array([
-    [0, 1, 1],
-    [1, 0, 0],
-    [1, 1, 0]
-  ])
-  r_data["vectors"][7] = np.array([
-    [1, 0, 0],
-    [0, 1, 1],
-    [0, 0, 1]
-  ])
-
-  ramp = mesh.Mesh(r_data.copy())
-  return ramp
-
-# Ensure blocks are created correctly (adhering to our constraints)
-def __block_assertions(x, y, level, rotation):
-  return (
-    # Rotation in units of 90 degrees counterclockwise
-    rotation in [0, 1, 2, 3]
-    
-    # Positive world coordinates
-    and x >= 0 and y >= 0
-          
-    # Level within [1, 6]
-    and 1 <= level <= 6)
-
-# MODULE PRIVATE FUNCTIONS
-
-# Helper function to make a block
-def _make_block(x, y, level) -> mesh.Mesh:
-  # Assertion checks
-  assert __block_assertions(x, y, level, 0)
-  
-  # Create a block
-  cube = __make_block_mesh()
-  
-  # Move to designated X Y and Z coordinates
-  cube.translate(np.array([x, y, level - 1]))
-  
-  return cube
-
-# PUBLIC FUNCTIONS
-
-def make_square(x, y, level) -> mesh.Mesh:
-  """Make a square at x, y coordinates in the given level."""
-  assert __block_assertions(x, y, level, 0)
-  
-  block_column = []
-  for l in range(1, level + 1):
-    c = _make_block(x, y, l)
-    block_column.append(c.data.copy())
-    
-  combined = mesh.Mesh(np.concatenate(block_column))
-  return combined
-
-def make_vramp(x, y, from_level, to_level, rotation=0) -> mesh.Mesh:
-  """Make a vertical ramp (cheese) at x, y coordinates.
-
-    With lower level being from_level and the higher level
-    being to_level with default rotation being 0.
-  """
-  # Assertion checks.
-  assert __block_assertions(x, y, from_level, rotation)
-  assert __block_assertions(0, 0, to_level, 0)
-
-  block_column = []
-  for l in range(from_level, to_level + 1):
-    vramp = __make_ramp_mesh()
-    vramp.x -= 0.5
-    vramp.y -= 0.5
-    vramp.z -= 0.5
-    
-    # TODO: Fix if broken
-    vramp.rotate([1.0, 0.0, 0.0], math.radians(-90))
-    vramp.rotate([0.0, 0.0, 1.0], math.radians(-90 * rotation))
-    
-    vramp.x += 0.5
-    vramp.y += 0.5
-    vramp.z += 0.5
-  
-    vramp.translate(np.array([x, y, l - 1]))
-    block_column.append(vramp.data.copy())
-  
-  # Append cube blocks below
-  for l in range(1, from_level):
-    c = _make_block(x, y, l)
-    block_column.append(c.data.copy())
-  
-  combined = mesh.Mesh(np.concatenate(block_column))
-  return combined
-
-def make_ramp(x, y, level, rotation=0) -> mesh.Mesh:
-  """Make a ramp at x, y coordinates in the given level with default rotation being 0."""
-  # Assertion checks.
-  assert __block_assertions(x, y, level, rotation)
-
-  ramp = __make_ramp_mesh()
-  
-  # Rotate about origin's Z axes
-  ramp.x -= 0.5
-  ramp.y -= 0.5
-  ramp.rotate([0.0, 0.0, 1.0], math.radians(-90 * rotation))
-  ramp.x += 0.5
-  ramp.y += 0.5
-  
-  # Move to designated X Y and Z coordinates
-  ramp.translate(np.array([x, y, level - 1]))
-  
-  block_column = [ramp.data.copy()]
-  
-  # Append cube blocks below
-  for i in range(1, level):
-    c = _make_block(x, y, i)
-    block_column.append(c.data.copy())
-  
-  combined = mesh.Mesh(np.concatenate(block_column))
-  
-  return combined
-
-# Flat world
-world_size = 5 # 5x5 world
-world = []
-for i in range(world_size):
-  for j in range(world_size):
-    s = make_ramp(i, j, i + 2, 2)
-    world.append(s.data.copy())
-    
-world_mesh = mesh.Mesh(np.concatenate(world), remove_duplicate_polygons=RemoveDuplicates.ALL)
-world_mesh.save("world_r.stl")
-
 from stl import mesh
-from mpl_toolkits import mplot3d
-import matplotlib.pyplot as plt
 
-# Create a new plot
-figure = plt.figure()
-axes = figure.add_subplot(projection='3d')
+# Previous constants (BLOCK_VECTORS, RAMP_VECTORS, ROTATION_MATRICES) remain the same...
+# Optimization: Pre-compute block and ramp vectors as constants
+BLOCK_VECTORS = jnp.array([
+    # Bottom face
+    [[0, 0, 0], [1, 0, 0], [0, 1, 0]],
+    [[1, 0, 0], [1, 1, 0], [0, 1, 0]],
+    # Top face
+    [[0, 0, 1], [0, 1, 1], [1, 0, 1]],
+    [[1, 0, 1], [0, 1, 1], [1, 1, 1]],
+    # Front face
+    [[0, 0, 0], [0, 0, 1], [1, 0, 0]],
+    [[1, 0, 0], [0, 0, 1], [1, 0, 1]],
+    # Back face
+    [[0, 1, 0], [1, 1, 0], [0, 1, 1]],
+    [[1, 1, 0], [1, 1, 1], [0, 1, 1]],
+    # Left face
+    [[0, 0, 0], [0, 1, 0], [0, 0, 1]],
+    [[0, 1, 0], [0, 1, 1], [0, 0, 1]],
+    # Right face
+    [[1, 0, 0], [1, 0, 1], [1, 1, 0]],
+    [[1, 1, 0], [1, 0, 1], [1, 1, 1]]
+])
 
-# Load the STL files and add the vectors to the plot
-poly_collection = mplot3d.art3d.Poly3DCollection(world_mesh.vectors)
-poly_collection.set_color((0.7,0.7,0.7))  # play with color
-axes.add_collection3d(poly_collection)
+RAMP_VECTORS = jnp.array([
+    # Bottom face
+    [[1, 0, 0], [0, 1, 0], [0, 0, 0]],
+    [[0, 1, 0], [1, 0, 0], [1, 1, 0]],
+    # Side face
+    [[0, 1, 1], [0, 0, 0], [0, 1, 0]],
+    [[0, 0, 0], [0, 1, 1], [0, 0, 1]],
+    # Right side
+    [[0, 0, 1], [1, 0, 0], [0, 0, 0]],
+    # Left side
+    [[1, 1, 0], [0, 1, 1], [0, 1, 0]],
+    # Top ramp face
+    [[0, 1, 1], [1, 0, 0], [1, 1, 0]],
+    [[1, 0, 0], [0, 1, 1], [0, 0, 1]]
+])
 
-# Show the plot to the screen
-plt.show()
+# Optimization: Pre-compute rotation matrices
+def get_rotation_matrix(rotation):
+    angle = -jnp.pi * rotation / 2
+    cos_t = jnp.cos(angle)
+    sin_t = jnp.sin(angle)
+    return jnp.array([
+        [cos_t, -sin_t, 0],
+        [sin_t, cos_t, 0],
+        [0, 0, 1]
+    ])
+
+ROTATION_MATRICES = jnp.stack([get_rotation_matrix(r) for r in range(4)])
+
+# Maximum number of triangles per column
+MAX_TRIANGLES = 72  # 6 levels * 12 triangles per level
+
+def pad_triangles(triangles: jnp.ndarray, max_triangles: int = MAX_TRIANGLES):
+    """Pad triangle array to fixed size using dynamic padding."""
+    triangles = triangles.astype("float32")
+    current_triangles = triangles.shape[0]
+    
+    # Create full-size array of zeros
+    result = jnp.zeros((max_triangles, 3, 3))
+    
+    # Use dynamic_update_slice to copy actual triangles
+    result = jax.lax.dynamic_update_slice(result, triangles, (0, 0, 0))
+    
+    return result
+
+def make_block_column(x: int, y: int, level: int):
+    """Block column generation with fixed output size."""
+    # Calculate actual number of triangles
+    num_triangles = level * 12
+    
+    # Generate blocks for required levels
+    offsets = jnp.arange(1, level + 1)[:, None, None, None]
+    translation = jnp.array([x, y, -1])[None, None, None, :]
+    blocks = BLOCK_VECTORS[None, :, :, :] + translation + jnp.array([0, 0, 1])[None, None, None, :] * offsets
+    
+    # Reshape and pad
+    blocks = blocks.reshape(-1, 3, 3)
+    return pad_triangles(blocks)
+
+def make_ramp_column(x: int, y: int, level: int, rotation: int):
+    """Ramp generation with fixed output size."""
+    # Base blocks
+    base_blocks = make_block_column(x, y, level - 1)[:((level-1) * 12)]
+    
+    # Ramp transformation
+    centered = RAMP_VECTORS - 0.5
+    rotated = jnp.einsum('ijk,kl->ijl', centered, ROTATION_MATRICES[rotation])
+    final_ramp = rotated + 0.5 + jnp.array([x, y, level - 1])[None, None, :]
+    
+    # Concatenate and pad
+    combined = jnp.concatenate([base_blocks, final_ramp])
+    return pad_triangles(combined)
+
+def make_vramp_column(x: int, y: int, from_level: int, to_level: int, rotation: int):
+    """Vertical ramp generation with fixed output size."""
+    # Base blocks
+    base_blocks = make_block_column(x, y, from_level - 1)[:(from_level-1) * 12]
+    
+    # Vertical ramp transformation
+    centered = RAMP_VECTORS - 0.5
+    x_rotation = jnp.array([
+        [1, 0, 0],
+        [0, 0, -1],
+        [0, 1, 0]
+    ])
+    vertical = jnp.einsum('ijk,kl->ijl', centered, x_rotation)
+    rotated = jnp.einsum('ijk,kl->ijl', vertical, ROTATION_MATRICES[rotation])
+    
+    # Generate vramps for each level
+    vramp_count = to_level - from_level + 1
+    offsets = jnp.arange(from_level, to_level + 1)[:, None, None, None]
+    translation = jnp.array([x, y, -1])[None, None, None, :]
+    vramps = (rotated[None, :, :, :] + translation + 0.5 +
+             jnp.array([0, 0, 1])[None, None, None, :] * offsets)
+    
+    # Concatenate and pad
+    combined = jnp.concatenate([base_blocks, vramps.reshape(-1, 3, 3)])
+    return pad_triangles(combined)
+
+@partial(jax.jit, static_argnums=[0, 1])
+def create_world(world_size: int, pattern_fn, key: random.PRNGKey = None):
+    """World generation with consistent shapes."""
+    i_coords, j_coords = jnp.meshgrid(
+        jnp.arange(world_size),
+        jnp.arange(world_size),
+        indexing='ij'
+    )
+    coords = jnp.stack([i_coords.flatten(), j_coords.flatten()], axis=1)
+    
+    if key is not None:
+        keys = random.split(key, world_size * world_size)
+        vectorized_pattern = vmap(lambda coord, subkey: pattern_fn(coord[0], coord[1], subkey))
+        pieces = vectorized_pattern(coords, keys)
+    else:
+        vectorized_pattern = vmap(lambda coord: pattern_fn(coord[0], coord[1], None))
+        pieces = vectorized_pattern(coords)
+
+    return pieces
+
+def prepare_for_stl(pieces):
+    """Convert JAX array to numpy array in the correct format for STL export."""
+    # Convert from JAX array to numpy
+    triangles = np.array(pieces)
+    
+    # Ensure the array is contiguous and in float32 format
+    # numpy-stl expects float32 data
+    triangles = np.ascontiguousarray(triangles, dtype=np.float32)
+    
+    # Create the mesh data structure
+    mesh_data = np.zeros(len(triangles), dtype=mesh.Mesh.dtype)
+    
+    # Assign vectors to the mesh
+    mesh_data['vectors'] = triangles
+    
+    return mesh_data
+  
+# # Helper function to filter out padding after JIT compilation
+# def filter_padding(pieces: jnp.ndarray) -> jnp.ndarray:
+#     """Remove padding (zeros) from the generated pieces."""
+#     mask = ~(jnp.abs(pieces) < 1e-7).all(axis=(2, 3))
+#     return pieces[mask]
+
+world_size = 5
+key = random.PRNGKey(0)
+# Create valley world
+terrace_world = create_world(world_size, terrace_pattern_jax, key)
+# filtered_world = filter_padding(valley_world)
+# Convert to numpy and prepare data
+mesh_data = prepare_for_stl(terrace_world.reshape(-1, *terrace_world.shape[-2:]))
+
+# Create and save mesh
+terrace_mesh = mesh.Mesh(mesh_data)
+terrace_mesh.save("terrace.stl")
