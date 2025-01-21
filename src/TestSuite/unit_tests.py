@@ -35,7 +35,7 @@ def run_test(
     test_name: str = "",
 ):
     """Helper function to test agent movement along a given axis and direction.
-    
+
     If axis is None, checks that the agent does not move.
     """
     # 1. Sample and initialize ICLand environment
@@ -81,9 +81,9 @@ def run_test(
 def main():
     """Runs a suite of agent movement tests in the ICLand environment.
 
-    This function uses a fixed PRNG key for reproducibility and calls the 
-    `run_test` helper with different movement policies (forward, backward, 
-    left, right) as well as a no-operation policy. Each test verifies that 
+    This function uses a fixed PRNG key for reproducibility and calls the
+    `run_test` helper with different movement policies (forward, backward,
+    left, right) as well as a no-operation policy. Each test verifies that
     the agent's position changes (or does not change) in the expected way.
     """
     # Use a consistent PRNG key for all tests

@@ -1,6 +1,5 @@
 """Main agent file."""
 
-
 import mujoco
 from mujoco import mjx
 import jax
