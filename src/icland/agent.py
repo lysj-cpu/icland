@@ -9,21 +9,18 @@ from .types import *
 
 @jax.jit
 def step_agent(
-    mjx_data: MjxStateType, action: jnp.ndarray, agent_ids: jnp.ndarray
+    mjx_data: MjxStateType, action: jnp.ndarray, agent_data: jnp.ndarray
 ) -> MjxStateType:
     """Perform a simulation step for the agent.
 
     Args:
         mjx_data: The simulation data object.
         action: The action to be performed by the agent.
-        agent_ids: A tuple containing the body and geometry IDs of the agent.
+        agent_data: The body and geometry IDs of the agent.
 
     Returns:
         Updated simulation data object.
     """
-    # Extract object IDs
-    body_id, geom_id = agent_ids
-
     # --------------------------------------------------------------------------
     # (A) Determine local movement and rotate it to world frame
     # --------------------------------------------------------------------------
@@ -62,8 +59,8 @@ def step_agent(
         slope_mag = jnp.linalg.norm(slope_component)
 
         is_agent_collision = jnp.logical_or(
-            mjx_data.contact.geom1[nth_contact] == geom_id,
-            mjx_data.contact.geom2[nth_contact] == geom_id,
+            mjx_data.contact.geom1[nth_contact] == agent_data.geom_id,
+            mjx_data.contact.geom2[nth_contact] == agent_data.geom_id,
         )
 
         is_touching = mjx_data.contact.dist[nth_contact] < 0.0
@@ -84,7 +81,9 @@ def step_agent(
     Apply the calculated linear force to the agent.
     """
     mjx_data = mjx_data.replace(
-        xfrc_applied=mjx_data.xfrc_applied.at[body_id, :3].set(movement_direction)
+        xfrc_applied=mjx_data.xfrc_applied.at[agent_data.body_id, :3].set(
+            movement_direction
+        )
     )
 
     # --------------------------------------------------------------------------
