@@ -131,7 +131,7 @@ def step(
     key: jax.Array,
     state: ICLandState,
     params: ICLandParams,
-    actions: ICLandActionSet,
+    actions: jax.Array,
 ) -> ICLandState:
     """Advance environment one step for all agents.
 
@@ -145,8 +145,8 @@ def step(
     agent_data = state.agent_data
 
     def step_single_agent(
-        carry: Tuple[MjxStateType, jnp.ndarray], inputs: jnp.ndarray
-    ) -> Tuple[Tuple[MjxStateType, jnp.ndarray], None]:
+        carry: Tuple[MjxStateType, jax.Array], inputs: AgentData
+    ) -> Tuple[Tuple[MjxStateType, jax.Array], None]:
         mjx_data, action = carry
         mjx_data = step_agent(mjx_data, action, inputs)
         return (mjx_data, action), None
