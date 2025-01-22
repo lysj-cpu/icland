@@ -58,14 +58,14 @@ def test_agent_movement(
 ) -> None:
     """Test agent movement in ICLand environment."""
     icland_state = initialize_icland(policy)
-    body_id = icland_state[2][0][0]
+    body_id = icland_state.agent_data.body_id[0]
 
     # Get initial position
-    initial_pos = icland_state[1].xpos[body_id]
+    initial_pos = icland_state.mjx_data.xpos[body_id]
 
     # Step the environment and get new position
     icland_state = icland.step(key, icland_state, None, policy)
-    new_pos = icland_state[1].xpos[body_id]
+    new_pos = icland_state.mjx_data.xpos[body_id]
 
     if axis is None:
         # No movement expected

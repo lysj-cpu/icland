@@ -87,7 +87,7 @@ def sample(key: jax.Array) -> ICLandParams:
     - agent_count: Number of agents in the environment.
     """
     mj_model: mujoco.MjModel = mujoco.MjModel.from_xml_string(TEST_XML_STRING)
-    return (mj_model, None, 1)
+    return ICLandParams(mj_model, None, 1)
 
 
 def init(key: jax.Array, params: ICLandParams) -> ICLandState:
@@ -98,24 +98,32 @@ def init(key: jax.Array, params: ICLandParams) -> ICLandState:
     - mjx_data: JAX-compatible Mujoco data.
     - object_ids: Array of body and geometry IDs for agents.
     """
-    mj_model, game, agent_count = params
+    mj_model = params.model
+    agent_count = params.agent_count
     mj_data: mujoco.MjData = mujoco.MjData(mj_model)
 
     mjx_model = mjx.put_model(mj_model)
     mjx_data = mjx.put_data(mj_model, mj_data)
 
     # Collect object IDs for all agents
-    object_ids = []
+    body_ids = []
+    geom_ids = []
+
     for agent_id in range(agent_count):
-        body_name = f"agent{agent_id + 1}"
-        geom_name = f"agent{agent_id + 1}_geom"
+        body_ids.append(
+            mujoco.mj_name2id(
+                mj_model, mujoco.mjtObj.mjOBJ_BODY, f"agent{agent_id + 1}"
+            )
+        )
+        geom_ids.append(
+            mujoco.mj_name2id(
+                mj_model, mujoco.mjtObj.mjOBJ_GEOM, f"agent{agent_id + 1}_geom"
+            )
+        )
 
-        body_id: int = mujoco.mj_name2id(mj_model, mujoco.mjtObj.mjOBJ_BODY, body_name)
-        geom_id: int = mujoco.mj_name2id(mj_model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
-
-        object_ids.append([body_id, geom_id])
-
-    return (mjx_model, mjx_data, jnp.array(object_ids))
+    return ICLandState(
+        mjx_model, mjx_data, AgentData(jnp.array(body_ids), jnp.array(geom_ids))
+    )
 
 
 @jax.jit
@@ -130,9 +138,11 @@ def step(
     Returns the updated state containing:
     - mjx_model: Updated Mujoco model.
     - mjx_data: Updated Mujoco data.
-    - object_ids: Array of body and geometry IDs for agents.
+    - agent_data: Body and geometry IDs for agents.
     """
-    mjx_model, mjx_data, object_ids = state
+    mjx_model = state.mjx_model
+    mjx_data = state.mjx_data
+    agent_data = state.agent_data
 
     def step_single_agent(
         carry: Tuple[MjxStateType, jnp.ndarray], inputs: jnp.ndarray
@@ -143,10 +153,10 @@ def step(
 
     # Use `jax.lax.scan` to iterate through agents and step each one
     (updated_data, _), _ = jax.lax.scan(
-        step_single_agent, (mjx_data, actions), object_ids
+        step_single_agent, (mjx_data, actions), agent_data
     )
 
     # Step the environment after applying all agent actions
     updated_data = mjx.step(mjx_model, updated_data)
 
-    return (mjx_model, updated_data, object_ids)
+    return ICLandState(mjx_model, updated_data, agent_data)
