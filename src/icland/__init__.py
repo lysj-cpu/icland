@@ -1,5 +1,16 @@
 """Recreating Google DeepMind's XLand RL environment in JAX."""
 
+import os
+
+# N.B. These need to be before the mujoco imports
+# Fixes AttributeError: 'Renderer' object has no attribute '_mjr_context'
+os.environ["MUJOCO_GL"] = "egl"
+
+# Tell XLA to use Triton GEMM, this can improve steps/sec by ~30% on some GPUs
+xla_flags = os.environ.get("XLA_FLAGS", "")
+xla_flags += " --xla_gpu_triton_gemm_any=True"
+os.environ["XLA_FLAGS"] = xla_flags
+
 import jax
 import mujoco
 from mujoco import mjx

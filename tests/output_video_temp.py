@@ -11,12 +11,10 @@ xla_flags = os.environ.get("XLA_FLAGS", "")
 xla_flags += " --xla_gpu_triton_gemm_any=True"
 os.environ["XLA_FLAGS"] = xla_flags
 
-import ICLand
 import jax
 import mujoco
 from mujoco import mjx
 import jax.numpy as jnp
-import math
 import imageio
 
 key = jax.random.PRNGKey(42)
