@@ -22,7 +22,10 @@ import mujoco
 from mujoco import mjx
 from .agent import step_agent
 import jax.numpy as jnp
-from typing import Tuple, Optional, Any
+from typing import Tuple, Optional, Any, TypeVar
+
+MjxStateType = TypeVar("MjxModelType", bound=mujoco.mjx._src.types.Data)
+MjxModelType = TypeVar("MjxModelType", bound=mujoco.mjx._src.types.Model)
 
 TEST_XML_STRING: str = """
 <mujoco>
@@ -75,7 +78,7 @@ TEST_XML_STRING: str = """
 """
 
 
-def sample(key: jax.random.PRNGKey) -> Tuple[mujoco.MjModel, Optional[str], int]:
+def sample(key: jax.Array) -> Tuple[mujoco.MjModel, Optional[str], int]:
     """Sample a new set of environment parameters using 'key'.
 
     Returns a tuple containing:
@@ -88,7 +91,7 @@ def sample(key: jax.random.PRNGKey) -> Tuple[mujoco.MjModel, Optional[str], int]
 
 
 def init(
-    key: jax.random.PRNGKey, params: Tuple[mujoco.MjModel, Optional[str], int]
+    key: jax.Array, params: Tuple[mujoco.MjModel, Optional[str], int]
 ) -> Tuple[Any, Any, jnp.ndarray]:
     """Initialize the environment state from params.
 
@@ -119,7 +122,7 @@ def init(
 
 @jax.jit
 def step(
-    key: jax.random.PRNGKey,
+    key: jax.Array,
     state: Tuple[Any, Any, jnp.ndarray],
     params: Tuple[mujoco.MjModel, Optional[str], int],
     actions: jnp.ndarray,
