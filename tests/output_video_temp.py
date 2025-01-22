@@ -16,10 +16,11 @@ import mujoco
 from mujoco import mjx
 import jax.numpy as jnp
 import imageio
+import icland
 
 key = jax.random.PRNGKey(42)
 
-icland_params = ICLand.sample(key)
+icland_params = icland.sample(key)
 
 
 cam = mujoco.MjvCamera()
@@ -27,7 +28,7 @@ mujoco.mjv_defaultCamera(cam)
 mj_model = icland_params[0]
 
 
-icland_state = ICLand.init(key, icland_params)
+icland_state = icland.init(key, icland_params)
 
 cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
 cam.trackbodyid = icland_state[2][0][0]
@@ -39,7 +40,7 @@ opt = mujoco.MjvOption()
 opt.flags[mujoco.mjtVisFlag.mjVIS_JOINT] = True
 opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = True
 
-icland_state = ICLand.step(key, icland_state, None, jnp.array([1, 0, 0]))
+icland_state = icland.step(key, icland_state, None, jnp.array([1, 0, 0]))
 mjx_data = icland_state[1]
 
 
@@ -49,7 +50,7 @@ print(mj_model)
 with mujoco.Renderer(mj_model) as renderer:
     while mjx_data.time < 8:
         print(mjx_data.time)
-        icland_state = ICLand.step(key, icland_state, None, jnp.array([1, 0, 0]))
+        icland_state = icland.step(key, icland_state, None, jnp.array([1, 0, 0]))
         mjx_data = icland_state[1]
         if len(third_person_frames) < mjx_data.time * 30:
             mj_data = mjx.get_data(mj_model, mjx_data)

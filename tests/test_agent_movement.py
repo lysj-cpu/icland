@@ -14,7 +14,7 @@ RIGHT_POLICY = jnp.array([0, 1, 0])
 
 
 @pytest.fixture
-def key():
+def key() -> jax.Array:
     """Fixture to provide a consistent PRNG key for tests."""
     return jax.random.PRNGKey(42)
 
@@ -45,7 +45,7 @@ def initialize_icland(key):
     ],
 )
 def test_agent_movement(
-    key: jax.random.PRNGKey,
+    key: jax.Array,
     initialize_icland,
     policy: jnp.ndarray,
     axis: int,
