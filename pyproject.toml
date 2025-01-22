@@ -6,6 +6,8 @@ readme = "README.md"
 authors = []
 requires-python = ">=3.13"
 dependencies = [
+    "imageio[ffmpeg]>=2.37.0",
+    "jax[cuda12]>=0.4.38",
     "mujoco>=3.2.6",
     "mujoco-mjx>=3.2.6",
 ]
@@ -17,6 +19,8 @@ build-backend = "hatchling.build"
 [dependency-groups]
 dev = [
     "pre-commit>=4.0.1",
+    "pytest>=8.3.4",
+    "pytest-cov>=6.0.0",
     "ruff>=0.9.1",
 ]
 
@@ -24,9 +28,10 @@ dev = [
 target-version = "py313"
 
 [tool.ruff.lint]
-# Enable pydocstyle checks
-# See: https://docs.astral.sh/ruff/rules/#pydocstyle-d
-select = ["D"]
+select = [
+    "D",     # Enable pydocstyle checks
+    "F401",  # Remove unused imports
+]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
