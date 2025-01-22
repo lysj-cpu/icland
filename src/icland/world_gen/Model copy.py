@@ -6,29 +6,12 @@ import math
 from enum import Enum
 import jax
 import jax.numpy as jnp
-from flax import struct
-from typing import Callable, List, Any
+from typing import Callable, List, Any, NamedTuple
 import random
+from flax import struct
 
-
-# def random_index_from_distribution(distribution, rand_value):
-#     """Select an index from 'distribution' proportionally to the values in 'distribution'.
-    
-#     'rand_value' is a random float in [0,1).
-
-#     Returns:
-#         index (int) chosen according to the weights in 'distribution'.
-#         If the sum of 'distribution' is 0, returns -1 as an error code.
-#     """
-#     total = sum(distribution)
-#     if total <= 0:
-#         return -1
-#     cumulative = 0.0
-#     for i, w in enumerate(distribution):
-#         cumulative += w
-#         if rand_value * total <= cumulative:
-#             return i
-#     return len(distribution) - 1  # Fallback if floating-point issues occur
+from functools import partial
+from JITModel import XMLReader
 
 @jax.jit
 def random_index_from_distribution(distribution, rand_value):
@@ -76,27 +59,34 @@ class Heuristic(Enum):
     SCANLINE = 3
 
 
+class ModelParams(NamedTuple):
+    MX: int
+    MY: int
+    T: int
+    propagator_length: int
+    periodic: bool
+    heuristic: int
+    key: jax.Array
+
 @struct.dataclass
-class Model:
+class ModelX:
     """Base Model class for WaveFunctionCollapse algorithm."""
 
     # Basic config
     MX: int
     MY: int
-    N: int
     periodic: bool
-    heuristic: Heuristic
-    ground: bool
+    heuristic: int
 
     T: int  # number of possible tile/pattern indices
 
     # Core arrays
     stacksize: int  # how many elements in the stack are currently valid
-    propagator: tuple  # or a jax.Array of shape (4, T, ?) - depends on usage
+    max_stacksize: int
     wave: jax.Array  # shape: (MX*MY, T), dtype=bool
     compatible: jax.Array  # shape: (MX*MY, T, 4), dtype=int
     observed: jax.Array  # shape: (MX*MY, ), dtype=int
-    stack: jax.Array  # shape: (stack_capacity, 2), for (i, t)
+    stack: jax.Array  # shape: (MX*MY, 2), for (i, t)
 
     # Weights
     weights: jax.Array     # shape: (T,)
@@ -116,129 +106,15 @@ class Model:
     # Because SCANLINE uses an incremental pointer
     observed_so_far: int
 
-    propagator: jax.Array
-    distribution: jax.Array
+    propagator: jax.Array # (4, T, propagator_length)
+    distribution: jax.Array # shape: (T, )
 
-    dx: List[int] = struct.field(pytree_node=False, default=(-1, 0, 1, 0))
-    dy: List[int] = struct.field(pytree_node=False, default=(0, 1, 0, -1))
-    opposite: List[int] = struct.field(pytree_node=False, default=(2, 3, 0, 1))
+    key: jax.Array
 
-    def run(self, seed, limit):
-        """Run the WaveFunctionCollapse algorithm with the given seed and iteration limit."""
-        if self.wave is None:
-            self.init()
+    dx: List[int] = struct.field(pytree_node=False, default=(-1, 0, 1, 0)) # 4
+    dy: List[int] = struct.field(pytree_node=False, default=(0, 1, 0, -1)) # 4
+    opposite: List[int] = struct.field(pytree_node=False, default=(2, 3, 0, 1)) # 4
 
-        self.clear()
-        
-        key = jax.random.PRNGKey(seed)
-        steps = 0
-        rng = random.Random(seed)
-
-        while True:
-            if limit >= 0 and steps >= limit:
-                break
-            steps += 1
-
-            node = self.next_unobserved_node()
-            if node >= 0:
-                self.observe(node, rng)
-                success = self.propagate()
-                if not success:
-                    return False
-            else:
-                for i in range(len(self.wave)):
-                    for t in range(self.T):
-                        if self.wave[i][t]:
-                            self.observed[i] = t
-                            break
-                return True
-        
-        return True
-    
-    @jax.jit
-    def clear(self):
-        """Resets wave and compatibility to allow all patterns at all cells, then optionally applies 'ground' constraints."""
-        wave = jnp.ones((self.MX * self.MY, self.T), dtype=bool)
-        compatible = jnp.zeros((self.MX * self.MY, self.T, 4), dtype=int)
-
-        # Set each direction's compatibility count to the number of patterns
-        # for i in range(self.MX * self.MY):
-        #     for t in range(self.T):
-        #         for d in range(4):
-        #             compatible = compatible.at[i, t, d].set(
-        #                 len(self.propagator[self.opposite[d]][t])
-        #             )
-
-        # Set each direction's compatibility count to the number of patterns
-        def set_compatible(i, t):
-            """ Helper function to calculate compatible values for each cell. """
-            return jnp.array([len(self.propagator[self.opposite[d]][t]) for d in range(4)])
-
-        # Use jax.vmap to vectorize the compatibility setting
-        compatible = jax.vmap(lambda i, t: set_compatible(i, t))(jnp.arange(self.MX * self.MY), jnp.arange(self.T))
-
-        sums_of_ones = jnp.full(self.MX * self.MY, self.T, dtype=int)
-        sums_of_weights = jnp.full(self.MX * self.MY, self.sum_of_weights, dtype=float)
-        sums_of_weight_log_weights = jnp.full(
-            self.MX * self.MY, self.sum_of_weight_log_weights, dtype=float
-        )
-        entropies = jnp.full(self.MX * self.MY, self.starting_entropy, dtype=float)
-        observed = jnp.full(self.MX * self.MY, -1, dtype=int)
-
-        # Apply 'ground' constraints if needed
-        if self.ground:
-            # for x in range(self.MX):
-            #     for t in range(self.T - 1):
-            #         wave = wave.at[x + (self.MY - 1) * self.MX, t].set(False)
-            #     for y in range(self.MY - 1):
-            #         wave = wave.at[x + y * self.MX, self.T - 1].set(False)
-
-            # Apply constraints to 'ground' values (last row and column)
-            ground_wave = wave.at[self.MX * (self.MY - 1) + jnp.arange(self.T - 1)].set(False)
-            ground_wave = ground_wave.at[jnp.arange(self.MX * (self.MY - 1)), self.T - 1].set(False)
-
-            # Perform propagation after applying constraints
-            new_model = self.replace(
-                wave=ground_wave,
-                compatible=compatible,
-                sums_of_ones=sums_of_ones,
-                sums_of_weights=sums_of_weights,
-                sums_of_weight_log_weights=sums_of_weight_log_weights,
-                entropies=entropies,
-                observed=observed,
-            ).propagate()
-            return new_model
-
-        return self.replace(
-            wave=wave,
-            compatible=compatible,
-            sums_of_ones=sums_of_ones,
-            sums_of_weights=sums_of_weights,
-            sums_of_weight_log_weights=sums_of_weight_log_weights,
-            entropies=entropies,
-            observed=observed,
-        )
-
-    
-    # Not yet jit-able
-    def observe(self, node, rng):
-        """Collapses the wave at 'node' by picking a pattern index according to weights distribution.
-
-        Then bans all other patterns at that node.
-        """
-        w = self.wave[node]
-        
-        # Prepare distribution of patterns that are still possible
-        for t in range(self.T):
-            self.distribution[t] = self.weights[t] if w[t] else 0.0
-        
-        r = random_index_from_distribution(self.distribution, rng.random())
-
-        # Ban any pattern that isn't the chosen one
-        for t in range(self.T):
-            # If wave[node][t] != (t == r) => ban it
-            if w[t] != (t == r):
-                self.ban(node, t)
 
     def next_unobserved_node(self):
         """Get the next unobserved node."""
@@ -256,159 +132,101 @@ class Model:
         #         min_entropy = entropy + noise
         #         argmin = i
         # return argmin
-        
-    def propagate(self):
-        """Propagates constraints across the wave."""
-        
-        while self.stacksize > 0:
-            i1, t1 = self.stack[self.stacksize - 1]
-            self.stacksize -= 1
 
-            x1 = i1 % self.MX
-            y1 = i1 // self.MX
+@jax.jit
+def observe(model, node, rng):
+    """Collapses the wave at 'node' by picking a pattern index according to weights distribution.
 
-            for d in range(4):
-                x2 = x1 + self.dx[d]
-                y2 = y1 + self.dy[d]
+    Then bans all other patterns at that node.
+    """
+    w = model.wave.at[node].get()
+    
+    # Prepare distribution of patterns that are still possible
+    distribution = model.distribution
+    distribution = jnp.where(w, model.weights, jnp.zeros_like(model.weights))
+    
+    r = random_index_from_distribution(model.distribution, rng.random())
 
-                if not self.periodic and (
-                    x2 < 0 or y2 < 0 or x2 >= self.MX or y2 >= self.MY
-                ):
-                    continue
+    # Ban any pattern that isn't the chosen one
+    # If wave[node][t] != (t == r) => ban it
+    process_ban = lambda i, m: jax.lax.cond(w.at[i].get() != (i == r), lambda x: ban(x, node, i), lambda x: x, m)
+    return jax.lax.fori_loop(0, self.T, process_ban, model)
 
-                if x2 < 0:
-                    x2 += self.MX
-                elif x2 >= self.MX:
-                    x2 -= self.MX
-                if y2 < 0:
-                    y2 += self.MY
-                elif y2 >= self.MY:
-                    y2 -= self.MY
-
-                i2 = x2 + y2 * self.MX
-                p = self.propagator[d][t1]
-
-                for t2 in p:
-                    comp = self.compatible[i2, t2, d]
-                    comp -= 1
-                    if comp == 0:
-                        self.ban(i2, t2)
-
-        return self
-
-    def ban(self, i, t):
-        """Bans pattern t at cell i. Updates wave, compatibility, sums_of_ones, entropies, and stack."""
-        # If wave[i][t] is already false, do nothing
-        if not self.wave[i][t]:
-            return
-
-        self.wave[i][t] = False
+@jax.jit
+def ban(model, i, t1):
+    # Ban
+    # wave compatible stack stacksize sums_one sums_weights sums_weight_log_weights weights weight_log_weights
+    """Bans pattern t at cell i. Updates wave, compatibility, sums_of_ones, entropies, and stack."""
+    
+    t = t1.astype(int)
+    condition_1 = jnp.logical_not(model.wave.at[i, t].get())
+    identity = lambda x: x
+    
+    def process_ban(model):
+        wave = model.wave
+        wave = wave.at[i, t].set(False)
 
         # Zero-out the compatibility in all directions for pattern t at cell i
-        comp = self.compatible[i][t]
-        for d in range(4):
-            comp[d] = 0
+        compatible = model.compatible
+        compatible = compatible.at[i, t, :].set(0)
 
-        # Push (i, t) onto stack
-        if self.stacksize < len(self.stack):
-            self.stack[self.stacksize] = (i, t)
-        else:
-            self.stack.append((i, t))
-        self.stacksize += 1
+        stack = model.stack
+        stacksize = model.stacksize
+        stack.at[stacksize].set(jnp.array([i, t]))
+        stacksize += 1
 
         # Update sums_of_ones, sums_of_weights, sums_of_weight_log_weights, entropies
-        self.sums_of_ones[i] -= 1
-        self.sums_of_weights[i] -= self.weights[t]
-        self.sums_of_weight_log_weights[i] -= self.weightLogWeights[t]
+        sums_of_ones = model.sums_of_ones
+        sums_of_ones = sums_of_ones.at[i].subtract(1)
+        
+        sums_of_weights = model.sums_of_weights
+        sums_of_weights = sums_of_weights.at[i].subtract(model.weights.at[t].get())
+        
+        sums_of_weight_log_weights = model.sums_of_weight_log_weights
+        sums_of_weight_log_weights = sums_of_weight_log_weights.at[i].subtract(model.weight_log_weights.at[t].get())
 
-        sum_w = self.sums_of_weights[i]
-        self.entropies[i] = (
-            math.log(sum_w) - (self.sums_of_weight_log_weights[i] / sum_w)
-            if sum_w > 0
-            else 0.0
-        )
-
-    def clear(self):
-        """Resets wave and compatibility to allow all patterns at all cells, then optionally applies 'ground' constraints."""
-        wave = jnp.ones((self.MX * self.MY, self.T), dtype=bool)
-        compatible = jnp.zeros((self.MX * self.MY, self.T, 4), dtype=int)
-
-        # Set each direction's compatibility count to the number of patterns
-        for i in range(self.MX * self.MY):
-            for t in range(self.T):
-                for d in range(4):
-                    compatible = compatible.at[i, t, d].set(
-                        len(self.propagator[self.opposite[d]][t])
-                    )
-
-        sums_of_ones = jnp.full(self.MX * self.MY, self.T, dtype=int)
-        sums_of_weights = jnp.full(self.MX * self.MY, self.sum_of_weights, dtype=float)
-        sums_of_weight_log_weights = jnp.full(
-            self.MX * self.MY, self.sum_of_weight_log_weights, dtype=float
-        )
-        entropies = jnp.full(self.MX * self.MY, self.starting_entropy, dtype=float)
-        observed = jnp.full(self.MX * self.MY, -1, dtype=int)
-
-        # Apply 'ground' constraints if needed
-        if self.ground:
-            for x in range(self.MX):
-                for t in range(self.T - 1):
-                    wave = wave.at[x + (self.MY - 1) * self.MX, t].set(False)
-                for y in range(self.MY - 1):
-                    wave = wave.at[x + y * self.MX, self.T - 1].set(False)
-
-            # Perform propagation after applying constraints
-            new_model = self.replace(
-                wave=wave,
-                compatible=compatible,
-                sums_of_ones=sums_of_ones,
-                sums_of_weights=sums_of_weights,
-                sums_of_weight_log_weights=sums_of_weight_log_weights,
-                entropies=entropies,
-                observed=observed,
-            ).propagate()
-            return new_model
-
-        return self.replace(
+        sum_w = sums_of_weights.at[i].get()
+        entropies = model.entropies
+        entropies.at[i].set(jnp.where(sum_w > 0, jnp.log(sum_w) - (sums_of_weight_log_weights.at[i].get() / sum_w), 0.0))
+        
+        return model.replace(
             wave=wave,
             compatible=compatible,
+            stack=stack,
+            stacksize=stacksize,
             sums_of_ones=sums_of_ones,
             sums_of_weights=sums_of_weights,
             sums_of_weight_log_weights=sums_of_weight_log_weights,
-            entropies=entropies,
-            observed=observed,
+            entropies=entropies
         )
+    
+    return jax.lax.cond(condition_1, identity, process_ban, model)
 
     def save(self, filename):
         """Raises NotImplementedError to ensure its subclass will provide an implementation."""
         raise NotImplementedError("Must be implemented in a subclass.")
 
+@partial(jax.jit, static_argnums=[0, 1, 2])
 def init(
     width: int,
     height: int,
-    N: int,
+    T: int,
     periodic: bool,
-    heuristic: Heuristic,
-    weights_py: list[float],
-    propagator_py,  # some Python structure describing adjacency
-    ground: bool = False,
-) -> Model:
-
-    T = len(weights_py)
+    heuristic: int,
+    weights: jax.Array,
+    propagator: jax.Array,
+    key: jax.Array
+) -> ModelX:
     wave_init = jnp.ones((width * height, T), dtype=bool)
 
-    # Convert Python lists to jnp arrays:
-    weights = jnp.array(weights_py, dtype=jnp.float32)
-
-    weight_log_weights = weights * jnp.log(jnp.where(weights > 0, weights, 1e-9))
+    weight_log_weights = weights * jnp.log(weights + 1e-9)
+    
     sum_of_weights = jnp.sum(weights)
     sum_of_weight_log_weights = jnp.sum(weight_log_weights)
     starting_entropy = jnp.log(sum_of_weights) - sum_of_weight_log_weights / sum_of_weights
-
+    
     # Example shape for 'compatible': (width*height, T, 4). Initialize to zero or some default.
     compatible_init = jnp.zeros((width * height, T, 4), dtype=jnp.int32)
-
-    propagator_jax = jnp.zeros((4, T, 10)) # CHANGE
 
     # Observed array init
     observed_init = -jnp.ones((width * height,), dtype=jnp.int32)
@@ -424,24 +242,24 @@ def init(
     distribution_init = jnp.zeros((T, ), dtype=jnp.float32)
 
     # Initialize the stack array
-    stack_init = jnp.zeros((len(wave_init) * T, 2), dtype=jnp.int32)
+    stack_init = jnp.zeros((width * height * T, 2), dtype=jnp.int32)
     stacksize_init = 0
+    max_stacksize_init = width * height * T
 
-    return Model(
+    return ModelX(
         MX=width,
         MY=height,
-        N=N,
         T=T,
         periodic=periodic,
         heuristic=heuristic,
-        ground=ground,
 
         wave=wave_init,
         compatible=compatible_init,
-        propagator=propagator_jax,
+        propagator=propagator,
         observed=observed_init,
         stack=stack_init,
         stacksize=stacksize_init,
+        max_stacksize=max_stacksize_init,
 
         weights=weights,
         weight_log_weights=weight_log_weights,
@@ -450,165 +268,195 @@ def init(
         sums_of_weight_log_weights=sums_of_weight_log_weights_init,
         entropies=entropies_init,
 
-        sum_of_weights=float(sum_of_weights),
-        sum_of_weight_log_weights=float(sum_of_weight_log_weights),
-        starting_entropy=float(starting_entropy),
+        sum_of_weights=sum_of_weights,
+        sum_of_weight_log_weights=sum_of_weight_log_weights,
+        starting_entropy=starting_entropy,
         distribution=distribution_init,
-        observed_so_far=0
+        observed_so_far=0,
+
+        key=key
     )
 
+@jax.jit
+def run(model, seed):
+    """Run the WaveFunctionCollapse algorithm with the given seed and iteration limit."""
+    # Pre: the model is freshly initialized
 
-model = init(3, 3, 2, False, Heuristic.ENTROPY, [1.0, 1.0], None)    
-model.run(0, 1000)
+    steps = 0
+    loop_condition = True
+    condition = lambda x: x
+    while True:
+        # Runs until finish
+        steps += 1
 
-    # def observe(self, rng_key):
-    #     """Collapses the wave at a node by selecting a pattern index."""
-    #     node = self.next_unobserved_node(rng_key)
-    #     if node == -1:
-    #         return self
+        node = next_unobserved_node(model, key)
+        if node >= 0:
+            model = observe(model, node, key)
+            model, success = propagate(model)
+            if not success:
+                return False # False
+        else:
+            for i in range(len(model.wave)):
+                for t in range(model.T):
+                    if model.wave[i][t]:
+                        model.observed[i] = t
+                        break # True
+            return True # False
+        
+    
+    
+    return True
 
-    #     wave = self.wave.at[node].set(False)
-    #     distribution = self.weights * wave[node]
-    #     r = random_index_from_distribution(distribution, jax.random.uniform(rng_key))
-    #     wave = wave.at[node, r].set(True)
+@jax.jit
+def next_unobserved_node(model):
+    """Selects the next cell to observe according to the chosen heuristic (Scanline, Entropy, or MRV).
+    
+    Returns:
+        index (int) of the chosen cell in [0, MX*MY), or -1 if all cells are determined.
+    """
+    # Handle the SCANLINE heuristic
+    identity = lambda x: x
+    
+    observed_so_far = model.observed_so_far
+    
+    def process_scanline_body(i, t): 
+        model, loop, val = t # Model, bool, int
+        def process_scanline_body_inner(i, t):
+            pred_1 = jnp.logical_not(model.periodic)
+            pred_2 = jnp.any(jnp.array([(i % model.MX) + model.N > model.MX, (i // model.MX) + model.N > model.MY]))
+            pred_3 = jnp.all(jnp.array([pred_1, pred_2]))
+            # IF pred_3 holds, continue. Do not change val
+            # Else check if sum holds. Then update model and set val, loop = false
+            def update_model(model):
+                observed
+            
+        return jax.lax.cond(loop, process_scanline_body_inner, lambda x, y: y, i, t)
 
-    #     return self.replace(wave=wave)
+    if model.heuristic == Heuristic.SCANLINE:
+        for i in range(model.observed_so_far, len(model.wave)):
+            # skip if out of range (non-periodic boundary constraints)
+            if (not model.periodic) and ((i % model.MX) + model.N > model.MX or (i // model.MX) + model.N > model.MY):
+                continue
+            else:
+                if model.sums_of_ones[i] > 1:
+                    model.observed_so_far = i + 1
+                    return i
+        return -1
+    else:
+        # Handle ENTROPY or MRV
+        min_entropy = 1e4
+        argmin = -1
+        for i in range(len(model.wave)):
+            # skip out-of-range if non-periodic
+            if (not model.periodic) and ((i % model.MX) + model.N > model.MX or (i // model.MX) + model.N > model.MY):
+                continue
 
-    # def next_unobserved_node(self, rng_key):
-    #     """Selects the next cell to observe based on heuristic."""
-    #     min_entropy = 1e4
-    #     argmin = -1
-    #     for i in range(len(self.wave)):
-    #         if self.sumsOfOnes[i] <= 1:
-    #             continue
-    #         entropy = self.entropies[i]
-    #         noise = 1e-6 * jax.random.uniform(rng_key)
-    #         if entropy + noise < min_entropy:
-    #             min_entropy = entropy + noise
-    #             argmin = i
-    #     return argmin
+            remaining_values = model.sums_of_ones[i]
 
-    # def propagate(self):
-    #     """Propagates constraints across the wave."""
-    #     while self.stacksize > 0:
-    #         i1, t1 = self.stack[self.stacksize - 1]
-    #         self.stacksize -= 1
+            # ENTROPY -> we look at entropies[i], MRV -> we look at remaining_values
+            if model.heuristic == Heuristic.ENTROPY:
+                entropy = model.entropies[i]
+            else:  # MRV
+                entropy = float(remaining_values)
 
-    #         x1 = i1 % self.MX
-    #         y1 = i1 // self.MX
+            if remaining_values > 1 and entropy <= min_entropy:
+                # small noise to break ties
+                random_no = random.uniform(model.key)
+                _key, subkey = random.uniform(model.key)
+                noise = 1e-6 * random_no
+                if entropy + noise < min_entropy:
+                    min_entropy = entropy + noise
+                    argmin = i
+        
+        return (model.replace(
+            key=subkey
+        ), argmin)
 
-    #         for d in range(4):
-    #             x2 = x1 + self.dx[d]
-    #             y2 = y1 + self.dy[d]
 
-    #             if not self.periodic and (
-    #                 x2 < 0 or y2 < 0 or x2 >= self.MX or y2 >= self.MY
-    #             ):
-    #                 continue
+@jax.jit
+def clear(model):
+    """Resets wave and compatibility to allow all patterns at all cells."""
+    wave = jnp.ones_like(model.wave)
+    compatible = jnp.zeros_like(model.compatible)
 
-    #             if x2 < 0:
-    #                 x2 += self.MX
-    #             elif x2 >= self.MX:
-    #                 x2 -= self.MX
-    #             if y2 < 0:
-    #                 y2 += self.MY
-    #             elif y2 >= self.MY:
-    #                 y2 -= self.MY
+    # Set each direction's compatibility count to the number of patterns
+    for i in range(model.compatible.shape[0]):
+        for t in range(model.compatible.shape[1]):
+            for d in range(model.compatible.shape[2]):
+                compatible = compatible.at[i, t, d].set(
+                    len(model.propagator[model.opposite[d]][t])
+                )
 
-    #             i2 = x2 + y2 * self.MX
-    #             p = self.propagator[d][t1]
+    sums_of_ones = jnp.full_like(model.sums_of_ones, t)
+    sums_of_weights = jnp.full_like(model.sums_of_weights, model.sum_of_weights)
+    sums_of_weight_log_weights = jnp.full_like(model.sums_of_weight_log_weights, model.sum_of_weight_log_weights)
+    entropies = jnp.full_like(model.entropies, model.starting_entropy)
+    observed = jnp.full_like(model.observed, -1)
 
-    #             for t2 in p:
-    #                 comp = self.compatible[i2, t2, d]
-    #                 comp -= 1
-    #                 if comp == 0:
-    #                     self.ban(i2, t2)
+    return model.replace(
+        wave=wave,
+        compatible=compatible,
+        sums_of_ones=sums_of_ones,
+        sums_of_weights=sums_of_weights,
+        sums_of_weight_log_weights=sums_of_weight_log_weights,
+        entropies=entropies,
+        observed=observed,
+    )
+    
+@jax.jit
+def propagate(model):
+    """Propagates constraints across the wave."""
+    
+    dx = jnp.array([-1, 0, 1, 0])
+    dy = jnp.array([0, 1, 0, -1])
+    
+    condition_1 = lambda model: model.stacksize > 0
+    
+    identity = lambda m, x, y, d, t: m
+    identity_2 = lambda m, i, t: m
+    
+    def proc_propagate_tile(model, x2, y2, d, t1):
+        x2 = jax.lax.cond(x2 < 0, lambda y: y + model.MX, lambda y: y - model.MX, x2)
+        y2 = jax.lax.cond(y2 < 0, lambda y: y + model.MY, lambda y: y - model.MY, y2)
 
-    #     return self
+        i2 = x2 + y2 * model.MX
+        p = model.propagator[d][t1]
 
-    # def ban(self, i, t):
-    #     """Bans pattern t at cell i. Updates wave, compatibility, sumsOfOnes, entropies, and stack."""
-    #     # If wave[i][t] is already false, do nothing
-    #     if not self.wave[i][t]:
-    #         return
+        for t2 in p:
+            comp = model.compatible.at[i2, t2.astype(int), d].get()
+            comp -= 1
+            pred = comp == 0
+            model = jax.lax.cond(pred, ban, identity_2, model, i2, t2)
 
-    #     self.wave[i][t] = False
+        return model
+    
+    def proc_body(model):
+        i1, t1 = model.stack[model.stacksize - 1]
+        model.replace(stacksize=model.stacksize - 1)
 
-    #     # Zero-out the compatibility in all directions for pattern t at cell i
-    #     comp = self.compatible[i][t]
-    #     for d in range(4):
-    #         comp[d] = 0
+        x1 = i1 % model.MX
+        y1 = i1 // model.MX
 
-    #     # Push (i, t) onto stack
-    #     if self.stacksize < len(self.stack):
-    #         self.stack[self.stacksize] = (i, t)
-    #     else:
-    #         self.stack.append((i, t))
-    #     self.stacksize += 1
+        for d in range(4):
+            x2 = x1 + dx[d]
+            y2 = y1 + dy[d]
+            pred_a = jnp.any(jnp.array([x2 < 0, y2 < 0, x2 >= model.MX, y2 >= model.MY]))
+            pred_b = jnp.logical_not(model.periodic)
+            pred = jnp.all(jnp.array([pred_a, pred_b]))
+            model = jax.lax.cond(pred, identity, proc_propagate_tile, model, x2, y2, d, t1)
+            
+        return model
+    
+    model = jax.lax.while_loop(condition_1, proc_body, model)
+    return model, model.sums_of_ones.at[0].get() > 0
 
-    #     # Update sumsOfOnes, sumsOfWeights, sumsOfWeightLogWeights, entropies
-    #     self.sumsOfOnes[i] -= 1
-    #     self.sumsOfWeights[i] -= self.weights[t]
-    #     self.sumsOfWeightLogWeights[i] -= self.weightLogWeights[t]
-
-    #     sum_w = self.sumsOfWeights[i]
-    #     self.entropies[i] = (
-    #         math.log(sum_w) - (self.sumsOfWeightLogWeights[i] / sum_w)
-    #         if sum_w > 0
-    #         else 0.0
-    #     )
-
-    # def clear(self):
-    #     """Resets wave and compatibility to allow all patterns at all cells, then optionally applies 'ground' constraints."""
-    #     wave = jnp.ones((self.MX * self.MY, self.T), dtype=bool)
-    #     compatible = jnp.zeros((self.MX * self.MY, self.T, 4), dtype=int)
-
-    #     # Set each direction's compatibility count to the number of patterns
-    #     for i in range(self.MX * self.MY):
-    #         for t in range(self.T):
-    #             for d in range(4):
-    #                 compatible = compatible.at[i, t, d].set(
-    #                     len(self.propagator[self.opposite[d]][t])
-    #                 )
-
-    #     sumsOfOnes = jnp.full(self.MX * self.MY, self.T, dtype=int)
-    #     sumsOfWeights = jnp.full(self.MX * self.MY, self.sumOfWeights, dtype=float)
-    #     sumsOfWeightLogWeights = jnp.full(
-    #         self.MX * self.MY, self.sumOfWeightLogWeights, dtype=float
-    #     )
-    #     entropies = jnp.full(self.MX * self.MY, self.startingEntropy, dtype=float)
-    #     observed = jnp.full(self.MX * self.MY, -1, dtype=int)
-
-    #     # Apply 'ground' constraints if needed
-    #     if self.ground:
-    #         for x in range(self.MX):
-    #             for t in range(self.T - 1):
-    #                 wave = wave.at[x + (self.MY - 1) * self.MX, t].set(False)
-    #             for y in range(self.MY - 1):
-    #                 wave = wave.at[x + y * self.MX, self.T - 1].set(False)
-
-    #         # Perform propagation after applying constraints
-    #         new_model = self.replace(
-    #             wave=wave,
-    #             compatible=compatible,
-    #             sumsOfOnes=sumsOfOnes,
-    #             sumsOfWeights=sumsOfWeights,
-    #             sumsOfWeightLogWeights=sumsOfWeightLogWeights,
-    #             entropies=entropies,
-    #             observed=observed,
-    #         ).propagate()
-    #         return new_model
-
-    #     return self.replace(
-    #         wave=wave,
-    #         compatible=compatible,
-    #         sumsOfOnes=sumsOfOnes,
-    #         sumsOfWeights=sumsOfWeights,
-    #         sumsOfWeightLogWeights=sumsOfWeightLogWeights,
-    #         entropies=entropies,
-    #         observed=observed,
-    #     )
-
-    # def save(self, filename):
-    #     """Raises NotImplementedError to ensure its subclass will provide an implementation."""
-    #     raise NotImplementedError("Must be implemented in a subclass.")
+# print("Initializing XML...")
+# reader = XMLReader()
+# t, w, p, c = reader.get_tilemap_data()
+# # models = jax.vmap(lambda _: init(10, 10, t, False, 0, w, p, None))(jnp.array([0 for _ in range(10)]))
+# # models = jax.vmap(clear)(models)
+# print("Initializing model...")
+# model = init(10, 10, t, False, 0, w, p, None)
+# print("Propagating model...")
+# # model = clear(model)
+# model, res = propagate(model)
