@@ -17,7 +17,7 @@ MjxModelType: TypeAlias = mujoco.mjx._src.types.Model
 """Type aliases for ICLand project."""
 
 
-class ICLandParams(PyTreeNode):
+class ICLandParams(PyTreeNode): # type: ignore[misc]
     r"""\Parameters for the ICLand environment.
 
     Attributes:
@@ -31,7 +31,7 @@ class ICLandParams(PyTreeNode):
     agent_count: int
 
 
-class AgentData(PyTreeNode):
+class AgentData(PyTreeNode): # type: ignore[misc]
     r"""\Agent in the ICLand environment.
 
     Attributes:
@@ -43,7 +43,7 @@ class AgentData(PyTreeNode):
     geom_id: jax.Array
 
 
-class ICLandState(PyTreeNode):
+class ICLandState(PyTreeNode): # type: ignore[misc]
     r"""\State of the ICLand environment.
 
     Attributes:
@@ -57,7 +57,7 @@ class ICLandState(PyTreeNode):
     agent_data: AgentData
 
 
-class ICLandActionSet(PyTreeNode):
+class ICLandActionSet(PyTreeNode): # type: ignore[misc]
     r"""\Actions taken by agents in the ICLand environment.
 
     Attributes:

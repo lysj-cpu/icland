@@ -9,7 +9,7 @@ from .types import *
 
 @jax.jit
 def step_agent(
-    mjx_data: MjxStateType, action: jnp.ndarray, agent_data: jnp.ndarray
+    mjx_data: MjxStateType, action: jnp.ndarray, agent_data: AgentData
 ) -> MjxStateType:
     """Perform a simulation step for the agent.
 
