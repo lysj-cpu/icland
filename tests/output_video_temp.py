@@ -11,11 +11,14 @@ xla_flags = os.environ.get("XLA_FLAGS", "")
 xla_flags += " --xla_gpu_triton_gemm_any=True"
 os.environ["XLA_FLAGS"] = xla_flags
 
+from typing import Any
+
+import imageio
 import jax
+import jax.numpy as jnp
 import mujoco
 from mujoco import mjx
-import jax.numpy as jnp
-import imageio
+
 import icland
 
 key = jax.random.PRNGKey(42)
@@ -44,7 +47,7 @@ icland_state = icland.step(key, icland_state, None, jnp.array([1, 0, 0]))
 mjx_data = icland_state[1]
 
 
-third_person_frames = []
+third_person_frames: list[Any] = []
 
 print(mj_model)
 with mujoco.Renderer(mj_model) as renderer:

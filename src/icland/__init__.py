@@ -1,8 +1,8 @@
 """Recreating Google DeepMind's XLand RL environment in JAX."""
 
 import os
-import warnings
 import shutil
+import warnings
 
 if shutil.which("nvidia-smi") is None:
     warnings.warn("Cannot communicate with GPU")
@@ -16,6 +16,8 @@ else:
     xla_flags += " --xla_gpu_triton_gemm_any=True"
     os.environ["XLA_FLAGS"] = xla_flags
 
+
+from typing import Tuple
 
 import jax
 import jax.numpy as jnp
@@ -136,7 +138,6 @@ def step(
         carry: Tuple[MjxStateType, jnp.ndarray], inputs: jnp.ndarray
     ) -> Tuple[Tuple[MjxStateType, jnp.ndarray], None]:
         mjx_data, action = carry
-        body_id, geom_id = inputs
         mjx_data = step_agent(mjx_data, action, inputs)
         return (mjx_data, action), None
 

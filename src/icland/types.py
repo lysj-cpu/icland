@@ -3,14 +3,15 @@
 It includes types for model parameters, state, and action sets used in the project.
 """
 
-from typing import TypeAlias, Optional, Tuple, TypeVar
-import mujoco
+from typing import Optional, Tuple, TypeAlias
+
 import jax.numpy as jnp
+import mujoco
 
 """Type variables from external modules."""
 
-MjxStateType = TypeVar("MjxModelType", bound=mujoco.mjx._src.types.Data)
-MjxModelType = TypeVar("MjxModelType", bound=mujoco.mjx._src.types.Model)
+MjxStateType: TypeAlias = mujoco.mjx._src.types.Data
+MjxModelType: TypeAlias = mujoco.mjx._src.types.Model
 
 """Type aliases for ICLand project."""
 
