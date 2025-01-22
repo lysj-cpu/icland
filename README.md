@@ -1,5 +1,8 @@
 # ICLand
 
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/lysj-cpu/icland/pytest.yml?style=flat-square)
+![Codecov](https://img.shields.io/codecov/c/github/lysj-cpu/icland?style=flat-square)
+
 ## Development Instructions
 
 Clone the project locally:
