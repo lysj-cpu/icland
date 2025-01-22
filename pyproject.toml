@@ -19,6 +19,7 @@ build-backend = "hatchling.build"
 [dependency-groups]
 dev = [
     "pre-commit>=4.0.1",
+    "pytest>=8.3.4",
     "ruff>=0.9.1",
 ]
 
@@ -26,9 +27,10 @@ dev = [
 target-version = "py313"
 
 [tool.ruff.lint]
-# Enable pydocstyle checks
-# See: https://docs.astral.sh/ruff/rules/#pydocstyle-d
-select = ["D"]
+select = [
+    "D",     # Enable pydocstyle checks
+    "F401",  # Remove unused imports
+]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
