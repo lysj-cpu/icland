@@ -1,9 +1,13 @@
 """Tests movement behaviour under different pre-defined movement policies."""
 
-import icland
+from typing import Callable
+
 import jax
 import jax.numpy as jnp
 import pytest
+
+import icland
+from icland.types import ICLandState
 
 # Define movement policies
 NOOP_POLICY = jnp.array([0, 0, 0])
@@ -20,10 +24,10 @@ def key() -> jax.Array:
 
 
 @pytest.fixture
-def initialize_icland(key):
+def initialize_icland(key: jax.Array) -> Callable[[jnp.ndarray], ICLandState]:
     """Fixture to initialize the ICLand environment."""
 
-    def _init(policy):
+    def _init(policy: jnp.ndarray) -> ICLandState:
         icland_params = icland.sample(key)
         icland_state = icland.init(key, icland_params)
         # Perform a warm-up step
@@ -46,12 +50,12 @@ def initialize_icland(key):
 )
 def test_agent_movement(
     key: jax.Array,
-    initialize_icland,
+    initialize_icland: Callable[[jnp.ndarray], ICLandState],
     policy: jnp.ndarray,
     axis: int,
     direction: float,
     description: str,
-):
+) -> None:
     """Test agent movement in ICLand environment."""
     icland_state = initialize_icland(policy)
     body_id = icland_state[2][0][0]

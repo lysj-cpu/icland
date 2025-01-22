@@ -2,11 +2,15 @@
 
 import jax
 import jax.numpy as jnp
+
 from .constants import *
+from .types import *
 
 
 @jax.jit
-def step_agent(mjx_data, action, agent_ids):
+def step_agent(
+    mjx_data: MjxStateType, action: jnp.ndarray, agent_ids: jnp.ndarray
+) -> MjxStateType:
     """Perform a simulation step for the agent.
 
     Args:

@@ -32,6 +32,12 @@ select = [
     "D",     # Enable pydocstyle checks
     "F401",  # Remove unused imports
 ]
+extend-select = ["I"]  # Isort imports
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+# Mujoco lacks supports for types
+# https://github.com/google-deepmind/mujoco/issues/244#issuecomment-1111010344
+[tool.mypy]
+disable_error_code = ["import-untyped"]
