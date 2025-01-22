@@ -18,14 +18,12 @@ else:
 
 
 import jax
+import jax.numpy as jnp
 import mujoco
 from mujoco import mjx
-from .agent import step_agent
-import jax.numpy as jnp
-from typing import Tuple, Optional, Any, TypeVar
 
-MjxStateType = TypeVar("MjxModelType", bound=mujoco.mjx._src.types.Data)
-MjxModelType = TypeVar("MjxModelType", bound=mujoco.mjx._src.types.Model)
+from .agent import step_agent
+from .types import *
 
 TEST_XML_STRING: str = """
 <mujoco>
@@ -78,7 +76,7 @@ TEST_XML_STRING: str = """
 """
 
 
-def sample(key: jax.Array) -> Tuple[mujoco.MjModel, Optional[str], int]:
+def sample(key: jax.Array) -> ICLandParams:
     """Sample a new set of environment parameters using 'key'.
 
     Returns a tuple containing:
@@ -90,9 +88,7 @@ def sample(key: jax.Array) -> Tuple[mujoco.MjModel, Optional[str], int]:
     return (mj_model, None, 1)
 
 
-def init(
-    key: jax.Array, params: Tuple[mujoco.MjModel, Optional[str], int]
-) -> Tuple[Any, Any, jnp.ndarray]:
+def init(key: jax.Array, params: ICLandParams) -> ICLandState:
     """Initialize the environment state from params.
 
     Returns a tuple containing:
@@ -123,10 +119,10 @@ def init(
 @jax.jit
 def step(
     key: jax.Array,
-    state: Tuple[Any, Any, jnp.ndarray],
-    params: Tuple[mujoco.MjModel, Optional[str], int],
-    actions: jnp.ndarray,
-) -> Tuple[Any, Any, jnp.ndarray]:
+    state: ICLandState,
+    params: ICLandParams,
+    actions: ICLandActionSet,
+) -> ICLandState:
     """Advance environment one step for all agents.
 
     Returns the updated state containing:
@@ -135,11 +131,10 @@ def step(
     - object_ids: Array of body and geometry IDs for agents.
     """
     mjx_model, mjx_data, object_ids = state
-    updated_data = mjx_data
 
     def step_single_agent(
-        carry: Tuple[Any, Any], inputs: jnp.ndarray
-    ) -> Tuple[Tuple[Any, Any], None]:
+        carry: Tuple[MjxStateType, jnp.ndarray], inputs: jnp.ndarray
+    ) -> Tuple[Tuple[MjxStateType, jnp.ndarray], None]:
         mjx_data, action = carry
         body_id, geom_id = inputs
         mjx_data = step_agent(mjx_data, action, inputs)
@@ -147,7 +142,7 @@ def step(
 
     # Use `jax.lax.scan` to iterate through agents and step each one
     (updated_data, _), _ = jax.lax.scan(
-        step_single_agent, (updated_data, actions), object_ids
+        step_single_agent, (mjx_data, actions), object_ids
     )
 
     # Step the environment after applying all agent actions
