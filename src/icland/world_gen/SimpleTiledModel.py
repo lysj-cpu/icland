@@ -2,7 +2,7 @@
 from flax import struct
 import os
 import xml.etree.ElementTree as ET
-from Model import Model
+from ModelCopy import Model
 from PIL import Image
 
 def load_bitmap(filepath):

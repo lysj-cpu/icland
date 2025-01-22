@@ -66,7 +66,7 @@ def main():
         subset = xelem.get("subset")  # can be None
         black_background = xelem.get("blackBackground", "false").lower() == "true"
 
-        model = SimpleTiledModel.SimpleTiledModel(width, height, T, j_weights, j_propagator, tilecodes)
+        model = SimpleTiledModel.SimpleTiledModel(width, height, T, j_weights, j_propagator, tilecodes, heuristic=heuristic)
 
         # Number of screenshots to generate
         screenshots = int(xelem.get("screenshots", "2"))
