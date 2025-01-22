@@ -435,7 +435,7 @@ class XMLReader():
         # Function to pad each sequence to max_len
         def pad_sequence(seq, max_len):
             # Create a result array of shape (T, max_len)
-            result = np.zeros((self.T, max_len))  # Use NumPy array for padding
+            result = np.full((self.T, max_len), -1)  # Use NumPy array for padding
             
             # Iterate over each time step (T dimension)
             for i in range(len(seq)):
@@ -455,20 +455,20 @@ class XMLReader():
 
         # Now handle weights conversion to a JAX array
         self.j_weights = jnp.array(self.weights)
-        
+                        
         self.j_tilecodes = jnp.array(self.tilecodes)
 
-    def save(self, model, filename):
+    def save(self, observed, width, height, filename):
         """Save the tilemap as a bitmap representation for debugging."""
         # We'll create a pixel buffer for the entire output image:
         # (MX * tilesize) by (MY * tilesize).
-        tilemap_width, tilemap_height = int(model.MX), int(model.MY)
+        tilemap_width, tilemap_height = width, height
         bitmapData = [0] * (tilemap_width * tilemap_height * self.tilesize * self.tilesize)
         # If we have a definite observation (observed[0]>=0 means not contradictory)
         for y in range(tilemap_height):
             for x in range(tilemap_width):
                 # tile index !!
-                tile_index = model.observed.at[x + y * tilemap_width].get()
+                tile_index = observed.at[x + y * tilemap_width].get()
                 tile_data = self.tiles[tile_index]
 
                 for dy in range(self.tilesize):

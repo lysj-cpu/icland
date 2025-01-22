@@ -422,30 +422,39 @@ def next_unobserved_node(model):
 
 @jax.jit
 def clear(model):
-    """Resets wave and compatibility to allow all patterns at all cells."""
-    wave = jnp.ones_like(model.wave)
-    compatible = jnp.zeros_like(model.compatible)
-
-    opposite = jnp.array([2, 3, 0, 1], dtype=int)
-
-    # Vectorize over types and directions
-    compatibility_counts = jax.vmap(
-        lambda t: jax.vmap(
-            lambda d: model.propagator.at[opposite.at[d].get(), t].get().shape[0]
-        )
-    )(jnp.arange(model.compatible.shape[2]))(jnp.arange(model.compatible.shape[1]))
-
-    # Broadcast compatibility counts across all patterns
-    compatible = model.compatible.at[:, :, :].set(compatibility_counts)
-
-    sums_of_ones = jnp.full_like(model.sums_of_ones, t)
+    """Resets wave and compatibility to allow all patterns at all cells.
+    
+    Optimized version using vectorized operations."""
+    # Initialize arrays directly to their final values
+    wave = jnp.ones_like(model.wave, dtype=bool)  # All True
+    observed = jnp.full_like(model.observed, -1)
+    
+    # Set all statistics arrays in one go
+    sums_of_ones = jnp.full_like(model.sums_of_ones, model.weights.shape[0])
     sums_of_weights = jnp.full_like(model.sums_of_weights, model.sum_of_weights)
     sums_of_weight_log_weights = jnp.full_like(
-        model.sums_of_weight_log_weights, model.sum_of_weight_log_weights
+        model.sums_of_weight_log_weights, 
+        model.sum_of_weight_log_weights
     )
     entropies = jnp.full_like(model.entropies, model.starting_entropy)
-    observed = jnp.full_like(model.observed, -1)
-
+    
+    # Vectorized computation of compatible array
+    opposite = jnp.array([2, 3, 0, 1])
+    
+    # Compute all pattern compatibilities at once
+    # Shape: (4, T) -> (T, 4)
+    pattern_compatibilities = jnp.sum(
+        model.propagator[opposite, :] >= 0,  # Using broadcasting
+        axis=2  # Sum over the patterns that can appear in each direction
+    ).T
+    
+    # Broadcast pattern compatibilities to all positions
+    # Shape: (MX * MY, T, 4)
+    compatible = jnp.broadcast_to(
+        pattern_compatibilities[None, :, :],
+        model.compatible.shape
+    )
+    
     return model.replace(
         wave=wave,
         compatible=compatible,
@@ -454,6 +463,7 @@ def clear(model):
         sums_of_weight_log_weights=sums_of_weight_log_weights,
         entropies=entropies,
         observed=observed,
+        observed_so_far=0
     )
 
 
@@ -527,13 +537,17 @@ t, w, p, c = reader.get_tilemap_data()
 # models_res = jax.vmap(run)(models)
 print("Initializing model...")
 model = init(10, 10, t, 1, False, 1, w, p, jax.random.key(0))
-print("Running model...")
-# # model = clear(model)
+print("Clearing model...")
+model = clear(model)
+print(model.compatible)
+print(model.observed_so_far)
+print(model.wave)
 # model, res = propagate(model)
 # model = next_unobserved_node(model)
-model, b = run(model)
+print("Running model...")
+# model, b = run(model)
 # print(b)
-one_hot = export(model, c, 10, 10)
+# one_hot = export(model, c, 10, 10)
 # print(one_hot)
 
-reader.save(model, "temp.png")
+# reader.save(model.observed, 10, 10, "temp.png")
