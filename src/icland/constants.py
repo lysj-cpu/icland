@@ -1,4 +1,8 @@
-"""Constants!"""
+"""This module defines constants used throughout the icland project.
+
+These constants include debug camera settings, agent movement parameters,
+and other small values.
+"""
 
 DEBUG_CAMERA_DISTANCE = 3.0
 DEBUG_CAMERA_AZIMUTH = 90.0
