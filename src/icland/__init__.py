@@ -1,15 +1,21 @@
 """Recreating Google DeepMind's XLand RL environment in JAX."""
 
 import os
+import warnings
+import shutil
 
-# N.B. These need to be before the mujoco imports
-# Fixes AttributeError: 'Renderer' object has no attribute '_mjr_context'
-os.environ["MUJOCO_GL"] = "egl"
+if shutil.which("nvidia-smi") is None:
+    warnings.warn("Cannot communicate with GPU")
+else:
+    # N.B. These need to be before the mujoco imports
+    # Fixes AttributeError: 'Renderer' object has no attribute '_mjr_context'
+    os.environ["MUJOCO_GL"] = "egl"
 
-# Tell XLA to use Triton GEMM, this can improve steps/sec by ~30% on some GPUs
-xla_flags = os.environ.get("XLA_FLAGS", "")
-xla_flags += " --xla_gpu_triton_gemm_any=True"
-os.environ["XLA_FLAGS"] = xla_flags
+    # Tell XLA to use Triton GEMM, this can improve steps/sec by ~30% on some GPUs
+    xla_flags = os.environ.get("XLA_FLAGS", "")
+    xla_flags += " --xla_gpu_triton_gemm_any=True"
+    os.environ["XLA_FLAGS"] = xla_flags
+
 
 import jax
 import mujoco
@@ -62,7 +68,7 @@ TEST_XML_STRING: str = """
           rgba="1 0.8 0.8 1"
           />
     <geom type="box" size="0.5 1 1" rgba="1 0.8 0.8 1"
-          pos="1.5 0 0.1" euler="0 45 90" 
+          pos="1.5 0 0.1" euler="0 45 90"
           />
   </worldbody>
 </mujoco>
