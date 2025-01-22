@@ -136,14 +136,13 @@ class XMLReader():
         
         return tile_type_num, rotation, from_num, to_num
         
-    def __init__(self, subsetName=None):
+    def __init__(self, xml_path, subsetName=None):
         """Initializes the XMLReader by parsing the tilemap XML file.
 
         Args:
             subsetName (str, optional): Name of a specific subset of tiles to load.
         """
         # Load XML file: "tilesets/<name>.xml"
-        xml_path = "tilemap/data.xml"
         tree = ET.parse(xml_path)
         xroot = tree.getroot()
         
@@ -301,7 +300,7 @@ class XMLReader():
                 # Each orientation is stored in a separate file, e.g. "<tilename> 0.png", "<tilename> 1.png", etc.
                 for t in range(cardinality):
                     bitmap, w_img, h_img = load_bitmap(
-                        os.path.join("tilemap", f"{tilename} {t}.png")
+                        os.path.abspath("src", "icland", "world_gen", "tilemap", f"{tilename} {t}.png")
                     )
                     # Usually, w_img == h_img => tile is square
                     if self.tilesize == 0:
@@ -313,7 +312,7 @@ class XMLReader():
             else:
                 # Single PNG for the base tile
                 bitmap, w_img, h_img = load_bitmap(
-                    os.path.join("tilemap", f"{tilename}.png")
+                    os.path.join("src", "icland", "world_gen", "tilemap", f"{tilename}.png")
                 )
                 if self.tilesize == 0:
                     self.tilesize = w_img
