@@ -75,7 +75,6 @@ TEST_XML_STRING: str = """
 """
 
 
-@staticmethod
 def sample(key: jax.random.PRNGKey) -> Tuple[mujoco.MjModel, Optional[str], int]:
     """Sample a new set of environment parameters using 'key'.
 
@@ -88,7 +87,6 @@ def sample(key: jax.random.PRNGKey) -> Tuple[mujoco.MjModel, Optional[str], int]
     return (mj_model, None, 1)
 
 
-@staticmethod
 def init(
     key: jax.random.PRNGKey, params: Tuple[mujoco.MjModel, Optional[str], int]
 ) -> Tuple[Any, Any, jnp.ndarray]:
@@ -119,7 +117,6 @@ def init(
     return (mjx_model, mjx_data, jnp.array(object_ids))
 
 
-@staticmethod
 @jax.jit
 def step(
     key: jax.random.PRNGKey,

@@ -5,7 +5,6 @@ import jax.numpy as jnp
 from .constants import *
 
 
-@staticmethod
 @jax.jit
 def step_agent(mjx_data, action, agent_ids):
     """This function updates the mjx_data for an agent."""
