@@ -44,8 +44,7 @@ def initialize_icland(key: jax.Array) -> Callable[[jnp.ndarray], ICLandState]:
         (BACK_POLICY, 0, -1, "Backward Movement"),
         (LEFT_POLICY, 1, -1, "Left Movement"),
         (RIGHT_POLICY, 1, 1, "Right Movement"),
-        # (NOOP_POLICY, None, None, "No Movement"),
-        # TODO: Noop policy
+        (NOOP_POLICY, 0, 0, "No Movement"),
     ],
 )
 def test_agent_movement(
@@ -70,20 +69,26 @@ def test_agent_movement(
     if axis is None:
         # No movement expected
         assert jnp.allclose(initial_pos, new_pos), (
-            f"{description} Failed: Agent moved when it shouldn't have. "
-            f"Initial: {initial_pos}, New: {new_pos}"
+            f"{description} failed: Agent moved when it shouldn't have. "
+            f"Initial: {initial_pos}, New: {new_pos}, Policy: {policy}"
         )
     else:
         # Movement expected
         initial_axis = initial_pos[axis]
         new_axis = new_pos[axis]
+
         if direction > 0:
             assert new_axis > initial_axis, (
-                f"{description} Failed: Expected positive movement along axis {axis}. "
-                f"Initial: {initial_axis}, New: {new_axis}"
+                f"{description} failed: Expected positive movement along axis {axis}. "
+                f"Initial: {initial_axis}, New: {new_axis}, Policy: {policy}"
+            )
+        elif direction == 0:
+            assert jnp.allclose(initial_pos[:2], new_pos[:2]), (
+                f"{description} failed: Agent moved with NOOP. "
+                f"Initial: {initial_pos}, New: {new_pos}, Policy: {policy}"
             )
         else:
             assert new_axis < initial_axis, (
                 f"{description} Failed: Expected negative movement along axis {axis}. "
-                f"Initial: {initial_axis}, New: {new_axis}"
+                f"Initial: {initial_axis}, New: {new_axis}, Policy: {policy}"
             )
