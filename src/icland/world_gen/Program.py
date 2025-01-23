@@ -1,9 +1,10 @@
 """Main entry point for the world generation program."""
-import os
 import glob
-import time
+import os
 import random
+import time
 import xml.etree.ElementTree as ET
+
 import Model
 import SimpleTiledModel
 from JITModel import XMLReader

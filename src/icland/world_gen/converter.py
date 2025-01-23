@@ -1,9 +1,9 @@
 
 """The code defines functions to generate block, ramp, and vertical ramp columns in a 3D world using JAX arrays and exports the generated mesh to an STL file."""
+import jax
 import jax.numpy as jnp
 import numpy as np
 from stl import mesh
-
 from XMLReader import TileType
 
 # Previous constants (BLOCK_VECTORS, RAMP_VECTORS, ROTATION_MATRICES) remain the same...

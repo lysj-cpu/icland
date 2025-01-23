@@ -1,23 +1,29 @@
 """Model for the WaveFunctionCollapse algorithm, JIT-compiled with JAX."""
-import jax
-import jax.numpy as jnp
-import numpy as np
+
 import os
 import xml.etree.ElementTree as ET
 from enum import Enum
+
+import jax.numpy as jnp
+import numpy as np
 from PIL import Image
+
 
 class Heuristic(Enum):
     """Enum for the heuristic selection in WaveFunctionCollapse."""
+
     ENTROPY = 1
     MRV = 2
     SCANLINE = 3
-    
+
+
 class TileType(Enum):
     """Enum for types of tiles used in the tilemap."""
+
     SQUARE = 0
     RAMP = 1
     VRAMP = 2
+
 
 def load_bitmap(filepath):
     """Loads an image file (e.g., PNG) into a list of ARGB-encoded 32-bit integers.
@@ -44,6 +50,7 @@ def load_bitmap(filepath):
 
     return (result, width, height)
 
+
 def save_bitmap(data, width, height, filename):
     """Saves a list of ARGB-encoded 32-bit integers as an image file (e.g., PNG).
 
@@ -69,6 +76,7 @@ def save_bitmap(data, width, height, filename):
     img.putdata(rgba_pixels)
     img.save(filename, format="PNG")
 
+
 # Helper to get XML attribute with a default (similar to xelem.Get<T>(...))
 def get_xml_attribute(xelem, attribute, default=None, cast_type=None):
     """Returns the value of 'attribute' from the XML element xelem.
@@ -92,7 +100,8 @@ def get_xml_attribute(xelem, attribute, default=None, cast_type=None):
             return cast_type(val)
     return val
 
-class XMLReader():
+
+class XMLReader:
     """A class to parse tilemap XML files and handle tile-related data for WaveFunctionCollapse.
 
     This class reads tile data, processes their transformations (rotations, reflections),
@@ -109,14 +118,15 @@ class XMLReader():
         j_weights (jax.numpy.array): JAX-compatible array of tile weights.
         j_tilecodes (jax.numpy.array): JAX-compatible array of tile properties.
     """
+
     def __tilename_to_code(self, tile: str, rotation: int):
         name_split = tile.split("_")
         tile_type = name_split[0]
         tile_type_num = 0
-        
+
         from_num = 0
         to_num = 0
-        
+
         is_ramp_type = False
         if tile_type == "square":
             tile_type_num = TileType.SQUARE.value
@@ -128,29 +138,29 @@ class XMLReader():
             is_ramp_type = True
         else:
             raise RuntimeError("Unknown tile type.")
-        
+
         if is_ramp_type:
             from_num, to_num = int(name_split[1]), int(name_split[2])
         else:
             to_num = int(name_split[-1])
-        
+
         return tile_type_num, rotation, from_num, to_num
-        
+
     def __init__(self, xml_path, subsetName=None):
         """Initializes the XMLReader by parsing the tilemap XML file.
 
-        Args:
+        Argumentss:
             subsetName (str, optional): Name of a specific subset of tiles to load.
         """
         # Load XML file: "tilesets/<name>.xml"
         tree = ET.parse(xml_path)
         xroot = tree.getroot()
-        
+
         self.tiles = []  # Will hold arrays of pixel data for each tile variant
         self.tilenames = []  # Will hold tile names (including variants)
         self.tilesize = 0  # Size (width==height) of each tile in pixels
-        
-        self.tilecodes = [] # Will hold 4-tuple of (type, rotation, from, to)
+
+        self.tilecodes = []  # Will hold 4-tuple of (type, rotation, from, to)
 
         # Read whether tiles are "unique"
         unique = get_xml_attribute(xroot, "unique", default=False, cast_type=bool)
@@ -300,26 +310,34 @@ class XMLReader():
                 # Each orientation is stored in a separate file, e.g. "<tilename> 0.png", "<tilename> 1.png", etc.
                 for t in range(cardinality):
                     bitmap, w_img, h_img = load_bitmap(
-                        os.path.abspath("src", "icland", "world_gen", "tilemap", f"{tilename} {t}.png")
+                        os.path.abspath(
+                            os.path.join(
+                                os.path.join(xml_path, os.pardir), f"{tilename} {t}.png"
+                            )
+                        )
                     )
                     # Usually, w_img == h_img => tile is square
                     if self.tilesize == 0:
                         self.tilesize = w_img
                     self.tiles.append(bitmap)
                     self.tilenames.append(f"{tilename} {t}")
-                    
+
                     self.tilecodes.append(self.__tilename_to_code(tilename, t))
             else:
                 # Single PNG for the base tile
                 bitmap, w_img, h_img = load_bitmap(
-                    os.path.join("src", "icland", "world_gen", "tilemap", f"{tilename}.png")
+                    os.path.abspath(
+                        os.path.join(
+                            os.path.join(xml_path, os.pardir), f"{tilename}.png"
+                        )
+                    )
                 )
                 if self.tilesize == 0:
                     self.tilesize = w_img
                 base_idx = len(self.tiles)
                 self.tiles.append(bitmap)
                 self.tilenames.append(f"{tilename} 0")
-                
+
                 self.tilecodes.append(self.__tilename_to_code(tilename, 0))
 
                 # Then produce the rest by rotate/reflect in code if cardinality > 1
@@ -338,7 +356,7 @@ class XMLReader():
                         # Actually, we should do a separate entry:
                         self.tiles.append(reflected)
                     self.tilenames.append(f"{tilename} {t}")
-                    
+
                     self.tilecodes.append(self.__tilename_to_code(tilename, t))
 
             # Weighted for each orientation
@@ -346,14 +364,14 @@ class XMLReader():
                 weightList.append(w)
 
         # The total number of distinct tile variants T is the final length of `actions`.
-        self.T = len(actions) # !
+        self.T = len(actions)  # !
         # Convert weightList to a python list of floats
-        self.weights = [float(x) for x in weightList] # !
+        self.weights = [float(x) for x in weightList]  # !
 
         # Build the propagator arrays: self.propagator[d][t] = list of tile indices that can appear
         # in direction d next to tile t.
         # We'll do a 3D structure: [4][T][variable-size list], same as in the C# code.
-        self.propagator = [[[] for _ in range(self.T)] for _ in range(4)] # !
+        self.propagator = [[[] for _ in range(self.T)] for _ in range(4)]  # !
 
         # We'll build a "densePropagator[d][t1][t2] = True/False" for adjacency, then convert
         # to a sparse list of valid t2's for each t1.
@@ -436,13 +454,13 @@ class XMLReader():
         def pad_sequence(seq, max_len):
             # Create a result array of shape (T, max_len)
             result = np.full((self.T, max_len), -1)  # Use NumPy array for padding
-            
+
             # Iterate over each time step (T dimension)
             for i in range(len(seq)):
                 seq_len = len(seq[i])
                 # Only copy up to the sequence length (no truncation, just padding)
                 result[i, :seq_len] = seq[i]
-            
+
             return result
 
         padded_sequences = [pad_sequence(seq, max_len) for seq in self.propagator]
@@ -455,7 +473,7 @@ class XMLReader():
 
         # Now handle weights conversion to a JAX array
         self.j_weights = jnp.array(self.weights)
-                        
+
         self.j_tilecodes = jnp.array(self.tilecodes)
 
     def save(self, observed, width, height, filename):
@@ -463,7 +481,9 @@ class XMLReader():
         # We'll create a pixel buffer for the entire output image:
         # (MX * tilesize) by (MY * tilesize).
         tilemap_width, tilemap_height = width, height
-        bitmapData = [0] * (tilemap_width * tilemap_height * self.tilesize * self.tilesize)
+        bitmapData = [0] * (
+            tilemap_width * tilemap_height * self.tilesize * self.tilesize
+        )
         # If we have a definite observation (observed[0]>=0 means not contradictory)
         for y in range(tilemap_height):
             for x in range(tilemap_width):
@@ -475,13 +495,16 @@ class XMLReader():
                     for dx in range(self.tilesize):
                         sx = x * self.tilesize + dx
                         sy = y * self.tilesize + dy
-                        bitmapData[sx + sy * (tilemap_width * self.tilesize)] = tile_data[
-                            dx + dy * self.tilesize
-                        ]
+                        bitmapData[sx + sy * (tilemap_width * self.tilesize)] = (
+                            tile_data[dx + dy * self.tilesize]
+                        )
 
         # Finally, save the image
         save_bitmap(
-            bitmapData, tilemap_width * self.tilesize, tilemap_height * self.tilesize, filename
+            bitmapData,
+            tilemap_width * self.tilesize,
+            tilemap_height * self.tilesize,
+            filename,
         )
 
     def get_tilemap_data(self):
