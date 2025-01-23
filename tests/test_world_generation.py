@@ -1,6 +1,4 @@
 
-import icland
-import jax
 import jax.numpy as jnp
 import os
 import pytest
@@ -156,6 +154,65 @@ def test_get_xml_attribute_no_attribute():
 
   # Test with no attribute present and a default value  
   assert get_xml_attribute(elem, "missing_attr", default="default") == "default"
+
+@pytest.fixture
+def mock_xml_file(tmp_path):
+    """Fixture to create a temporary XML file for testing."""
+    xml_content = """
+    <set>
+        <tiles unique="false">
+            <tile name="square_1" symmetry="X" weight="1.0"/>
+        </tiles>
+        <neighbors>
+            <neighbor left="square_1 0" right="square_1 0"/>
+        </neighbors>
+    </set>
+    """
+    xml_path = tmp_path / "mock_tilemap.xml"
+    with open(xml_path, "w") as f:
+        f.write(xml_content)
+    return xml_path
+
+
+@pytest.fixture
+def xml_reader(mock_xml_file):
+    """Fixture to create an XMLReader instance with mock data."""
+    return XMLReader(xml_path=mock_xml_file)
+
+
+def test_get_tilemap_data(xml_reader):
+    """Test the get_tilemap_data method of the XMLReader class."""
+    T, j_weights, j_propagator, j_tilecodes = xml_reader.get_tilemap_data()
+
+    # Check the returned tuple structure
+    assert isinstance(T, int)
+    assert isinstance(j_weights, jnp.ndarray)
+    assert isinstance(j_propagator, jnp.ndarray)
+    assert isinstance(j_tilecodes, jnp.ndarray)
+
+    # Check basic properties of the returned data
+    assert T > 0  # Should have at least one tile
+    assert j_weights.shape[0] == T
+    assert j_propagator.shape[1] == T
+    assert j_tilecodes.shape[0] == T
+
+
+def test_save(xml_reader, tmp_path):
+    """Test the save method of the XMLReader class."""
+    width, height = 2, 2
+    observed = jnp.array([0, 0, 0, 0])  # Mock observed array with tile indices
+    filename = tmp_path / "output_tilemap.png"
+
+    # Call the save method
+    xml_reader.save(observed, width, height, str(filename))
+
+    # Verify that the file was created
+    assert os.path.exists(filename)
+
+    # Check the file content using PIL
+    with Image.open(filename) as img:
+        assert img.size == (width * xml_reader.tilesize, height * xml_reader.tilesize)
+        assert img.format == "PNG"
 
 # Test Model
 def test_model():
