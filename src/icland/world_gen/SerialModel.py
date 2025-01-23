@@ -7,8 +7,9 @@ from enum import Enum
 
 import jax
 import jax.numpy as jnp
-from converter import create_world, export_stl
-from XMLReader import TileType, XMLReader
+
+from src.icland.world_gen.converter import create_world, export_stl
+from src.icland.world_gen.XMLReader import TileType, XMLReader
 
 
 def random_index_from_distribution(distribution, rand_value):

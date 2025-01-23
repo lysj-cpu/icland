@@ -6,7 +6,6 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 from flax import struct
-from XMLReader import XMLReader
 
 
 @jax.jit
@@ -56,7 +55,7 @@ class Heuristic(Enum):
 
 
 @struct.dataclass
-class ModelX:
+class JITModel:
     """Base Model class for WaveFunctionCollapse algorithm."""
 
     # Basic config
@@ -134,33 +133,27 @@ def ban(model, i, t1):
     identity = lambda x: x
 
     def process_ban(model):
-        wave = model.wave
-        wave = wave.at[i, t].set(False)
+        wave = model.wave.at[i, t].set(False)
 
         # Zero-out the compatibility in all directions for pattern t at cell i
-        compatible = model.compatible
-        compatible = compatible.at[i, t, :].set(0)
+        compatible = model.compatible.at[i, t, :].set(0)
 
         stack = model.stack
         stacksize = model.stacksize
-        stack.at[stacksize].set(jnp.array([i, t]))
+        stack = stack.at[stacksize].set(jnp.array([i, t]))
         stacksize += 1
 
         # Update sums_of_ones, sums_of_weights, sums_of_weight_log_weights, entropies
-        sums_of_ones = model.sums_of_ones
-        sums_of_ones = sums_of_ones.at[i].subtract(1)
-
-        sums_of_weights = model.sums_of_weights
-        sums_of_weights = sums_of_weights.at[i].subtract(model.weights.at[t].get())
-
-        sums_of_weight_log_weights = model.sums_of_weight_log_weights
-        sums_of_weight_log_weights = sums_of_weight_log_weights.at[i].subtract(
+        sums_of_ones = model.sums_of_ones.at[i].subtract(1)
+        sums_of_weights = model.sums_of_weights.at[i].subtract(
+            model.weights.at[t].get()
+        )
+        sums_of_weight_log_weights = model.sums_of_weight_log_weights.at[i].subtract(
             model.weight_log_weights.at[t].get()
         )
 
         sum_w = sums_of_weights.at[i].get()
-        entropies = model.entropies
-        entropies.at[i].set(
+        entropies = model.entropies.at[i].set(
             jnp.where(
                 sum_w > 0,
                 jnp.log(sum_w) - (sums_of_weight_log_weights.at[i].get() / sum_w),
@@ -181,6 +174,7 @@ def ban(model, i, t1):
 
     return jax.lax.cond(condition_1, identity, process_ban, model)
 
+
 @partial(jax.jit, static_argnums=[0, 1, 2])
 def init(
     width: int,
@@ -192,7 +186,7 @@ def init(
     weights: jax.Array,
     propagator: jax.Array,
     key: jax.Array,
-) -> ModelX:
+) -> JITModel:
     """Initialise variables for a new Model."""
     wave_init = jnp.ones((width * height, T), dtype=bool)
 
@@ -226,7 +220,7 @@ def init(
     stacksize_init = 0
     max_stacksize_init = width * height * T
 
-    return ModelX(
+    return JITModel(
         MX=width,
         MY=height,
         T=T,
@@ -298,6 +292,8 @@ def run(model, max_steps=1000):
                 t = jax.lax.map(
                     find_true, jnp.arange(model.distribution.shape[0])
                 ).argmax()
+                print('t: ' + t)
+
                 model = model.replace(observed=model.observed.at[i].set(t))
                 return model
 
@@ -431,33 +427,31 @@ def clear(model):
     # Initialize arrays directly to their final values
     wave = jnp.ones_like(model.wave, dtype=bool)  # All True
     observed = jnp.full_like(model.observed, -1)
-    
+
     # Set all statistics arrays in one go
     sums_of_ones = jnp.full_like(model.sums_of_ones, model.weights.shape[0])
     sums_of_weights = jnp.full_like(model.sums_of_weights, model.sum_of_weights)
     sums_of_weight_log_weights = jnp.full_like(
-        model.sums_of_weight_log_weights, 
-        model.sum_of_weight_log_weights
+        model.sums_of_weight_log_weights, model.sum_of_weight_log_weights
     )
     entropies = jnp.full_like(model.entropies, model.starting_entropy)
-    
+
     # Vectorized computation of compatible array
     opposite = jnp.array([2, 3, 0, 1])
-    
+
     # Compute all pattern compatibilities at once
     # Shape: (4, T) -> (T, 4)
     pattern_compatibilities = jnp.sum(
         model.propagator[opposite, :] >= 0,  # Using broadcasting
-        axis=2  # Sum over the patterns that can appear in each direction
+        axis=2,  # Sum over the patterns that can appear in each direction
     ).T
-    
+
     # Broadcast pattern compatibilities to all positions
     # Shape: (MX * MY, T, 4)
     compatible = jnp.broadcast_to(
-        pattern_compatibilities[None, :, :],
-        model.compatible.shape
+        pattern_compatibilities[None, :, :], model.compatible.shape
     )
-    
+
     return model.replace(
         wave=wave,
         compatible=compatible,
@@ -466,7 +460,7 @@ def clear(model):
         sums_of_weight_log_weights=sums_of_weight_log_weights,
         entropies=entropies,
         observed=observed,
-        observed_so_far=0
+        observed_so_far=0,
     )
 
 
@@ -520,6 +514,7 @@ def propagate(model):
     model = jax.lax.while_loop(condition_1, proc_body, model)
     return model, model.sums_of_ones.at[0].get() > 0
 
+
 @partial(jax.jit, static_argnums=[2, 3])
 def export(model, tile_map, width, height):
     """Reshapes model data, combines it with tile info via vectorization, and generates a one-hot encoded state."""
@@ -527,30 +522,32 @@ def export(model, tile_map, width, height):
     # Combine observed state and tile information using jax.vmap
     # Apply combine function using vmap for vectorization
     combined = jax.vmap(lambda x: tile_map.at[x].get())(observed_reshaped)
-    
-    return combined
-            
-# Run the operations to be profiled
-print(os.path.join("tilemap", "data.xml"))
-reader = XMLReader()
-t, w, p, c = reader.get_tilemap_data()
-# rng = jax.random.PRNGKey(0)
-# rngs = jax.random.split(rng, 10)
-# models = jax.vmap(lambda r: init(10, 10, t, 1, False, 1, w, p, r))(rngs)
-# models_res = jax.vmap(run)(models)
-print("Initializing model...")
-model = init(10, 10, t, 1, False, 1, w, p, jax.random.key(0))
-print("Clearing model...")
-model = clear(model)
-print(model.compatible)
-print(model.observed_so_far)
-print(model.wave)
-# model, res = propagate(model)
-# model = next_unobserved_node(model)
-print("Running model...")
-# model, b = run(model)
-# print(b)
-# one_hot = export(model, c, 10, 10)
-# print(one_hot)
 
-# reader.save(model.observed, 10, 10, "temp.png")
+    return combined
+
+
+# # Run the operations to be profiled
+# xml_path = os.path.join("src", "icland", "world_gen", "tilemap", "data.xml")
+# print(xml_path)
+# reader = XMLReader(xml_path=xml_path)
+# t, w, p, c = reader.get_tilemap_data()
+# # rng = jax.random.PRNGKey(0)
+# # rngs = jax.random.split(rng, 10)
+# # models = jax.vmap(lambda r: init(10, 10, t, 1, False, 1, w, p, r))(rngs)
+# # models_res = jax.vmap(run)(models)
+# print("Initializing model...")
+# model = init(10, 10, t, 1, False, 1, w, p, jax.ranpdom.key(0))
+# print("Clearing model...")
+# model = clear(model)
+# print(model.compatible)
+# print(model.observed_so_far)
+# print(model.wave)
+# # model, res = propagate(model)
+# # model = next_unobserved_node(model)
+# print("Running model...")
+# # model, b = run(model)
+# # print(b)
+# # one_hot = export(model, c, 10, 10)
+# # print(one_hot)
+
+# # reader.save(model.observed, 10, 10, "temp.png")

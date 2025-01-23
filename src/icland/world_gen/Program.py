@@ -1,4 +1,5 @@
 """Main entry point for the world generation program."""
+
 import glob
 import os
 import random
@@ -35,7 +36,6 @@ def main():
 
     jit_model = XMLReader()
     T, j_weights, j_propagator, tilecodes = jit_model.get_tilemap_data()
-    
 
     # Helper: parse string -> Model.Heuristic
     # (Adjust if your Heuristic enum has different names or structure.)
@@ -62,12 +62,14 @@ def main():
 
         heuristic_string = xelem.get("heuristic", "Entropy")
         heuristic = parse_heuristic(heuristic_string)
-        
+
         # SimpleTiledModel-specific parameters
         subset = xelem.get("subset")  # can be None
         black_background = xelem.get("blackBackground", "false").lower() == "true"
 
-        model = SimpleTiledModel.SimpleTiledModel(width, height, T, j_weights, j_propagator, tilecodes, heuristic=heuristic)
+        model = SimpleTiledModel.SimpleTiledModel(
+            width, height, T, j_weights, j_propagator, tilecodes, heuristic=heuristic
+        )
 
         # Number of screenshots to generate
         screenshots = int(xelem.get("screenshots", "2"))
