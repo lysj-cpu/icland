@@ -1,11 +1,13 @@
 """This file contains the base Model class for WaveFunctionCollapse and helper functions."""
 
+from enum import Enum
+from functools import partial
+
 import jax
 import jax.numpy as jnp
-from enum import Enum
 from flax import struct
-from functools import partial
 from XMLReader import XMLReader
+
 
 @jax.jit
 def random_index_from_distribution(distribution, rand_value):
@@ -423,8 +425,9 @@ def next_unobserved_node(model):
 @jax.jit
 def clear(model):
     """Resets wave and compatibility to allow all patterns at all cells.
-    
-    Optimized version using vectorized operations."""
+
+    Optimized version using vectorized operations.
+    """
     # Initialize arrays directly to their final values
     wave = jnp.ones_like(model.wave, dtype=bool)  # All True
     observed = jnp.full_like(model.observed, -1)
@@ -528,7 +531,7 @@ def export(model, tile_map, width, height):
     return combined
             
 # Run the operations to be profiled
-print("Initializing XML...")
+print(os.path.join("tilemap", "data.xml"))
 reader = XMLReader()
 t, w, p, c = reader.get_tilemap_data()
 # rng = jax.random.PRNGKey(0)
