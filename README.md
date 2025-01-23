@@ -1,6 +1,6 @@
 # ICLand
 
-[![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/lysj-cpu/icland/pytest.yml?style=flat-square)](https://github.com/lysj-cpu/icland/actions/workflows/pytest.yml)
+[![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/lysj-cpu/icland/tests.yml?style=flat-square)](https://github.com/lysj-cpu/icland/actions/workflows/tests.yml)
 [![Codecov](https://img.shields.io/codecov/c/github/lysj-cpu/icland?style=flat-square)](https://app.codecov.io/github/lysj-cpu/icland)
 
 ## Development Instructions
