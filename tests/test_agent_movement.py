@@ -5,16 +5,10 @@ from typing import Callable
 import jax
 import jax.numpy as jnp
 import pytest
+from test_policies import *
 
 import icland
 from icland.types import ICLandState
-
-# Define movement policies
-NOOP_POLICY = jnp.array([0, 0, 0])
-FORWARD_POLICY = jnp.array([1, 0, 0])
-BACK_POLICY = jnp.array([-1, 0, 0])
-LEFT_POLICY = jnp.array([0, -1, 0])
-RIGHT_POLICY = jnp.array([0, 1, 0])
 
 
 @pytest.fixture
