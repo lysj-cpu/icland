@@ -1,20 +1,35 @@
 """Test scripts for world generation part of the pipeline."""
 import os
 import tempfile
-from icland.world_gen.XMLReader import XMLReader, TileType, load_bitmap, save_bitmap, get_xml_attribute
-from PIL import Image
 from xml.etree.ElementTree import Element
-import pytest
+
 import jax.numpy as jnp
-import numpy as np
+import pytest
+from PIL import Image
+
+from src.icland.world_gen.XMLReader import (
+  TileType,
+  XMLReader,
+  get_xml_attribute,
+  load_bitmap,
+  save_bitmap,
+)
+
 
 @pytest.fixture
 def xml_reader():
+  """Fixture to create an XMLReader instance with our data XML file."""
   xml_file = 'src/icland/world_gen/tilemap/data.xml'
   return XMLReader(xml_file)
 
 def test_load_bitmap():
-    """Test loading bitmap function for debugging tilemaps."""
+    """Test loading bitmap function for debugging tilemaps.
+    
+    This test verifies that the `load_bitmap` function correctly loads a
+    bitmap from a temporary PNG file, converts the pixel data to ARGB format,
+    and returns the expected width, height, and pixel data. It also ensures
+    that transparency and color information are correctly interpreted.
+    """
     # Create a simple 2x2 RGBA image in memory
     img = Image.new("RGBA", (2, 2), color=(255, 0, 0, 255))  # Red pixels
     img.putpixel((1, 0), (0, 255, 0, 128))  # Green with 50% transparency
@@ -46,7 +61,13 @@ def test_load_bitmap():
 
 
 def test_save_bitmap():
-    """Test saving bitmap function for debugging tilemaps."""
+    """Test saving bitmap function for debugging tilemaps.
+
+    This test ensures that the `save_bitmap` function can correctly save
+    ARGB pixel data to a PNG file, and that the saved image matches the
+    expected dimensions and pixel data. It checks that the pixels are
+    written in the expected format, including transparency.
+    """
     width, height = 2, 2
     argb_data = [
         0xFFFF0000,  # Red
@@ -87,7 +108,14 @@ def test_save_bitmap():
 
 
 def test_get_xml_attribute():
-    """Test general behaviour of XML reader in retrieving attributes."""
+    """Test general behaviour of XML reader in retrieving attributes.
+
+    This test checks if the `get_xml_attribute` function can correctly
+    retrieve attributes from an XML element, with correct type casting
+    for different data types such as int, float, bool, and string. It also
+    verifies that default values are used when attributes are missing, and
+    that generic type casting works as expected.
+    """
     elem = Element(
         "test",
         attrib={
@@ -217,6 +245,14 @@ def test_save(xml_reader, tmp_path):
 
 
 def test_xml_reader(xml_reader):
+  """Test the XMLReader class attributes and data integrity.
+
+  This test verifies that the various attributes of the `XMLReader`
+  class, such as `tiles`, `tilenames`, `tilecodes`, `weights`, and
+  `propagator`, are correctly initialized and match the expected
+  structure and data types. It checks that the number of tiles (`T`)
+  corresponds to the length of these attributes.
+  """
   # Attributes:
   #       tiles (list): Pixel data arrays for each tile variant.
   #       tilenames (list): Names of tiles (including variants).
