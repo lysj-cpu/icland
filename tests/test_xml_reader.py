@@ -5,19 +5,15 @@ import jax.numpy as jnp
 import os
 import pytest
 import tempfile
-from icland.world_gen.XMLReader import XMLReader, load_bitmap, save_bitmap, get_xml_attribute
+from icland.world_gen.XMLReader import XMLReader, TileType, load_bitmap, save_bitmap, get_xml_attribute
 from PIL import Image
 from xml.etree.ElementTree import Element
 
-# Test XML Reader
-def test_xml_reader():
+@pytest.fixture
+def xml_reader():
   xml_file = 'src/icland/world_gen/tilemap/data.xml'
-  jit_model = XMLReader(xml_file)
-  T, j_weights, j_propagator, tilecodes = jit_model.get_tilemap_data()
-  print(f'T: {T}')
-  print(f'j_weights: {j_weights}')
-  print(f'j_propagator: {j_propagator}')
-  print(f'tilecodes: {tilecodes}')
+  return XMLReader(xml_file)
+
 
 def test_load_bitmap():
   # Create a simple 2x2 RGBA image in memory
@@ -157,12 +153,76 @@ def test_get_xml_attribute_no_attribute():
   # Test with no attribute present and a default value  
   assert get_xml_attribute(elem, "missing_attr", default="default") == "default"
 
-# Test Model
-def test_model():
-    pass
+
+def test_xml_reader(xml_reader):
+  # Attributes:
+  #       tiles (list): Pixel data arrays for each tile variant.
+  #       tilenames (list): Names of tiles (including variants).
+  #       tilesize (int): Size (width and height) of each tile in pixels.
+  #       tilecodes (list): Encoded tile properties as 4-tuples (type, rotation, from, to).
+  #       weights (list): Weights associated with each tile variant.
+  #       propagator (list): Sparse adjacency data indicating valid neighboring tiles.
+  #       j_propagator (jax.numpy.array): JAX-compatible array representation of `propagator`.
+  #       j_weights (jax.numpy.array): JAX-compatible array of tile weights.
+  #       j_tilecodes (jax.numpy.array): JAX-compatible array of tile properties.
+  #       T (int): Number of tile variants.
+
+  assert xml_reader.T == len(xml_reader.tiles)
+  assert xml_reader.T == len(xml_reader.tilenames)
+  assert xml_reader.T == len(xml_reader.tilecodes)
+  assert xml_reader.T == len(xml_reader.weights)
+  assert xml_reader.T == len(xml_reader.propagator[0])
+  assert xml_reader.tilesize == 8
+  assert "ramp_1_2 0" in xml_reader.tilenames[0]
+  assert "square_turn_6 3" in xml_reader.tilenames[-1]
+  assert xml_reader.tilecodes[0] == (TileType.RAMP.value, 0, 1, 2)
+  assert xml_reader.weights[0] == 3.0
+  # One of the tiles that could be right of tile 0 (because 2 is left to right)
+  assert xml_reader.tilenames[xml_reader.propagator[2][0][1]] == "square_boundary_1 2"
+  assert len(xml_reader.propagator) == 4
+
+  assert xml_reader.j_propagator.at[2, 0, 1].get() == xml_reader.tilenames.index("square_boundary_1 2")
+
+
+def test_xml_reader_save(dummy_reader, tmp_path):
+    """
+    Test the 'save' function. Creates a minimal model with
+    MX=1, MY=1, and observed=[0], meaning we choose our
+    single tile (index 0). Then saves a 2x2 PNG and checks
+    that the file exists with the correct pixel data.
+    """
+    
+    # Minimal "model" class with needed attributes
+    class DummyModel:
+        MX = 1
+        MY = 1
+        # The 'observed' array must have (MX*MY) entries
+        observed = jnp.array([0])  # picks tile 0
+
+    model = DummyModel()
+    
+    output_file = tmp_path / "test_output.png"
+    
+    # Call the save method
+    dummy_reader.save(model, str(output_file))
+    
+    # Verify file was created
+    assert output_file.is_file(), "Output file was not created by save()"
+    
+    # Open and inspect the resulting image
+    with Image.open(output_file) as img:
+        assert img.size == (2, 2), "Output image dimensions should be 2x2"
+        
+        # Check that all pixels are white (255,255,255,255 in RGBA)
+        pixels = list(img.getdata())
+        for p in pixels:
+            assert p == (255, 255, 255, 255), f"Expected white pixel but got {p}"
+
+
 
 # Test converter
 def test_converter():
   pass
+
 
 # Test the entire pipeline
