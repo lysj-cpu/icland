@@ -1,11 +1,14 @@
 """This file contains the base Model class for WaveFunctionCollapse and helper functions."""
 
+import os
 from enum import Enum
 from functools import partial
 
 import jax
 import jax.numpy as jnp
 from flax import struct
+from tile_data import NUM_ACTIONS, PROPAGATOR, TILECODES, WEIGHTS
+from XMLReader import XMLReader
 
 
 @jax.jit
@@ -59,17 +62,16 @@ class JITModel:
     """Base Model class for WaveFunctionCollapse algorithm."""
 
     # Basic config
-    MX: int
-    MY: int
+    MX: jnp.int32
+    MY: jnp.int32
     periodic: bool
-    heuristic: int
+    heuristic: jnp.int32
 
-    T: int  # number of possible tile/pattern indices
-    N: int  # Sample size (N=1 for simple tiles)
+    T: jnp.int32  # number of possible tile/pattern indices
+    N: jnp.int32  # Sample size (N=1 for simple tiles)
 
     # Core arrays
-    stacksize: int  # how many elements in the stack are currently valid
-    max_stacksize: int
+    stacksize: jnp.int32  # how many elements in the stack are currently valid
     wave: jax.Array  # shape: (MX*MY, T), dtype=bool
     compatible: jax.Array  # shape: (MX*MY, T, 4), dtype=int
     observed: jax.Array  # shape: (MX*MY, ), dtype=int
@@ -86,12 +88,12 @@ class JITModel:
     entropies: jax.Array  # shape: (MX*MY,)
 
     # Precomputed sums for the entire set of patterns
-    sum_of_weights: float
-    sum_of_weight_log_weights: float
-    starting_entropy: float
+    sum_of_weights: jnp.float32
+    sum_of_weight_log_weights: jnp.float32
+    starting_entropy: jnp.float32
 
     # Because SCANLINE uses an incremental pointer
-    observed_so_far: int
+    observed_so_far: jnp.int32
 
     propagator: jax.Array  # (4, T, propagator_length)
     distribution: jax.Array  # shape: (T, )
@@ -109,11 +111,13 @@ def observe(model, node):
 
     # Prepare distribution of patterns that are still possible
     distribution = model.distribution
-    distribution = jnp.where(w, model.weights, jnp.zeros_like(model.weights))
+    distribution = jnp.where(w, model.weights, jnp.zeros((model.weights.shape[0],)))
 
     key, subkey = jax.random.split(model.key)
-    r = random_index_from_distribution(distribution, jax.random.uniform(subkey))
-    model = model.replace(key=key)
+    rand_val = jax.random.uniform(subkey)
+    r = random_index_from_distribution(distribution, rand_val)
+    # jax.debug.print("Chosen: {} with randval {}", r, rand_val)
+    model = model.replace(key=key, distribution=distribution)
 
     # Ban any pattern that isn't the chosen one
     # If wave[node][t] != (t == r) => ban it
@@ -128,7 +132,8 @@ def observe(model, node):
 @jax.jit
 def ban(model, i, t1):
     """Bans pattern t at cell i. Updates wave, compatibility, sums_of_ones, entropies, and stack."""
-    t = t1.astype(int)
+    t = t1.astype(jnp.int32)
+    # jax.debug.print("Banning at index {} action {}", i, t1)
     condition_1 = jnp.logical_not(model.wave.at[i, t].get())
     identity = lambda x: x
 
@@ -177,20 +182,20 @@ def ban(model, i, t1):
 
 @partial(jax.jit, static_argnums=[0, 1, 2])
 def init(
-    width: int,
-    height: int,
-    T: int,
-    N: int,
+    width: jnp.int32,
+    height: jnp.int32,
+    T: jnp.int32,
+    N: jnp.int32,
     periodic: bool,
-    heuristic: int,
+    heuristic: jnp.int32,
     weights: jax.Array,
     propagator: jax.Array,
     key: jax.Array,
 ) -> JITModel:
     """Initialise variables for a new Model."""
-    wave_init = jnp.ones((width * height, T), dtype=bool)
+    wave_init = jnp.zeros((width * height, T), dtype=bool)
 
-    weight_log_weights = weights * jnp.log(weights + 1e-9)
+    weight_log_weights = weights * jnp.log(weights)
 
     sum_of_weights = jnp.sum(weights)
     sum_of_weight_log_weights = jnp.sum(weight_log_weights)
@@ -218,7 +223,6 @@ def init(
     # Initialize the stack array
     stack_init = jnp.zeros((width * height * T, 2), dtype=jnp.int32)
     stacksize_init = 0
-    max_stacksize_init = width * height * T
 
     return JITModel(
         MX=width,
@@ -233,7 +237,6 @@ def init(
         observed=observed_init,
         stack=stack_init,
         stacksize=stacksize_init,
-        max_stacksize=max_stacksize_init,
         weights=weights,
         weight_log_weights=weight_log_weights,
         sums_of_ones=sums_of_ones_init,
@@ -255,6 +258,7 @@ def run(model, max_steps=1000):
     # Pre: the model is freshly initialized
 
     # Define the loop state
+    model = clear(model)
     init_state = {"model": model, "steps": 0, "done": False, "success": True}
 
     def cond_fun(state):
@@ -272,6 +276,8 @@ def run(model, max_steps=1000):
 
         # Get next unobserved node
         model, node = next_unobserved_node(model)
+        jax.debug.print("Chosen node {} as next", node)
+        jax.debug.print("Sum is {}", model.sums_of_ones.at[node].get())
 
         # Use lax.cond instead of if/else
         def handle_node(args):
@@ -280,24 +286,38 @@ def run(model, max_steps=1000):
             model = observe(model, node)
             model, success = propagate(model)
             return model, False, success
-
+        
         def handle_completion(args):
             model, node, key = args
 
             # Final observation assignment
-            def body_fun(i, model):
+            def handle_completion_inner(i, model):
                 def find_true(t):
                     return model.wave[i][t]
 
-                t = jax.lax.map(
-                    find_true, jnp.arange(model.distribution.shape[0])
-                ).argmax()
-                print('t: ' + t)
+                jax.debug.print("Observing index {}", i)
 
-                model = model.replace(observed=model.observed.at[i].set(t))
+                # collapsed: array of bools, where true are valid choices
+                collapsed = jax.lax.map(
+                    find_true, jnp.arange(model.distribution.shape[0])
+                )
+
+                jax.debug.print("Argmax is {}", collapsed.argmax())
+
+                # set the first argument that is true
+                model = jax.lax.cond(
+                    jnp.any(collapsed),
+                    lambda x: x.replace(
+                        observed=x.observed.at[i].set(collapsed.argmax())
+                    ),
+                    lambda x: x,
+                    model,
+                )
                 return model
 
-            model = jax.lax.fori_loop(0, model.wave.shape[0], body_fun, model)
+            model = jax.lax.fori_loop(
+                0, model.wave.shape[0], handle_completion_inner, model
+            )
             return model, True, True
 
         model, done, success = jax.lax.cond(
@@ -337,8 +357,7 @@ def next_unobserved_node(model):
                     jnp.logical_or(model.periodic, x + N <= MX),
                     jnp.logical_or(model.periodic, y + N <= MY),
                 ]
-            ),
-            axis=0,
+            )
         )
 
     all_indices = jnp.arange(model.wave.shape[0])
@@ -382,7 +401,7 @@ def next_unobserved_node(model):
         node_entropies = jax.lax.cond(
             heuristic == Heuristic.ENTROPY.value,
             lambda _: entropies,
-            lambda _: sums_of_ones.astype(float),
+            lambda _: sums_of_ones.astype(jnp.float32),
             None,
         )
         sum_of_ones_mask = jax.vmap(lambda x: model.sums_of_ones.at[x].get() > 1)(
@@ -392,7 +411,10 @@ def next_unobserved_node(model):
             jnp.logical_and(valid_nodes_mask, sum_of_ones_mask)
         )
 
-        def process_node(_):
+        def process_node(node_entropies):
+            node_entropies = node_entropies + 1e-6 * jax.random.normal(
+                key, shape=node_entropies.shape
+            )
             valid_node_entropies = jnp.where(
                 node_entropies_mask,
                 node_entropies,
@@ -407,14 +429,14 @@ def next_unobserved_node(model):
             jnp.any(node_entropies_mask),
             process_node,
             lambda _: (model, -1),
-            operand=None,  # No operand needed for this condition
+            operand=node_entropies,  # No operand needed for this condition
         )
 
     return jax.lax.cond(
         heuristic == Heuristic.SCANLINE.value,
         scanline_heuristic,
         entropy_mrv_heuristic,
-        operand=None,  # No operand needed for this condition
+        operand=entropies,  # No operand needed for this condition
     )
 
 
@@ -476,17 +498,36 @@ def propagate(model):
     identity_2 = lambda m, i, t: m
 
     def proc_propagate_tile(model, x2, y2, d, t1):
-        x2 = jax.lax.cond(x2 < 0, lambda y: y + model.MX, lambda y: y - model.MX, x2)
-        y2 = jax.lax.cond(y2 < 0, lambda y: y + model.MY, lambda y: y - model.MY, y2)
+        x2 = jax.lax.cond(
+            x2 < 0,
+            lambda y: y + model.MX,
+            lambda y: jax.lax.cond(
+                x2 >= model.MX, lambda z: z - model.MX, lambda w: w, y
+            ),
+            x2,
+        )
+        y2 = jax.lax.cond(
+            y2 < 0,
+            lambda y: y + model.MY,
+            lambda y: jax.lax.cond(
+                y2 >= model.MY, lambda z: z - model.MY, lambda w: w, y
+            ),
+            y2,
+        )
 
         i2 = x2 + y2 * model.MX
         p = model.propagator[d][t1]
 
         for t2 in p:
-            comp = model.compatible.at[i2, t2.astype(int), d].get()
-            comp -= 1
-            pred = comp == 0
-            model = jax.lax.cond(pred, ban, identity_2, model, i2, t2)
+            pred_2 = t2 >= 0
+
+            def process_p(model, i2, t2):
+                comp = model.compatible.at[i2, t2.astype(jnp.int32), d].subtract(1)
+                model = model.replace(compatible=comp)
+                pred = comp.at[i2, t2.astype(jnp.int32), d].get() == 0
+                return jax.lax.cond(pred, ban, identity_2, model, i2, t2)
+
+            model = jax.lax.cond(pred_2, process_p, identity_2, model, i2, t2)
 
         return model
 
@@ -501,7 +542,9 @@ def propagate(model):
             x2 = x1 + dx[d]
             y2 = y1 + dy[d]
             pred_a = jnp.any(
-                jnp.array([x2 < 0, y2 < 0, x2 >= model.MX, y2 >= model.MY])
+                jnp.array(
+                    [x2 < 0, y2 < 0, x2 + model.N >= model.MX, y2 + model.N >= model.MY]
+                )
             )
             pred_b = jnp.logical_not(model.periodic)
             pred = jnp.all(jnp.array([pred_a, pred_b]))
@@ -526,28 +569,40 @@ def export(model, tile_map, width, height):
     return combined
 
 
-# # Run the operations to be profiled
-# xml_path = os.path.join("src", "icland", "world_gen", "tilemap", "data.xml")
-# print(xml_path)
-# reader = XMLReader(xml_path=xml_path)
-# t, w, p, c = reader.get_tilemap_data()
-# # rng = jax.random.PRNGKey(0)
-# # rngs = jax.random.split(rng, 10)
-# # models = jax.vmap(lambda r: init(10, 10, t, 1, False, 1, w, p, r))(rngs)
-# # models_res = jax.vmap(run)(models)
-# print("Initializing model...")
-# model = init(10, 10, t, 1, False, 1, w, p, jax.ranpdom.key(0))
-# print("Clearing model...")
-# model = clear(model)
-# print(model.compatible)
+reader = XMLReader(os.path.join("tilemap", "data.xml"))
+# rng = jax.random.PRNGKey(0)
+# rngs = jax.random.split(rng, 10)
+# models = jax.vmap(lambda r: init(10, 10, t, 1, False, 1, w, p, r))(rngs)
+# models_res = jax.vmap(run)(models)
+print("Initializing model...")
+model = init(10, 10, NUM_ACTIONS, 1, False, 1, WEIGHTS, PROPAGATOR, jax.random.key(420))
+print("Clearing model...")
+model = clear(model)
+# print(model.compatible.tolist())
+# print(p.tolist())
 # print(model.observed_so_far)
 # print(model.wave)
-# # model, res = propagate(model)
-# # model = next_unobserved_node(model)
-# print("Running model...")
-# # model, b = run(model)
-# # print(b)
-# # one_hot = export(model, c, 10, 10)
-# # print(one_hot)
+# model, res = propagate(model)
+# model = next_unobserved_node(model)
+print("Running model...")
+# model = observe(model, 0)
+# model, _ = propagate(model)
+# print(model.wave.tolist())
+# print(model.compatible.tolist())
+# print(model.stack.tolist())
+# print(model.stacksize)
+# print(model.sums_of_ones.tolist())
+# print(model.sums_of_weights.tolist())
+# print(model.sums_of_weight_log_weights.tolist())
+# print(model.entropies.tolist())
+# print(model.distribution.tolist())
+b = False
+while not b:
+    model, b = run(model)
+    print(model.wave)
+    key, _ = jax.random.split(model.key)
+    model = model.replace(key = key)
+one_hot = export(model, TILECODES, 10, 10)
+print(one_hot.tolist())
 
-# # reader.save(model.observed, 10, 10, "temp.png")
+# reader.save(model.observed, 10, 10, "temp.png")

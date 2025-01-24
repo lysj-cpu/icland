@@ -1,15 +1,15 @@
 """This file contains the base SerialModel class for WaveFunctionCollapse and helper functions."""
 
 import math
-import os
 import random
 from enum import Enum
+from functools import partial
 
 import jax
 import jax.numpy as jnp
-
-from src.icland.world_gen.converter import create_world, export_stl
-from src.icland.world_gen.XMLReader import TileType, XMLReader
+from converter import create_world, export_stl
+from tile_data import NUM_ACTIONS, PROPAGATOR, TILECODES, WEIGHTS
+from XMLReader import TileType
 
 
 def random_index_from_distribution(distribution, rand_value):
@@ -195,7 +195,7 @@ class SerialModel:
     def observe(self, node, rng):
         """Collapses the wave at 'node' by picking a pattern index according to weights distribution.
 
-        Then __bans all other patterns at that node.
+        Then _bans all other patterns at that node.
         """
         w = self.wave[node]
 
@@ -204,12 +204,13 @@ class SerialModel:
             self.distribution[t] = self.weights[t] if w[t] else 0.0
 
         r = random_index_from_distribution(self.distribution, rng.random())
+        # r = random_index_from_distribution(self.distribution, 0.07805848121643066)
 
         # Ban any pattern that isn't the chosen one
         for t in range(self.T):
-            # If wave[node][t] != (t == r) => __ban it
+            # If wave[node][t] != (t == r) => _ban it
             if w[t] != (t == r):
-                self.__ban(node, t)
+                self._ban(node, t)
 
     def propagate(self):
         """Propagate the wave function collapse constraints.
@@ -255,14 +256,14 @@ class SerialModel:
                     comp = compat[int(t2)]
                     comp[d] -= 1
                     if comp[d] == 0:
-                        # If no compatibility remains in direction d, __ban this pattern
-                        self.__ban(i2, t2)
+                        # If no compatibility remains in direction d, _ban this pattern
+                        self._ban(i2, t2)
 
         # The original snippet returns sumsOfOnes[0] > 0.
         # This is not typical for full WFC, but we'll preserve it.
         return self.sumsOfOnes[0] > 0
 
-    def __ban(self, i, t1):
+    def _ban(self, i, t1):
         t = int(t1)
         """Bans pattern t at cell i. Updates wave, compatibility, sumsOfOnes, entropies, and stack."""
         # If wave[i][t] is already false, do nothing
@@ -289,11 +290,13 @@ class SerialModel:
         self.sumsOfWeightLogWeights[i] -= self.weightLogWeights[t]
 
         sum_w = self.sumsOfWeights[i]
-        self.entropies[i] = (
+        entropy_res = (
             math.log(sum_w) - (self.sumsOfWeightLogWeights[i] / sum_w)
             if sum_w > 0
             else 0.0
         )
+        # print("Next entropy:", entropy_res)
+        self.entropies[i] = entropy_res
 
     def clear(self):
         """Resets wave and compatibility to allow all patterns at all cells, then optionally applies 'ground' constraints."""
@@ -321,10 +324,10 @@ class SerialModel:
             for x in range(self.MX):
                 # Ban all patterns except the last one (T-1) in the bottom row
                 for t in range(self.T - 1):
-                    self.__ban(x + (self.MY - 1) * self.MX, t)
-                # For other rows above the bottom, __ban the ground pattern
+                    self._ban(x + (self.MY - 1) * self.MX, t)
+                # For other rows above the bottom, _ban the ground pattern
                 for y in range(self.MY - 1):
-                    self.__ban(x + y * self.MX, self.T - 1)
+                    self._ban(x + y * self.MX, self.T - 1)
 
             # Propagate after applying ground constraints
             self.propagate()
@@ -337,138 +340,319 @@ class SerialModel:
         return jnp.array(self.observed), combined
 
 
-def _validate(combined):
-    # Given an observation, validates that there is a playable spawn area
-    # and returns all tiles that are spawnable
+@partial(jax.jit, static_argnums=[2])
+def _sample_spawn_points(key, spawn_map, num_objects):
+    # Key will be consumed.
+    flat_tilemap = spawn_map.flatten()
+    nonzero_indices = jnp.where(
+        flat_tilemap != 0, size=flat_tilemap.shape[0], fill_value=-1
+    )[0]
 
-    # Export the tilemap
+    def run_once(key):
+        def pick(item):
+            _, key = item
+            key, subkey = jax.random.split(key)
+            choice = jax.random.choice(subkey, nonzero_indices)
+            return choice, key
+
+        random_index, key = jax.lax.while_loop(lambda x: x[0] < 0, pick, (-1, key))
+
+        # Convert the flat index back to 2D coordinates
+        row = random_index // spawn_map.shape[0]
+        col = random_index % spawn_map.shape[0]
+
+        return jnp.array([row, col])
+
+    keys = jax.random.split(key, num_objects)
+
+    return jax.vmap(run_once)(keys)
+
+
+@jax.jit
+def _get_spawn_map(combined):
     combined = combined.astype(jnp.int32)
-
     w, h = combined.shape[0], combined.shape[1]
-    # From the tilemap, a grid of (WxHx4), do bfs on each tile
-    visited = jnp.zeros((w, h), dtype=jnp.bool)
-    spawnable = jnp.zeros((w, h), dtype=jnp.int16)
 
-    def __adj(i, j, combined):
+    # Initialize arrays with JAX functions
+    visited = jax.lax.full((w, h), False, dtype=jnp.bool)
+    spawnable = jax.lax.full((w, h), 0, dtype=jnp.int32)
+
+    @jax.jit
+    def __adj_jit(i, j, combined):
         slots = jnp.full((4, 2), -1)
         dx = jnp.array([-1, 0, 1, 0])
         dy = jnp.array([0, 1, 0, -1])
 
-        tile, r, f, level = combined.at[i, j].get()
-        if tile == TileType.SQUARE.value:
+        def process_square(combined, i, j, slots, dx, dy):
+            tile, r, f, level = combined[i, j]
             for d in range(4):
-                x = i + dx.at[d].get()
-                y = j + dy.at[d].get()
-                if 0 <= x < combined.shape[0] and 0 <= y < combined.shape[1]:
-                    q, r2, f2, l = combined.at[x, y].get()
-                    if q == TileType.SQUARE.value and l == level:
-                        slots = slots.at[d].set(jnp.array([x, y]))
-                    elif (
-                        q == TileType.RAMP.value
-                        and r2 == (2 - d) % 4
-                        and f2 == level
-                        and l == level + 1
-                    ):
-                        slots = slots.at[d].set(jnp.array([x, y]))
-                    elif (
-                        q == TileType.RAMP.value
-                        and r2 == (4 - d) % 4
-                        and f2 == level - 1
-                        and l == level
-                    ):
-                        slots = slots.at[d].set(jnp.array([x, y]))
+                x = i + dx[d]
+                y = j + dy[d]
 
-        if tile == TileType.RAMP.value:
+                def process_square_inner(slots):
+                    q, r2, f2, l = combined[x, y]
+                    return jax.lax.cond(
+                        jnp.any(
+                            jnp.array(
+                                [
+                                    jnp.all(
+                                        jnp.array(
+                                            [
+                                                q == TileType.RAMP.value,
+                                                r2 == (4 - d) % 4,
+                                                f2 == level - 1,
+                                                l == level,
+                                            ]
+                                        )
+                                    ),
+                                    jnp.all(
+                                        jnp.array(
+                                            [
+                                                q == TileType.RAMP.value,
+                                                r2 == (2 - d) % 4,
+                                                f2 == level,
+                                                l == level + 1,
+                                            ]
+                                        )
+                                    ),
+                                    jnp.all(
+                                        jnp.array(
+                                            [q == TileType.SQUARE.value, l == level]
+                                        )
+                                    ),
+                                ]
+                            )
+                        ),
+                        lambda z: z.at[d].set(jnp.array([x, y])),
+                        lambda z: z,
+                        slots,
+                    )
+
+                slots = jax.lax.cond(
+                    jnp.all(
+                        jnp.array(
+                            [
+                                0 <= x,
+                                x < combined.shape[0],
+                                0 <= y,
+                                y < combined.shape[1],
+                            ]
+                        )
+                    ),
+                    process_square_inner,
+                    lambda x: x,
+                    slots,
+                )
+            return slots
+
+        def process_ramp(combined, i, j, slots, dx, dy):
+            tile, r, f, level = combined[i, j]
+            mask = jnp.where((r + 1) % 2 == 0, 1, 0)
             for d in range(4):
-                x = i + dx.at[d].get()
-                y = j + dy.at[d].get()
-                if (
-                    0 <= x < combined.shape[0]
-                    and 0 <= y < combined.shape[1]
-                    and (d + r % 2) % 2 == 0
-                ):
-                    q, r2, f2, l = combined.at[x, y].get()
-                    if q == TileType.SQUARE.value and d == (2 - r) % 4 and l == level:
-                        slots = slots.at[d].set(jnp.array([x, y]))
-                    if q == TileType.SQUARE.value and d == (4 - r) % 4 and l == f:
-                        slots = slots.at[d].set(jnp.array([x, y]))
-                    if (
-                        q == TileType.RAMP.value
-                        and d == (2 - r) % 4
-                        and r == r2
-                        and f2 == level
-                    ):
-                        slots = slots.at[d].set(jnp.array([x, y]))
-                    if (
-                        q == TileType.RAMP.value
-                        and d == (4 - r) % 4
-                        and r == r2
-                        and l == f
-                    ):
-                        slots = slots.at[d].set(jnp.array([x, y]))
+                x = i + dx[d]
+                y = j + dy[d]
 
-        return slots
+                def process_ramp_inner(slots):
+                    q, r2, f2, l = combined[x, y]
+                    return jax.lax.cond(
+                        jnp.any(
+                            jnp.array(
+                                [
+                                    jnp.all(
+                                        jnp.array(
+                                            [
+                                                q == TileType.SQUARE.value,
+                                                d == (2 - r) % 4,
+                                                l == level,
+                                            ]
+                                        )
+                                    ),
+                                    jnp.all(
+                                        jnp.array(
+                                            [
+                                                q == TileType.SQUARE.value,
+                                                d == (4 - r) % 4,
+                                                l == f,
+                                            ]
+                                        )
+                                    ),
+                                    jnp.all(
+                                        jnp.array(
+                                            [
+                                                q == TileType.RAMP.value,
+                                                d == (2 - r) % 4,
+                                                r == r2,
+                                                f2 == level,
+                                            ]
+                                        )
+                                    ),
+                                    jnp.all(
+                                        jnp.array(
+                                            [
+                                                q == TileType.RAMP.value,
+                                                d == (4 - r) % 4,
+                                                r == r2,
+                                                l == f,
+                                            ]
+                                        )
+                                    ),
+                                ]
+                            )
+                        ),
+                        lambda z: z.at[d].set(jnp.array([x, y])),
+                        lambda z: z,
+                        slots,
+                    )
 
-    def __bfs(i, j, ind, w, h, visited, spawnable, combined):
-        capacity = w * h
+                slots = jax.lax.cond(
+                    jnp.all(
+                        jnp.array(
+                            [
+                                0 <= x,
+                                x < combined.shape[0],
+                                0 <= y,
+                                y < combined.shape[1],
+                                (d + mask) % 2 == 0,
+                            ]
+                        )
+                    ),
+                    process_ramp_inner,
+                    lambda x: x,
+                    slots,
+                )
+            return slots
+
+        return jax.lax.switch(
+            combined[i, j, 0],
+            [process_square, process_ramp, lambda a, b, c, s, d, e: s],
+            combined,
+            i,
+            j,
+            slots,
+            dx,
+            dy,
+        )
+
+    @jax.jit
+    def __bfs(i, j, ind, visited, spawnable, combined):
+        capacity = combined.shape[0] * combined.shape[1]
         queue = jnp.full((capacity, 2), -1)
         front, rear, size = 0, 0, 0
 
+        @jax.jit
         def __enqueue(i, j, rear, queue, size):
             queue = queue.at[rear].set(jnp.array([i, j]))
             rear = (rear + 1) % capacity
-            size = size + 1
+            size += 1
             return rear, queue, size
 
+        @jax.jit
         def __dequeue(front, queue, size):
-            res = queue.at[front].get()
+            res = queue[front]
             front = (front + 1) % capacity
-            size = size - 1
+            size -= 1
             return res, front, size
 
         visited = visited.at[i, j].set(True)
         rear, queue, size = __enqueue(i, j, rear, queue, size)
 
-        while size > 0:
+        def body_fun(args):
+            queue, front, rear, size, visited, spawnable = args
             item, front, size = __dequeue(front, queue, size)
-            x, y = item.astype(jnp.int16)
+            x, y = item.astype(jnp.int32)
 
             # PROCESS
             spawnable = spawnable.at[x, y].set(ind)
 
             # Find next nodes
-            for node in __adj(x, y, combined):
+            def process_adj(carry, node):
                 p, q = node
-                if jnp.all(
-                    jnp.array([p >= 0, q >= 0, jnp.logical_not(visited.at[p, q].get())])
-                ):
+
+                visited, rear, queue, size, combined = carry
+
+                def process_node(visited, rear, queue, size):
                     visited = visited.at[p, q].set(True)
                     rear, queue, size = __enqueue(p, q, rear, queue, size)
+                    return visited, rear, queue, size
+
+                def process_node_identity(visited, rear, queue, size):
+                    return visited, rear, queue, size
+
+                visited, rear, queue, size = jax.lax.cond(
+                    jnp.all(
+                        jnp.array([p >= 0, q >= 0, jnp.logical_not(visited[p, q])])
+                    ),
+                    process_node,
+                    process_node_identity,
+                    visited,
+                    rear,
+                    queue,
+                    size,
+                )
+                return (visited, rear, queue, size, combined), None
+
+            (visited, rear, queue, size, _), _ = jax.lax.scan(
+                process_adj,
+                (visited, rear, queue, size, combined),
+                __adj_jit(x, y, combined),
+            )
+
+            return queue, front, rear, size, visited, spawnable
+
+        _, _, _, _, visited, spawnable = jax.lax.while_loop(
+            lambda args: args[3] > 0,
+            body_fun,
+            (queue, front, rear, size, visited, spawnable),
+        )
 
         return visited, spawnable
 
-    for i in range(w):
-        for j in range(h):
-            if jnp.logical_not(visited.at[i, j].get()):
-                visited, spawnable = __bfs(
-                    i, j, i * w + j, w, h, visited, spawnable, combined
-                )
+    def scan_body(carry, ind):
+        visited, spawnable = carry
+        i = ind // w
+        j = ind % w
+        visited, spawnable = jax.lax.cond(
+            jnp.logical_not(visited.at[i, j].get()),
+            lambda x: __bfs(i, j, i * w + j, x[0], x[1], combined),
+            lambda x: x,
+            (visited, spawnable),
+        )
+        return (visited, spawnable), None
+
+    (visited, spawnable), _ = jax.lax.scan(
+        scan_body, (visited, spawnable), jnp.arange(w * h)
+    )
+
     spawnable = jnp.where(
-        spawnable == jnp.argmax(jnp.bincount(spawnable.flatten())), 1, 0
+        spawnable == jnp.argmax(jnp.bincount(spawnable.flatten(), length=1)), 1, 0
     )
     return spawnable
 
-
-reader = XMLReader(os.path.join("tilemap", "data.xml"))
-t, w, p, c = reader.get_tilemap_data()
+t, w, p, c = NUM_ACTIONS, WEIGHTS, PROPAGATOR, TILECODES
 model = SerialModel(10, 10, 1, False, Heuristic.ENTROPY)
 model.T = t
 model.weights = w.tolist()
-model.propagator = [[[int(x) for x in w if x >= 0] for w in z] for z in p]
+model.propagator = p.astype(int).tolist()
 seed = 42
+# model.init()
+# model.clear()
+# model.observe(0, 0.07805848121643066)
+# model.propagate()
+# print(model.wave)
+# print(model.compatible)
+# print(model.stack)
+# print(model.stacksize)
+# print(model.sumsOfOnes)
+# print(model.sumsOfWeights)
+# print(model.sumsOfWeightLogWeights)
+# print(model.entropies)
+# print(model.distribution)
 model.run(seed, 1000)
 obs, tilemap = model._export(c)
-print(_validate(tilemap))
-reader.save(obs, model.MX, model.MY, "temp_2.png")
+
+# reader.save(obs, model.MX, model.MY, "temp_2.png")
 world = create_world(tilemap)
 export_stl(world, "test.stl")
+# spawnmap = _get_spawn_map(tilemap)
+# res = _sample_spawn_points(jax.random.key(0), spawnmap, 10)
+# print(res)
