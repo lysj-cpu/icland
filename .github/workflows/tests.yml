@@ -2,8 +2,7 @@ name: Tests
 on: [ push, pull_request ]
 
 jobs:
-  pytest:
-    name: python
+  tests:
     runs-on: ubuntu-latest
 
     steps:
@@ -16,7 +15,7 @@ jobs:
         run: uv sync --all-extras --dev
 
       - name: Run pytest
-        run: uv run pytest --cov-report=xml:coverage.xml --cov icland
+        run: uv run pytest --cov-report=xml:coverage.xml --doctest-modules --cov icland
 
       - name: Run mypy
         run: uv run mypy --strict .
