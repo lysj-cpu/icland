@@ -81,10 +81,19 @@ TEST_XML_STRING: str = """
 def sample(key: jax.Array) -> ICLandParams:
     """Sample a new set of environment parameters using 'key'.
 
-    Returns a tuple containing:
-    - mj_model: Mujoco model of the environment.
-    - game: Game string (placeholder, currently None).
-    - agent_count: Number of agents in the environment.
+    Returns:
+        ICLandParams: Parameters for the ICLand environment.
+
+        - mj_model: Mujoco model of the environment.
+        - game: Game string (placeholder, currently None).
+        - agent_count: Number of agents in the environment.
+
+    Examples:
+        >>> from icland import sample
+        >>> import jax
+        >>> key = jax.random.key(42)
+        >>> sample(key)
+        ICLandParams(model=MjModel, game=None, agent_count=1)
     """
     mj_model: mujoco.MjModel = mujoco.MjModel.from_xml_string(TEST_XML_STRING)
     return ICLandParams(mj_model, None, 1)
@@ -93,10 +102,20 @@ def sample(key: jax.Array) -> ICLandParams:
 def init(key: jax.Array, params: ICLandParams) -> ICLandState:
     """Initialize the environment state from params.
 
-    Returns a tuple containing:
-    - mjx_model: JAX-compatible Mujoco model.
-    - mjx_data: JAX-compatible Mujoco data.
-    - object_ids: Array of body and geometry IDs for agents.
+    Returns:
+        ICLandState: State of the ICLand environment.
+
+        - mjx_model: JAX-compatible Mujoco model.
+        - mjx_data: JAX-compatible Mujoco data.
+        - agent_data: Body and geometry IDs for agents.
+
+    Examples:
+        >>> from icland import sample, init
+        >>> import jax
+        >>> key = jax.random.key(42)
+        >>> params = sample(key)
+        >>> init(key, params)
+        ICLandState(mjx_model=Model(...), mjx_data=Data(...), agent_data=AgentData(...))
     """
     mj_model = params.model
     agent_count = params.agent_count
@@ -135,10 +154,23 @@ def step(
 ) -> ICLandState:
     """Advance environment one step for all agents.
 
-    Returns the updated state containing:
-    - mjx_model: Updated Mujoco model.
-    - mjx_data: Updated Mujoco data.
-    - agent_data: Body and geometry IDs for agents.
+    Returns:
+        ICLandState: State of the ICLand environment.
+
+        - mjx_model: JAX-compatible Mujoco model.
+        - mjx_data: JAX-compatible Mujoco data.
+        - agent_data: Body and geometry IDs for agents.
+
+    Examples:
+        >>> from icland import sample, init, step
+        >>> import jax
+        >>> import jax.numpy as jnp
+        >>> forward_policy = jnp.array([1, 0, 0])
+        >>> key = jax.random.key(42)
+        >>> params = sample(key)
+        >>> state = init(key, params)
+        >>> step(key, state, params, forward_policy)
+        ICLandState(mjx_model=Model(...), mjx_data=Data(...), agent_data=AgentData(...))
     """
     mjx_model = state.mjx_model
     mjx_data = state.mjx_data

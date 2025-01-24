@@ -30,6 +30,13 @@ class ICLandParams(PyTreeNode):  # type: ignore[misc]
     game: Optional[str]
     agent_count: int
 
+    # Without this, model is model=<mujoco._structs.MjModel object at 0x7b61fb18dc70>
+    # For some arbitrary memory address. __repr__ provides cleaner output
+    # for users and for testing.
+    def __repr__(self):
+        """Return a string representation of the ICLandParams object."""
+        return f"ICLandParams(model={type(self.model).__name__}, game={self.game}, agent_count={self.agent_count})"
+
 
 class AgentData(PyTreeNode):  # type: ignore[misc]
     r"""\Agent in the ICLand environment.
