@@ -109,10 +109,11 @@ def render_video(
     imageio.mimsave(video_name, third_person_frames, fps=30, quality=8)
 
 
-for i, preset in enumerate(SIMULATION_PRESETS):
-    render_video(
-        preset["world"],
-        preset["policy"],
-        preset["duration"],
-        f"tests/output/video_{preset['name']}.mp4",
-    )
+if __name__ == "__main__":
+    for i, preset in enumerate(SIMULATION_PRESETS):
+        render_video(
+            preset["world"],
+            preset["policy"],
+            preset["duration"],
+            f"tests/output/video_{preset['name']}.mp4",
+        )
