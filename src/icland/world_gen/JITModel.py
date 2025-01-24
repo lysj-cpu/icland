@@ -249,7 +249,6 @@ def init(
     )
 
 
-@partial(jax.jit, static_argnames=["max_steps"])
 def run(model, max_steps=1000):
     """Run the WaveFunctionCollapse algorithm with the given seed and iteration limit."""
     # Pre: the model is freshly initialized
@@ -268,21 +267,21 @@ def run(model, max_steps=1000):
 
         # Generate new key for this iteration
         key, subkey = jax.random.split(model.key)
-        model = model.replace(key=key)
+        model = model.replace(key=subkey)
 
         # Get next unobserved node
         model, node = next_unobserved_node(model)
 
         # Use lax.cond instead of if/else
         def handle_node(args):
-            model, node, key = args
+            model, node = args
             # Observe and propagate
             model = observe(model, node)
             model, success = propagate(model)
             return model, False, success
 
         def handle_completion(args):
-            model, node, key = args
+            model, node = args
 
             # Final observation assignment
             def body_fun(i, model):
@@ -292,7 +291,6 @@ def run(model, max_steps=1000):
                 t = jax.lax.map(
                     find_true, jnp.arange(model.distribution.shape[0])
                 ).argmax()
-                print('t: ' + t)
 
                 model = model.replace(observed=model.observed.at[i].set(t))
                 return model
@@ -301,7 +299,7 @@ def run(model, max_steps=1000):
             return model, True, True
 
         model, done, success = jax.lax.cond(
-            node >= 0, handle_node, handle_completion, (model, node, subkey)
+            node >= 0, handle_node, handle_completion, (model, node)
         )
 
         return {"model": model, "steps": steps + 1, "done": done, "success": success}
@@ -312,7 +310,6 @@ def run(model, max_steps=1000):
     return final_state["model"], final_state["success"]
 
 
-@jax.jit
 def next_unobserved_node(model):
     """Selects the next cell to observe according to the chosen heuristic (Scanline, Entropy, or MRV).
 
@@ -347,13 +344,20 @@ def next_unobserved_node(model):
     key = model.key
 
     def scanline_heuristic(_):
-        observed_mask = jax.vmap(lambda x: x >= observed_so_far)(all_indices)
-        sum_of_ones_mask = jax.vmap(lambda x: model.sums_of_ones.at[x].get() > 1)(
-            all_indices
-        )
+        print("observed_so_far")
+        print(observed_so_far)
+        observed_mask = all_indices >= observed_so_far
+        sum_of_ones_mask = model.sums_of_ones[all_indices] > 1
+
+        jax.debug.print("valid_mask: {}", valid_nodes_mask)
+        jax.debug.print("observed_mask: {}", observed_mask)
+        jax.debug.print("sum_of_ones_mask: {}", sum_of_ones_mask)
         valid_scanline_nodes_with_choices = jnp.atleast_1d(
-            jnp.all(jnp.array([valid_nodes_mask, observed_mask, sum_of_ones_mask]))
+            jnp.all(
+                jnp.array([valid_nodes_mask, observed_mask, sum_of_ones_mask]), axis=0
+            )
         )
+        jax.debug.print("valid_scanline...: {}", valid_scanline_nodes_with_choices)
 
         # Use lax.dynamic_slice_in_dim to select the first element
         def process_node(_):
@@ -366,7 +370,6 @@ def next_unobserved_node(model):
             return (
                 model.replace(
                     observed_so_far=next_node + 1,
-                    key=jax.random.fold_in(key, next_node),
                 ),
                 next_node,
             )

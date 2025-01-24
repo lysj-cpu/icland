@@ -1,4 +1,5 @@
 """Test scripts for world generation part of the pipeline."""
+
 import os
 import tempfile
 from xml.etree.ElementTree import Element
@@ -8,23 +9,24 @@ import pytest
 from PIL import Image
 
 from src.icland.world_gen.XMLReader import (
-  TileType,
-  XMLReader,
-  get_xml_attribute,
-  load_bitmap,
-  save_bitmap,
+    TileType,
+    XMLReader,
+    get_xml_attribute,
+    load_bitmap,
+    save_bitmap,
 )
 
 
 @pytest.fixture
 def xml_reader():
-  """Fixture to create an XMLReader instance with our data XML file."""
-  xml_file = 'src/icland/world_gen/tilemap/data.xml'
-  return XMLReader(xml_file)
+    """Fixture to create an XMLReader instance with our data XML file."""
+    xml_file = "src/icland/world_gen/tilemap/data.xml"
+    return XMLReader(xml_file)
+
 
 def test_load_bitmap():
     """Test loading bitmap function for debugging tilemaps.
-    
+
     This test verifies that the `load_bitmap` function correctly loads a
     bitmap from a temporary PNG file, converts the pixel data to ARGB format,
     and returns the expected width, height, and pixel data. It also ensures
@@ -245,38 +247,40 @@ def test_save(xml_reader, tmp_path):
 
 
 def test_xml_reader(xml_reader):
-  """Test the XMLReader class attributes and data integrity.
+    """Test the XMLReader class attributes and data integrity.
 
-  This test verifies that the various attributes of the `XMLReader`
-  class, such as `tiles`, `tilenames`, `tilecodes`, `weights`, and
-  `propagator`, are correctly initialized and match the expected
-  structure and data types. It checks that the number of tiles (`T`)
-  corresponds to the length of these attributes.
-  """
-  # Attributes:
-  #       tiles (list): Pixel data arrays for each tile variant.
-  #       tilenames (list): Names of tiles (including variants).
-  #       tilesize (int): Size (width and height) of each tile in pixels.
-  #       tilecodes (list): Encoded tile properties as 4-tuples (type, rotation, from, to).
-  #       weights (list): Weights associated with each tile variant.
-  #       propagator (list): Sparse adjacency data indicating valid neighboring tiles.
-  #       j_propagator (jax.numpy.array): JAX-compatible array representation of `propagator`.
-  #       j_weights (jax.numpy.array): JAX-compatible array of tile weights.
-  #       j_tilecodes (jax.numpy.array): JAX-compatible array of tile properties.
-  #       T (int): Number of tile variants.
+    This test verifies that the various attributes of the `XMLReader`
+    class, such as `tiles`, `tilenames`, `tilecodes`, `weights`, and
+    `propagator`, are correctly initialized and match the expected
+    structure and data types. It checks that the number of tiles (`T`)
+    corresponds to the length of these attributes.
+    """
+    # Attributes:
+    #       tiles (list): Pixel data arrays for each tile variant.
+    #       tilenames (list): Names of tiles (including variants).
+    #       tilesize (int): Size (width and height) of each tile in pixels.
+    #       tilecodes (list): Encoded tile properties as 4-tuples (type, rotation, from, to).
+    #       weights (list): Weights associated with each tile variant.
+    #       propagator (list): Sparse adjacency data indicating valid neighboring tiles.
+    #       j_propagator (jax.numpy.array): JAX-compatible array representation of `propagator`.
+    #       j_weights (jax.numpy.array): JAX-compatible array of tile weights.
+    #       j_tilecodes (jax.numpy.array): JAX-compatible array of tile properties.
+    #       T (int): Number of tile variants.
 
-  assert xml_reader.T == len(xml_reader.tiles)
-  assert xml_reader.T == len(xml_reader.tilenames)
-  assert xml_reader.T == len(xml_reader.tilecodes)
-  assert xml_reader.T == len(xml_reader.weights)
-  assert xml_reader.T == len(xml_reader.propagator[0])
-  assert xml_reader.tilesize == 8
-  assert "ramp_1_2 0" in xml_reader.tilenames[0]
-  assert "square_turn_6 3" in xml_reader.tilenames[-1]
-  assert xml_reader.tilecodes[0] == (TileType.RAMP.value, 0, 1, 2)
-  assert xml_reader.weights[0] == 3.0
-  # One of the tiles that could be right of tile 0 (because 2 is left to right)
-  assert xml_reader.tilenames[xml_reader.propagator[2][0][1]] == "square_boundary_1 2"
-  assert len(xml_reader.propagator) == 4
+    assert xml_reader.T == len(xml_reader.tiles)
+    assert xml_reader.T == len(xml_reader.tilenames)
+    assert xml_reader.T == len(xml_reader.tilecodes)
+    assert xml_reader.T == len(xml_reader.weights)
+    assert xml_reader.T == len(xml_reader.propagator[0])
+    assert xml_reader.tilesize == 8
+    assert "ramp_1_2 0" in xml_reader.tilenames[0]
+    assert "square_turn_6 3" in xml_reader.tilenames[-1]
+    assert xml_reader.tilecodes[0] == (TileType.RAMP.value, 0, 1, 2)
+    assert xml_reader.weights[0] == 3.0
+    # One of the tiles that could be right of tile 0 (because 2 is left to right)
+    assert xml_reader.tilenames[xml_reader.propagator[2][0][1]] == "square_boundary_1 2"
+    assert len(xml_reader.propagator) == 4
 
-  assert xml_reader.j_propagator.at[2, 0, 1].get() == xml_reader.tilenames.index("square_boundary_1 2")
+    assert xml_reader.j_propagator.at[2, 0, 1].get() == xml_reader.tilenames.index(
+        "square_boundary_1 2"
+    )
