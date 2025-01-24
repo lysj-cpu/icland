@@ -5,6 +5,7 @@ import jax.numpy as jnp
 import numpy as np
 from stl import mesh
 from XMLReader import TileType
+from stl.base import RemoveDuplicates
 
 # Previous constants (BLOCK_VECTORS, RAMP_VECTORS, ROTATION_MATRICES) remain the same...
 # Optimization: Pre-compute block and ramp vectors as constants
@@ -69,7 +70,7 @@ def pad_triangles(triangles: jnp.ndarray, max_triangles: int = MAX_TRIANGLES):
     triangles = triangles.astype("float32")
     current_triangles = triangles.shape[0]
 
-    # Create full-size array of zeros
+    # Create full-size array of 0s
     result = jnp.zeros((max_triangles, 3, 3))
 
     # Use dynamic_update_slice to copy actual triangles
@@ -174,13 +175,19 @@ def export_stl(pieces, filename):
     pieces_reshaped = pieces.reshape(-1, *pieces.shape[-2:])
     # Convert from JAX array to numpy
     triangles = np.array(pieces_reshaped)
+    # Invert the normals
+    triangles = triangles[:, ::-1, :]
+    print(triangles)
 
     # Ensure the array is contiguous and in float32 format
     # numpy-stl expects float32 data
     triangles = np.ascontiguousarray(triangles, dtype=np.float32)
 
     # Create the mesh data structure
-    world_mesh = mesh.Mesh(np.zeros(len(triangles), dtype=mesh.Mesh.dtype))
+    world_mesh = mesh.Mesh(
+        np.zeros(len(triangles), dtype=mesh.Mesh.dtype),
+        remove_duplicate_polygons=RemoveDuplicates.NONE,
+    )
 
     # Assign vectors to the mesh
     world_mesh.vectors = triangles
