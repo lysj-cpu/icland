@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import pytest
 from PIL import Image
 
-from src.icland.world_gen.XMLReader import (
+from icland.world_gen.XMLReader import (
     TileType,
     XMLReader,
     get_xml_attribute,

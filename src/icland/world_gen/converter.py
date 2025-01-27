@@ -4,8 +4,9 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from stl import mesh
-from XMLReader import TileType
 from stl.base import RemoveDuplicates
+
+from icland.world_gen.XMLReader import TileType
 
 # Previous constants (BLOCK_VECTORS, RAMP_VECTORS, ROTATION_MATRICES) remain the same...
 # Optimization: Pre-compute block and ramp vectors as constants

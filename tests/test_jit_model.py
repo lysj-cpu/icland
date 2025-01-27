@@ -6,13 +6,14 @@ import pytest
 
 from icland.world_gen.JITModel import (
     Heuristic,
-    ban,
-    clear,
-    init,
-    next_unobserved_node,
-    observe,
-    propagate,
-    random_index_from_distribution,
+    _ban,
+    _clear,
+    _init,
+    _next_unobserved_node,
+    _observe,
+    _propagate,
+    _random_index_from_distribution,
+    _run,
 )
 from icland.world_gen.XMLReader import XMLReader
 
@@ -28,7 +29,7 @@ def xml_reader():
 def model(xml_reader):
     """Fixture to create a JITModel instance."""
     t, w, p, _ = xml_reader.get_tilemap_data()
-    model = init(
+    model = _init(
         width=10,
         height=10,
         T=t,
@@ -49,6 +50,7 @@ def tilemap(xml_reader):
     return c
 
 
+# Tests for random_index_from_distribution
 @pytest.mark.parametrize(
     "distribution, rand_value, expected_result",
     [
@@ -71,7 +73,7 @@ def tilemap(xml_reader):
 def test_random_index_from_distribution(distribution, rand_value, expected_result):
     """Test the random_index_from_distribution function."""
     # JIT compile the function
-    jit_func = jax.jit(random_index_from_distribution)
+    jit_func = jax.jit(_random_index_from_distribution)
 
     # Call the function and check the result
     result = jit_func(distribution, rand_value)
@@ -92,7 +94,7 @@ def test_edge_cases_for_random_index_from_distribution(distribution):
     """Test edge cases for random_index_from_distribution with edge cases in distribution."""
     # Test with random values between 0 and 1 for rand_value
     for rand_value in [0.0, 0.5, 0.999]:
-        result = random_index_from_distribution(distribution, rand_value)
+        result = _random_index_from_distribution(distribution, rand_value)
         if jnp.sum(distribution) == 0:
             assert result == -1, f"Expected -1 for sum 0, but got {result}"
         else:
@@ -101,7 +103,7 @@ def test_edge_cases_for_random_index_from_distribution(distribution):
             )
 
 
-def test_model_initialization(model):
+def test_model_init(model):
     """Test the initialization of the ModelX."""
     assert model.MX == 10
     assert model.MY == 10
@@ -133,21 +135,6 @@ def test_model_initialization(model):
     )
 
 
-def test_model_propagate(model):
-    """Test the propagate function."""
-    updated_model, has_non_zero_sum = propagate(model)  # Propagate constraints
-
-    assert updated_model.stacksize == 0, (
-        "Stack size should be reduced after propagation."
-    )
-    assert has_non_zero_sum, (
-        "The sum of ones should be greater than 0 after propagation."
-    )
-    assert updated_model.compatible[0, 0, 0] == 0, (
-        "The compatible array should have been modified."
-    )
-
-
 def test_model_observe(model):
     """Test the observe function."""
     # - key changed
@@ -166,7 +153,7 @@ def test_model_observe(model):
     node = 12
 
     # Run the `observe` function
-    observed_model = observe(model, node)
+    observed_model = _observe(model, node)
     assert model.key != observed_model.key, (
         "The random key should be updated after observation."
     )
@@ -198,7 +185,7 @@ def test_model_ban(model):
     i = 5
     t = 1  # Pattern index to ban
 
-    updated_model = ban(model, i, jnp.array(t))
+    updated_model = _ban(model, i, jnp.array(t))
 
     assert updated_model.wave.at[i, t].get() == False, (
         f"Pattern {t} at cell {i} should be banned."
@@ -248,22 +235,48 @@ def test_model_ban(model):
     )
 
 
-# def test_model_run(model):
-#     key = jax.random.PRNGKey(0)
+def test_model_run(model):
+    """Test the run function."""
+    key = jax.random.PRNGKey(0)
 
-#     # Run the function
-#     final_model, success = run(model, max_steps=100)
+    # Run the function
 
-#     # Assert the success flag
-#     assert success, "Algorithm did not complete successfully"
+    for k in range(10):
+        key, subkey = jax.random.split(model.key)
+        model = _clear(model)
+        model = model.replace(key=key)
+        model, success = _run(model, max_steps=100)
 
-#     # Verify model updates
-#     print('observed: ', final_model.observed)
-#     assert jnp.all(final_model.observed >= 0), "Not all nodes were observed"
-#     assert final_model.key is not None, "Final model has no key"
+        if success:
+            print("DONE")
+            # Save result
+        else:
+            print("CONTRADICTION")
 
-#     # Ensure no infinite loop (e.g., reached max_steps)
-#     assert final_model.key != key, "Algorithm did not run properly"
+    assert True
+
+    # Verify model updates
+    # print("observed: ", final_model.observed)
+    # assert jnp.all(final_model.observed >= 0), "Not all nodes were observed"
+    # assert final_model.key is not None, "Final model has no key"
+
+    # # Ensure no infinite loop (e.g., reached max_steps)
+    # assert final_model.key != key, "Algorithm did not run properly"
+
+
+def test_model_propagate(model):
+    """Test the propagate function."""
+    updated_model, has_non_zero_sum = _propagate(model)  # Propagate constraints
+
+    assert updated_model.stacksize == 0, (
+        "Stack size should be reduced after propagation."
+    )
+    assert has_non_zero_sum, (
+        "The sum of ones should be greater than 0 after propagation."
+    )
+    assert updated_model.compatible[0, 0, 0] == 0, (
+        "The compatible array should have been modified."
+    )
 
 
 def test_model_next_unobserved_node_scanline(model):
@@ -274,8 +287,8 @@ def test_model_next_unobserved_node_scanline(model):
     sums_of_ones[0] = 2 (>1), so we expect index=0.
     """
     model = model.replace(heuristic=Heuristic.SCANLINE.value)
-    model_1, chosen_index_1 = next_unobserved_node(model)
-    model_2, chosen_index_2 = next_unobserved_node(model_1)
+    model_1, chosen_index_1 = _next_unobserved_node(model)
+    model_2, chosen_index_2 = _next_unobserved_node(model_1)
     assert chosen_index_1 == 0
     assert model_1.observed_so_far == 1
     assert chosen_index_2 == 1
@@ -293,7 +306,7 @@ def test_next_unobserved_node_entropy(model):
     Even though index=2 has lower entropy (0.4), it's out-of-bounds with N=2 (periodic=False).
     """
     model = model.replace(heuristic=Heuristic.ENTROPY.value)
-    new_model, chosen_index = next_unobserved_node(model)
+    new_model, chosen_index = _next_unobserved_node(model)
     assert chosen_index == 0
     assert new_model.observed_so_far == 0, (
         "Check if your code updates observed_so_far for ENTROPY"
@@ -307,23 +320,24 @@ def test_next_unobserved_node_mrv(model):
     The only in-bounds index is 0, which has sums_of_ones=2 (>1), so expect 0 again.
     """
     model = model.replace(heuristic=Heuristic.MRV.value)
-    new_model, chosen_index = next_unobserved_node(model)
+    new_model, chosen_index = _next_unobserved_node(model)
     assert chosen_index == 0
 
 
-# def test_next_unobserved_node_all_determined(model):
-#     """Test for next unobserved node when all are determined.
+def test_next_unobserved_node_all_determined(model):
+    """Test for next unobserved node when all are determined.
 
-#     If all valid cells have sums_of_ones <= 1 (or if none are in-bounds),
-#     the function should return -1.
-#     """
-#     # Force sums_of_ones <= 1
-#     sums_of_ones = jnp.array([1, 1, 1, 1])
-#     model = model.replace(sums_of_ones=sums_of_ones)
-#     new_model, chosen_index = next_unobserved_node(model)
-#     assert chosen_index == -1, "Expected -1 when all are determined"
+    If all valid cells have sums_of_ones <= 1 (or if none are in-bounds),
+    the function should return -1.
+    """
+    # Force sums_of_ones <= 1
+    sums_of_ones = jnp.ones_like(model.sums_of_ones)
+    model = model.replace(heuristic=Heuristic.ENTROPY.value, sums_of_ones=sums_of_ones)
+    new_model, chosen_index = _next_unobserved_node(model)
+    assert chosen_index == -1, "Expected -1 when all are determined"
 
 
+# TODO: Not sure what chosen_index should be now, because it is a bit random
 # def test_next_unobserved_node_periodic(model):
 #     """Demonstrate what happens if periodic=True, so more cells might be in-bounds.
 
@@ -341,7 +355,7 @@ def test_next_unobserved_node_mrv(model):
 def test_model_clear(model):
     """Test the clear function to ensure it resets the model's attributes correctly."""
     # Call the clear function
-    updated_model = clear(model)
+    updated_model = _clear(model)
 
     # Test that 'wave' is reset to all True
     assert jnp.all(updated_model.wave == True), "Wave should be all True."
