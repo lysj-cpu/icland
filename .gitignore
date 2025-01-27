@@ -268,4 +268,4 @@ $RECYCLE.BIN/
 
 # End of https://www.toptal.com/developers/gitignore/api/python,macos,windows,linux,visualstudiocode
 
-tests/output/*
+tests/video_output/*

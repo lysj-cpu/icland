@@ -30,8 +30,8 @@ import imageio
 import jax
 import mujoco
 from mujoco import mjx
-from test_policies import *
-from test_worlds import *
+from assets.policies import *
+from assets.worlds import *
 
 import icland
 from icland.types import *
@@ -114,5 +114,5 @@ for i, preset in enumerate(SIMULATION_PRESETS):
         preset["world"],
         preset["policy"],
         preset["duration"],
-        f"tests/output/video_{preset['name']}.mp4",
+        f"tests/video_output/{preset['name']}.mp4",
     )

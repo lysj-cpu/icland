@@ -5,7 +5,7 @@ from typing import Callable
 import jax
 import jax.numpy as jnp
 import pytest
-from test_policies import *
+from assets.policies import *
 
 import icland
 from icland.types import ICLandState
@@ -41,7 +41,7 @@ def initialize_icland(key: jax.Array) -> Callable[[jnp.ndarray], ICLandState]:
         (NOOP_POLICY, 0, 0, "No Movement"),
     ],
 )
-def test_agent_movement(
+def test_agent(
     key: jax.Array,
     initialize_icland: Callable[[jnp.ndarray], ICLandState],
     policy: jnp.ndarray,
