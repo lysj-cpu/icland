@@ -4,11 +4,13 @@ from typing import Callable
 
 import jax
 import jax.numpy as jnp
+import mujoco
 import pytest
 from assets.policies import *
+from assets.worlds import *
 
 import icland
-from icland.types import ICLandState
+from icland.types import *
 
 
 @pytest.fixture
@@ -16,73 +18,59 @@ def key() -> jax.Array:
     """Fixture to provide a consistent PRNG key for tests."""
     return jax.random.PRNGKey(42)
 
-
-@pytest.fixture
-def initialize_icland(key: jax.Array) -> Callable[[jnp.ndarray], ICLandState]:
-    """Fixture to initialize the ICLand environment."""
-
-    def _init(policy: jnp.ndarray) -> ICLandState:
-        icland_params = icland.sample(key)
-        icland_state = icland.init(key, icland_params)
-        # Perform a warm-up step
-        icland_state = icland.step(key, icland_state, None, policy)
-        return icland_state
-
-    return _init
-
-
 @pytest.mark.parametrize(
-    "policy, axis, direction, description",
+    "name, policy, expected_direction",
     [
-        (FORWARD_POLICY, 0, 1, "Forward Movement"),
-        (BACK_POLICY, 0, -1, "Backward Movement"),
-        (LEFT_POLICY, 1, -1, "Left Movement"),
-        (RIGHT_POLICY, 1, 1, "Right Movement"),
-        (NOOP_POLICY, 0, 0, "No Movement"),
+        ("Forward Movement", FORWARD_POLICY, jnp.array([1, 0])),
+        ("Backward Movement", BACKWARD_POLICY, jnp.array([-1, 0])),
+        ("Left Movement", LEFT_POLICY, jnp.array([0, -1])),
+        ("Right Movement", RIGHT_POLICY, jnp.array([0, 1])),
+        ("No Movement", NOOP_POLICY, jnp.array([0, 0])),
     ],
 )
-def test_agent(
+def test_agent_translation(
     key: jax.Array,
-    initialize_icland: Callable[[jnp.ndarray], ICLandState],
+    name: str,
     policy: jnp.ndarray,
-    axis: int,
-    direction: float,
-    description: str,
+    expected_direction: jnp.ndarray,
 ) -> None:
     """Test agent movement in ICLand environment."""
-    icland_state = initialize_icland(policy)
+
+    mj_model = mujoco.MjModel.from_xml_string(EMPTY_WORLD)
+
+    icland_params = ICLandParams(
+        mj_model,
+        None,
+        1
+    )
+
+    icland_state = icland.init(key, icland_params)
     body_id = icland_state.agent_data.body_id[0]
 
-    # Get initial position
-    initial_pos = icland_state.mjx_data.xpos[body_id]
+    # Get initial position, without height
+    initial_pos = icland_state.mjx_data.xpos[body_id][:2]
 
-    # Step the environment and get new position
+    # Step the environment to update the agents velocty
     icland_state = icland.step(key, icland_state, None, policy)
-    new_pos = icland_state.mjx_data.xpos[body_id]
 
-    if axis is None:
-        # No movement expected
-        assert jnp.allclose(initial_pos, new_pos), (
-            f"{description} failed: Agent moved when it shouldn't have. "
-            f"Initial: {initial_pos}, New: {new_pos}, Policy: {policy}"
-        )
-    else:
-        # Movement expected
-        initial_axis = initial_pos[axis]
-        new_axis = new_pos[axis]
+    # Check if the correct velocity was applied
+    velocity = icland_state.mjx_data.qvel[:2]
+    normalised_velocity = velocity / (jnp.linalg.norm(velocity) + 1e-10)
+    assert jnp.allclose(normalised_velocity, expected_direction), (
+        f"{name} failed: Expected velocity {expected_direction}, "
+        f"Actual velocity {normalised_velocity}"
+    )
 
-        if direction > 0:
-            assert new_axis > initial_axis, (
-                f"{description} failed: Expected positive movement along axis {axis}. "
-                f"Initial: {initial_axis}, New: {new_axis}, Policy: {policy}"
-            )
-        elif direction == 0:
-            assert jnp.allclose(initial_pos[:2], new_pos[:2]), (
-                f"{description} failed: Agent moved with NOOP. "
-                f"Initial: {initial_pos}, New: {new_pos}, Policy: {policy}"
-            )
-        else:
-            assert new_axis < initial_axis, (
-                f"{description} Failed: Expected negative movement along axis {axis}. "
-                f"Initial: {initial_axis}, New: {new_axis}, Policy: {policy}"
-            )
+    # Step the environment to update the agents position via the velocity
+    icland_state = icland.step(key, icland_state, None, NOOP_POLICY)
+
+    # Get new position
+    new_position = icland_state.mjx_data.xpos[body_id][:2]
+    
+    # Check if the agent moved in the expected direction
+    displacement = new_position - initial_pos
+    normalised_displacement = displacement / (jnp.linalg.norm(displacement) + 1e-10)
+    assert jnp.allclose(normalised_displacement, expected_direction), (
+        f"{name} failed: Expected displacement {expected_direction}, "
+        f"Actual displacement {normalised_displacement}"
+    )
