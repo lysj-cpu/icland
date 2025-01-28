@@ -53,20 +53,20 @@ RAMP_VECTORS = jnp.array(
 
 
 # Optimization: Pre-compute rotation matrices
-def __get_rotation_matrix(rotation):
+def __get_rotation_matrix(rotation: jax.Array) -> jax.Array:
     angle = -jnp.pi * rotation / 2
     cos_t = jnp.cos(angle)
     sin_t = jnp.sin(angle)
     return jnp.array([[cos_t, -sin_t, 0], [sin_t, cos_t, 0], [0, 0, 1]])
 
 
-ROTATION_MATRICES = jnp.stack([__get_rotation_matrix(r) for r in range(4)])
+ROTATION_MATRICES = jnp.stack([__get_rotation_matrix(jnp.array(r, dtype=jnp.int32)) for r in range(4)])
 
 # Maximum number of triangles per column
 MAX_TRIANGLES = 72  # 6 levels * 12 triangles per level
 
 
-def pad_triangles(triangles: jnp.ndarray, max_triangles: int = MAX_TRIANGLES):
+def pad_triangles(triangles: jax.Array, max_triangles: jax.Array = jnp.array(MAX_TRIANGLES, dtype=jnp.int32)) -> jax.Array:
     """Pad triangle array to fixed size using dynamic padding."""
     triangles = triangles.astype("float32")
     current_triangles = triangles.shape[0]
@@ -80,7 +80,7 @@ def pad_triangles(triangles: jnp.ndarray, max_triangles: int = MAX_TRIANGLES):
     return result
 
 
-def make_block_column(x: int, y: int, level: int):
+def make_block_column(x: jax.Array, y: jax.Array, level: jax.Array) -> jax.Array:
     """Block column generation with fixed output size."""
     # Calculate actual number of triangles
     num_triangles = level * 12
@@ -99,7 +99,7 @@ def make_block_column(x: int, y: int, level: int):
     return pad_triangles(blocks)
 
 
-def make_ramp_column(x: int, y: int, level: int, rotation: int):
+def make_ramp_column(x: jax.Array, y: jax.Array, level: jax.Array, rotation: jax.Array) -> jax.Array:
     """Ramp generation with fixed output size."""
     # Base blocks
     base_blocks = make_block_column(x, y, level - 1)[: ((level - 1) * 12)]
@@ -114,7 +114,7 @@ def make_ramp_column(x: int, y: int, level: int, rotation: int):
     return pad_triangles(combined)
 
 
-def make_vramp_column(x: int, y: int, from_level: int, to_level: int, rotation: int):
+def make_vramp_column(x: jax.Array, y: jax.Array, from_level: jax.Array, to_level: jax.Array, rotation: jax.Array) -> jax.Array:
     """Vertical ramp generation with fixed output size."""
     # Base blocks
     base_blocks = make_block_column(x, y, from_level)[: from_level * 12]
@@ -141,7 +141,7 @@ def make_vramp_column(x: int, y: int, from_level: int, to_level: int, rotation: 
     return pad_triangles(combined)
 
 
-def create_world(tile_map: jax.Array):
+def create_world(tile_map: jax.Array) -> jax.Array:
     """World generation with consistent shapes."""
     i_indices, j_indices = jnp.meshgrid(
         jnp.arange(tile_map.shape[0]), jnp.arange(tile_map.shape[1]), indexing="ij"
@@ -151,7 +151,7 @@ def create_world(tile_map: jax.Array):
 
     coords = jnp.concatenate([i_indices, j_indices, tile_map], axis=-1)
 
-    def process_tile(entry):
+    def process_tile(entry: jax.Array) -> jax.Array:
         x, y, block, rotation, frm, to = entry
         if block == TileType.SQUARE.value:
             return make_block_column(x, y, to)
@@ -170,7 +170,7 @@ def create_world(tile_map: jax.Array):
     return pieces
 
 
-def export_stl(pieces, filename):
+def export_stl(pieces: jax.Array, filename: str) -> mesh.Mesh:
     """Convert JAX array to numpy array in the correct format for STL export."""
     # # Helper function to filter out padding after JIT compilation
     pieces_reshaped = pieces.reshape(-1, *pieces.shape[-2:])

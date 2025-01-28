@@ -7,6 +7,9 @@ from enum import Enum
 import jax.numpy as jnp
 import numpy as np
 from PIL import Image
+from typing import Any, Callable, Tuple
+from numpy.typing import NDArray
+import jax
 
 
 class Heuristic(Enum):
@@ -25,7 +28,7 @@ class TileType(Enum):
     VRAMP = 2
 
 
-def load_bitmap(filepath):
+def load_bitmap(filepath: str) -> Tuple[list[int], int, int]:
     """Loads an image file (e.g., PNG) into a list of ARGB-encoded 32-bit integers.
 
     Returns:
@@ -51,7 +54,7 @@ def load_bitmap(filepath):
     return (result, width, height)
 
 
-def save_bitmap(data, width, height, filename):
+def save_bitmap(data: list[int], width: int, height: int, filename: str) -> None:
     """Saves a list of ARGB-encoded 32-bit integers as an image file (e.g., PNG).
 
     Arguments:
@@ -78,7 +81,7 @@ def save_bitmap(data, width, height, filename):
 
 
 # Helper to get XML attribute with a default (similar to xelem.Get<T>(...))
-def get_xml_attribute(xelem, attribute, default=None, cast_type=None):
+def get_xml_attribute(xelem: ET.Element, attribute: str, default:Any=None, cast_type:Any=None) -> Any:
     """Returns the value of 'attribute' from the XML element xelem.
 
     If the attribute is not present, returns 'default'.
@@ -119,7 +122,7 @@ class XMLReader:
         j_tilecodes (jax.numpy.array): JAX-compatible array of tile properties.
     """
 
-    def __tilename_to_code(self, tile: str, rotation: int):
+    def __tilename_to_code(self, tile: str, rotation: int) -> tuple[int, int, int, int]:
         name_split = tile.split("_")
         tile_type = name_split[0]
         tile_type_num = 0
@@ -146,7 +149,7 @@ class XMLReader:
 
         return tile_type_num, rotation, from_num, to_num
 
-    def __init__(self, xml_path, subsetName=None):
+    def __init__(self, xml_path: str, subsetName:(str|None)=None) -> None:
         """Initializes the XMLReader by parsing the tilemap XML file.
 
         Argumentss:
@@ -192,7 +195,7 @@ class XMLReader:
                 print(f"ERROR: <subsets> not found in {xml_path}.")
 
         # Local helper functions to rotate and reflect pixel arrays
-        def tile(f, size):
+        def tile(f: Callable[[int, int], int], size: int) -> list[int]:
             """Creates a flat list of length size*size by calling f(x,y) for each pixel."""
             result = [0] * (size * size)
             for y in range(size):
@@ -200,14 +203,14 @@ class XMLReader:
                     result[x + y * size] = f(x, y)
             return result
 
-        def rotate(array, size):
+        def rotate(array: list[int], size: int) -> list[int]:
             """Rotates the array by 90 degrees clockwise.
 
             The function is: new[x,y] = old[size-1-y, x].
             """
             return tile(lambda x, y: array[size - 1 - y + x * size], size)
 
-        def reflect(array, size):
+        def reflect(array: list[int], size: int) -> list[int]:
             """Reflects (mirror) the array horizontally.
 
             The function is: new[x,y] = old[size-1-x, y].
@@ -216,7 +219,7 @@ class XMLReader:
 
         # We'll maintain a list of transformations (the 'action' array in C#).
         # In Python, we'll call it `actions`. Each item is an array of 8 transformations.
-        actions = []
+        actions: list[list[int]] = []
         firstOccurrence = {}
 
         # We'll accumulate weights in a list, then convert to a Python list or NumPy array later.
@@ -243,8 +246,8 @@ class XMLReader:
             # Determine the group transformations: cardinality, rotation function 'a', reflection function 'b'
             if sym == "L":
                 cardinality = 4
-                a = lambda i: (i + 1) % 4
-                b = lambda i: i + 1 if (i % 2 == 0) else i - 1
+                a: Callable[[int], int] = lambda i: (i + 1) % 4
+                b: Callable[[int], int] = lambda i: i + 1 if (i % 2 == 0) else i - 1
             elif sym == "T":
                 cardinality = 4
                 a = lambda i: (i + 1) % 4
@@ -371,7 +374,7 @@ class XMLReader:
         # Build the propagator arrays: self.propagator[d][t] = list of tile indices that can appear
         # in direction d next to tile t.
         # We'll do a 3D structure: [4][T][variable-size list], same as in the C# code.
-        self.propagator = [[[] for _ in range(self.T)] for _ in range(4)]  # !
+        self.propagator: list[list[list[int]]] = [[[] for _ in range(self.T)] for _ in range(4)]  # !
 
         # We'll build a "densePropagator[d][t1][t2] = True/False" for adjacency, then convert
         # to a sparse list of valid t2's for each t1.
@@ -451,7 +454,7 @@ class XMLReader:
         j_prop_result = jnp.zeros((4, self.T, max_len))
 
         # Function to pad each sequence to max_len
-        def pad_sequence(seq, max_len):
+        def pad_sequence(seq: list[list[int]], max_len: int) -> NDArray[np.int64]:
             # Create a result array of shape (T, max_len)
             result = np.full((self.T, max_len), -1)  # Use NumPy array for padding
 
@@ -476,7 +479,7 @@ class XMLReader:
 
         self.j_tilecodes = jnp.array(self.tilecodes)
 
-    def save(self, observed, width, height, filename):
+    def save(self, observed: jax.Array, width: int, height: int, filename: str) -> None:
         """Save the tilemap as a bitmap representation for debugging."""
         # We'll create a pixel buffer for the entire output image:
         # (MX * tilesize) by (MY * tilesize).
@@ -507,7 +510,7 @@ class XMLReader:
             filename,
         )
 
-    def get_tilemap_data(self):
+    def get_tilemap_data(self) -> tuple[int, jax.Array, jax.Array, jax.Array]:
         """Returns relevant tilemap data.
 
         Returns:

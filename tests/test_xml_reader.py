@@ -1,9 +1,11 @@
 """Test scripts for world generation part of the pipeline."""
 
 import os
+from pathlib import Path
 import tempfile
 from xml.etree.ElementTree import Element
 
+import jax
 import jax.numpy as jnp
 import pytest
 from PIL import Image
@@ -18,13 +20,13 @@ from icland.world_gen.XMLReader import (
 
 
 @pytest.fixture
-def xml_reader():
+def xml_reader() -> XMLReader:
     """Fixture to create an XMLReader instance with our data XML file."""
     xml_file = "src/icland/world_gen/tilemap/data.xml"
     return XMLReader(xml_file)
 
 
-def test_load_bitmap():
+def test_load_bitmap() -> None:
     """Test loading bitmap function for debugging tilemaps.
 
     This test verifies that the `load_bitmap` function correctly loads a
@@ -62,7 +64,7 @@ def test_load_bitmap():
         os.remove(temp_path)
 
 
-def test_save_bitmap():
+def test_save_bitmap() -> None:
     """Test saving bitmap function for debugging tilemaps.
 
     This test ensures that the `save_bitmap` function can correctly save
@@ -109,7 +111,7 @@ def test_save_bitmap():
         os.remove(temp_path)
 
 
-def test_get_xml_attribute():
+def test_get_xml_attribute() -> None:
     """Test general behaviour of XML reader in retrieving attributes.
 
     This test checks if the `get_xml_attribute` function can correctly
@@ -157,7 +159,7 @@ def test_get_xml_attribute():
     )
 
 
-def test_get_xml_attribute_no_casting():
+def test_get_xml_attribute_no_casting() -> None:
     """Test behaviour of XML reader in handling valid casts."""
     elem = Element("test", attrib={"attr": "123"})
 
@@ -165,7 +167,7 @@ def test_get_xml_attribute_no_casting():
     assert get_xml_attribute(elem, "attr") == "123"
 
 
-def test_get_xml_attribute_invalid_cast():
+def test_get_xml_attribute_invalid_cast() -> None:
     """Test behaviour of XML reader in handling invalid casts."""
     elem = Element("test", attrib={"attr": "not_a_number"})
 
@@ -178,7 +180,7 @@ def test_get_xml_attribute_invalid_cast():
         get_xml_attribute(elem, "attr", cast_type=float)
 
 
-def test_get_xml_attribute_bool_edge_cases():
+def test_get_xml_attribute_bool_edge_cases() -> None:
     """Test behaviour of XML reader in edge cases."""
     elem = Element(
         "test",
@@ -201,7 +203,7 @@ def test_get_xml_attribute_bool_edge_cases():
     )  # Default for unexpected values
 
 
-def test_get_xml_attribute_no_attribute():
+def test_get_xml_attribute_no_attribute() -> None:
     """Test behaviour of XML reader when XML has no attributes."""
     elem = Element("test")
 
@@ -212,15 +214,15 @@ def test_get_xml_attribute_no_attribute():
     assert get_xml_attribute(elem, "missing_attr", default="default") == "default"
 
 
-def test_get_tilemap_data(xml_reader):
+def test_get_tilemap_data(xml_reader: XMLReader) -> None:
     """Test the get_tilemap_data method of the XMLReader class."""
     T, j_weights, j_propagator, j_tilecodes = xml_reader.get_tilemap_data()
 
     # Check the returned tuple structure
     assert isinstance(T, int)
-    assert isinstance(j_weights, jnp.ndarray)
-    assert isinstance(j_propagator, jnp.ndarray)
-    assert isinstance(j_tilecodes, jnp.ndarray)
+    assert isinstance(j_weights, jax.Array)
+    assert isinstance(j_propagator, jax.Array)
+    assert isinstance(j_tilecodes, jax.Array)
 
     # Check basic properties of the returned data
     assert T > 0  # Should have at least one tile
@@ -229,7 +231,7 @@ def test_get_tilemap_data(xml_reader):
     assert j_tilecodes.shape[0] == T
 
 
-def test_save(xml_reader, tmp_path):
+def test_save(xml_reader: XMLReader, tmp_path: Path) -> None:
     """Test the save method of the XMLReader class."""
     width, height = 2, 2
     observed = jnp.array([0, 0, 0, 0])  # Mock observed array with tile indices
@@ -246,7 +248,7 @@ def test_save(xml_reader, tmp_path):
         assert img.format == "PNG"
 
 
-def test_xml_reader(xml_reader):
+def test_xml_reader(xml_reader: XMLReader) -> None:
     """Test the XMLReader class attributes and data integrity.
 
     This test verifies that the various attributes of the `XMLReader`
