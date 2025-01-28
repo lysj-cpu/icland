@@ -161,14 +161,13 @@ class XMLReader:
         tree = ET.parse(xml_path)
         xroot = tree.getroot()
 
-        self.tiles = []  # Will hold arrays of pixel data for each tile variant
-        self.tilenames = []  # Will hold tile names (including variants)
-        self.tilesize = 0  # Size (width==height) of each tile in pixels
+        self.tiles: list[
+            list[int]
+        ] = []  # Will hold arrays of pixel data for each tile variant
+        self.tilenames: list[str] = []  # Will hold tile names (including variants)
+        self.tilesize: int = 0  # Size (width==height) of each tile in pixels
 
         self.tilecodes = []  # Will hold 4-tuple of (type, rotation, from, to)
-
-        # Read whether tiles are "unique"
-        unique = get_xml_attribute(xroot, "unique", default=False, cast_type=bool)
 
         # Prepare optional subset
         subset = None
