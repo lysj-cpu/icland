@@ -25,8 +25,8 @@ import mujoco
 from mujoco import mjx
 
 from .agent import step_agent
-from .types import *
 from .constants import *
+from .types import *
 
 TEST_XML_STRING: str = """
 <mujoco>
@@ -118,7 +118,6 @@ def init(key: jax.Array, params: ICLandParams) -> ICLandState:
         >>> init(key, params)
         ICLandState(mjx_model=Model(...), mjx_data=Data(...), agent_data=jnp.ndarray(...))
     """
-
     # Unpack params
     mj_model = params.model
     agent_count = params.agent_count
@@ -129,18 +128,23 @@ def init(key: jax.Array, params: ICLandParams) -> ICLandState:
     mjx_data = mjx.put_data(mj_model, mj_data)
 
     # Collect object IDs for all agents
-    agent_components = jnp.empty((agent_count, 2), dtype=jnp.int32)
+    agent_components = jnp.empty(
+        (agent_count, AGENT_COMPONENT_IDS_DIM), dtype=jnp.int32
+    )
 
     for agent_id in range(agent_count):
+        body_id = mujoco.mj_name2id(
+            mj_model, mujoco.mjtObj.mjOBJ_BODY, f"agent{agent_id}"
+        )
+
+        geom_id = mujoco.mj_name2id(
+            mj_model, mujoco.mjtObj.mjOBJ_GEOM, f"agent{agent_id}_geom"
+        )
+
+        dof_address = mjx_model.body_dofadr[body_id]
+
         agent_components = agent_components.at[agent_id].set(
-            [
-                mujoco.mj_name2id(
-                    mj_model, mujoco.mjtObj.mjOBJ_BODY, f"agent{agent_id}"
-                ),
-                mujoco.mj_name2id(
-                    mj_model, mujoco.mjtObj.mjOBJ_GEOM, f"agent{agent_id}_geom"
-                ),
-            ]
+            [body_id, geom_id, dof_address]
         )
 
     return ICLandState(mjx_model, mjx_data, agent_components)
@@ -173,7 +177,6 @@ def step(
         >>> step(key, state, params, forward_policy)
         ICLandState(mjx_model=Model(...), mjx_data=Data(...), agent_data=jnp.ndarray(...))
     """
-
     # Unpack state
     mjx_model = state.mjx_model
     mjx_data = state.mjx_data
@@ -184,7 +187,8 @@ def step(
 
     # Define a function to step a single agent
     def step_single_agent(
-        carry: Tuple[MjxStateType, jax.Array], agent_components: Tuple[jnp.ndarray, int]
+        carry: Tuple[MjxStateType, jax.Array],
+        agent_components: Tuple[jnp.ndarray, jnp.ndarray],
     ) -> Tuple[Tuple[MjxStateType, jax.Array], None]:
         mjx_data, action = carry
 
@@ -203,7 +207,7 @@ def step(
     (updated_data, _), _ = jax.lax.scan(
         step_single_agent,
         (mjx_data, actions),
-        (agent_components, jnp.arange(agent_components.shape[0])),
+        (agent_components, jnp.arange(agent_components.shape[0], dtype=jnp.int32)),
     )
 
     # Step the environment after applying all agent actions

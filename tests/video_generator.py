@@ -28,15 +28,30 @@ from typing import Any, Dict, List
 
 import imageio
 import jax
+import jax.numpy as jnp
 import mujoco
-from mujoco import mjx
 from assets.policies import *
 from assets.worlds import *
+from mujoco import mjx
 
 import icland
 from icland.types import *
 
 SIMULATION_PRESETS: List[Dict[str, Any]] = [
+    {
+        "name": "two_agent_move_collide",
+        "world": TWO_AGENT_EMPTY_WORLD_COLLIDE,
+        "policy": jnp.array([FORWARD_POLICY, BACKWARD_POLICY]),
+        "duration": 4,
+        "agent_count": 2,
+    },
+    {
+        "name": "two_agent_move_parallel",
+        "world": TWO_AGENT_EMPTY_WORLD,
+        "policy": jnp.array([FORWARD_POLICY, FORWARD_POLICY]),
+        "duration": 4,
+        "agent_count": 2,
+    },
     {
         "name": "empty_world",
         "world": EMPTY_WORLD,
@@ -52,7 +67,11 @@ key = jax.random.PRNGKey(42)
 
 
 def render_video(
-    model_xml: str, policy: jax.Array, duration: int, video_name: str
+    model_xml: str,
+    policy: jax.Array,
+    duration: int,
+    video_name: str,
+    agent_count: int = 1,
 ) -> None:
     """Renders a video of a simulation using the given model and policy.
 
@@ -61,13 +80,14 @@ def render_video(
         policy (callable): Policy function to determine the agent's actions.
         duration (float): Duration of the video in seconds.
         video_name (str): Name of the output video file.
+        agent_count (int): Number of agents in the simulation.
 
     Returns:
         None
     """
     mj_model = mujoco.MjModel.from_xml_string(model_xml)
 
-    icland_params = ICLandParams(model=mj_model, game=None, agent_count=1)
+    icland_params = ICLandParams(model=mj_model, game=None, agent_count=agent_count)
 
     icland_state = icland.init(key, icland_params)
     icland_state = icland.step(key, icland_state, None, policy)
@@ -80,7 +100,7 @@ def render_video(
 
     cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
     cam.trackbodyid = icland_state.component_ids[0, 0]
-    cam.distance = 3
+    cam.distance = 1.5
     cam.azimuth = 90.0
     cam.elevation = -40.0
 
@@ -116,4 +136,5 @@ if __name__ == "__main__":
             preset["policy"],
             preset["duration"],
             f"tests/video_output/{preset['name']}.mp4",
+            agent_count=preset.get("agent_count", 1),
         )

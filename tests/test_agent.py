@@ -1,7 +1,5 @@
 """Tests movement behaviour under different pre-defined movement policies."""
 
-from typing import Callable
-
 import jax
 import jax.numpy as jnp
 import mujoco
@@ -36,7 +34,6 @@ def test_agent_translation(
     expected_direction: jnp.ndarray,
 ) -> None:
     """Test agent movement in ICLand environment."""
-
     # Create the ICLand environment
     mj_model = mujoco.MjModel.from_xml_string(EMPTY_WORLD)
     icland_params = ICLandParams(mj_model, None, 1)
@@ -87,7 +84,6 @@ def test_agent_rotation(
     expected_orientation: jnp.ndarray,
 ) -> None:
     """Test agent movement in ICLand environment."""
-
     # Create the ICLand environment
     mj_model = mujoco.MjModel.from_xml_string(EMPTY_WORLD)
     icland_params = ICLandParams(mj_model, None, 1)
@@ -122,3 +118,53 @@ def test_agent_rotation(
         f"{name} failed: Expected orientation {expected_orientation}, "
         f"Actual orientation {normalised_orientation_delta}"
     )
+
+
+@pytest.mark.parametrize(
+    "name, policies",
+    [
+        ("Move In Parallel", jnp.array([FORWARD_POLICY, FORWARD_POLICY])),
+        ("Two Agents Colide", jnp.array([FORWARD_POLICY, BACKWARD_POLICY])),
+    ],
+)
+def test_two_agents(key: jax.Array, name: str, policies: jnp.ndarray) -> None:
+    """Test two agents movement in ICLand environment."""
+    # Create the ICLand environment
+    mj_model = mujoco.MjModel.from_xml_string(TWO_AGENT_EMPTY_WORLD)
+    icland_params = ICLandParams(mj_model, None, 2)
+    icland_state = icland.init(key, icland_params)
+
+    # Simulate 2 seconds
+    while icland_state.mjx_data.time < 2:
+        icland_state = icland.step(key, icland_state, None, policies)
+
+    # Get the positions of the two agents
+    body_id_1, body_id_2 = icland_state.component_ids[:, 0]
+    agent_1_pos = icland_state.mjx_data.xpos[body_id_1][:2]
+    agent_2_pos = icland_state.mjx_data.xpos[body_id_2][:2]
+
+    # Simulate one more step.
+    icland_state = icland.step(key, icland_state, None, NOOP_POLICY)
+
+    agent_1_new_pos = icland_state.mjx_data.xpos[body_id_1][:2]
+    agent_2_new_pos = icland_state.mjx_data.xpos[body_id_2][:2]
+
+    # Get the displacements
+    displacement_1 = agent_1_new_pos - agent_1_pos
+    displacement_2 = agent_2_new_pos - agent_2_pos
+
+    if name == "Move In Parallel":
+        # Check the two agents moved in parallel
+        assert jnp.allclose(displacement_1 - displacement_2, 0), (
+            f"{name} failed: Expected displacement difference 0, "
+            f"Agent 1 displacement {displacement_1}, Agent 2 displacement {displacement_2}"
+        )
+    elif name == "Two Agents Colide":
+        # Check agents do not move (they have collided)
+        assert jnp.allclose(displacement_1 + displacement_2, 0), (
+            f"{name} failed: Expected displacement difference 0, "
+            f"Agent 1 displacement {displacement_1}, Agent 2 displacement {displacement_2}"
+        )
+
+    else:
+        raise ValueError("Invalid test case name")

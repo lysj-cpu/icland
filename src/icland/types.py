@@ -5,7 +5,6 @@ It includes types for model parameters, state, and action sets used in the proje
 
 from typing import Optional, TypeAlias
 
-import jax
 import jax.numpy as jnp
 import mujoco
 from mujoco.mjx._src.dataclasses import PyTreeNode

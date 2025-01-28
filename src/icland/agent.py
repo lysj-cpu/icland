@@ -9,7 +9,9 @@ from .types import *
 
 @jax.jit
 def step_agent(
-    mjx_data: MjxStateType, action: jnp.ndarray, agent_data: jnp.ndarray
+    mjx_data: MjxStateType,
+    action: jnp.ndarray,
+    agent_data: jnp.ndarray,
 ) -> MjxStateType:
     """Perform a simulation step for the agent.
 
@@ -30,7 +32,7 @@ def step_agent(
     """
     movement_direction = action[:2]
 
-    body_id, geom_id = agent_data
+    body_id, geom_id, dof_address = agent_data
 
     # Hinge angle about z is in qpos[3]
     angle = mjx_data.qpos[3]
@@ -105,13 +107,15 @@ def step_agent(
     """
     Clamp the agent's linear speed in the XY plane to the maximum allowed speed.
     """
-    vel_2d = mjx_data.qvel[0:2]  # [vx, vy]
+    vel_2d = jax.lax.dynamic_slice(mjx_data.qvel, (dof_address,), (2,))  # [vx, vy]
     speed = jnp.linalg.norm(vel_2d)
 
     scale = jnp.where(
         speed > AGENT_MAX_MOVEMENT_SPEED, AGENT_MAX_MOVEMENT_SPEED / speed, 1.0
     )
-    mjx_data = mjx_data.replace(qvel=mjx_data.qvel.at[:2].multiply(scale))
+    mjx_data = mjx_data.replace(
+        qvel=jax.lax.dynamic_update_slice(mjx_data.qvel, scale * vel_2d, (dof_address,))
+    )
 
     # --------------------------------------------------------------------------
     # (F) Clamp angular velocity about z
@@ -120,13 +124,13 @@ def step_agent(
     Clamp the agent's angular velocity about the z-axis to the maximum allowed
     rotation speed.
     """
-    omega = mjx_data.qvel[3]
+    omega = mjx_data.qvel[dof_address + 3]
     mjx_data = mjx_data.replace(
-        qvel=mjx_data.qvel.at[3].set(
+        qvel=mjx_data.qvel.at[dof_address + 3].set(
             jnp.where(
                 abs(omega) > AGENT_MAX_ROTATION_SPEED,
                 jnp.sign(omega) * AGENT_MAX_ROTATION_SPEED,
-                mjx_data.qvel[3],
+                mjx_data.qvel[dof_address + 3],
             )
         )
     )
@@ -138,9 +142,9 @@ def step_agent(
     Apply friction to the agent's linear and rotational velocities.
     """
     mjx_data = mjx_data.replace(
-        qvel=mjx_data.qvel.at[jnp.array([0, 1, 3])].multiply(
-            1.0 - AGENT_MOVEMENT_FRICTION_COEFFICIENT
-        )
+        qvel=mjx_data.qvel.at[
+            jnp.array([dof_address, dof_address + 1, dof_address + 3])
+        ].multiply(1.0 - AGENT_MOVEMENT_FRICTION_COEFFICIENT)
     )
 
     return mjx_data

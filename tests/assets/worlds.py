@@ -24,8 +24,7 @@ EMPTY_WORLD = """
         type="capsule"
         size="0.06"
         fromto="0 0 0 0 0 -0.4"
-        solimp="0.9 0.995 0.001 1 1000"
-        friction="0.001 0.001 0.0001"
+        
         mass="0.01"
       />
 
@@ -33,8 +32,135 @@ EMPTY_WORLD = """
         type="box"
         size="0.05 0.05 0.05"
         pos="0 0 0.2"
-        solimp="0.9 0.995 0.001 1 1000"
-        friction="0.001 0.001 0.0001"
+        
+        mass="0.001"
+      />
+    </body>
+
+    <!-- Ground plane, also with low friction -->
+    <geom
+      name="ground"
+      type="plane"
+      size="0 0 0.01"
+      rgba="1 1 1 1"
+    />
+
+  </worldbody>
+</mujoco>
+"""
+
+TWO_AGENT_EMPTY_WORLD = """
+<mujoco>
+  <worldbody>
+    <light name="main_light" pos="0 0 1" dir="0 0 -1"
+           diffuse="1 1 1" specular="0.1 0.1 0.1"/>
+
+    <body name="agent0" pos="0 0 1">
+      <joint type="slide" axis="1 0 0" />
+      <joint type="slide" axis="0 1 0" />
+      <joint type="slide" axis="0 0 1" />
+      <joint type="hinge" axis="0 0 1" stiffness="1"/>
+
+      <geom
+        name="agent0_geom"
+        type="capsule"
+        size="0.06"
+        fromto="0 0 0 0 0 -0.4"
+        
+        mass="0.01"
+      />
+
+      <geom
+        type="box"
+        size="0.05 0.05 0.05"
+        pos="0 0 0.2"
+        
+        mass="0.001"
+      />
+    </body>
+
+    <body name="agent1" pos="0 0.5 1">
+      <joint type="slide" axis="1 0 0" />
+      <joint type="slide" axis="0 1 0" />
+      <joint type="slide" axis="0 0 1" />
+      <joint type="hinge" axis="0 0 1" stiffness="1"/>
+
+      <geom
+        name="agent1_geom"
+        type="capsule"
+        size="0.06"
+        fromto="0 0 0 0 0 -0.4"
+        
+        mass="0.01"
+      />
+
+      <geom
+        type="box"
+        size="0.05 0.05 0.05"
+        pos="0 0 0.2"
+        
+        mass="0.001"
+      />
+    </body>
+
+    <!-- Ground plane, also with low friction -->
+    <geom
+      name="ground"
+      type="plane"
+      size="0 0 0.01"
+      rgba="1 1 1 1"
+    />
+
+  </worldbody>
+</mujoco>
+"""
+
+TWO_AGENT_EMPTY_WORLD_COLLIDE = """
+<mujoco>
+  <worldbody>
+    <light name="main_light" pos="0 0 1" dir="0 0 -1"
+           diffuse="1 1 1" specular="0.1 0.1 0.1"/>
+
+    <body name="agent0" pos="0 0 1">
+      <joint type="slide" axis="1 0 0" />
+      <joint type="slide" axis="0 1 0" />
+      <joint type="slide" axis="0 0 1" />
+      <joint type="hinge" axis="0 0 1" stiffness="1"/>
+
+      <geom
+        name="agent0_geom"
+        type="capsule"
+        size="0.06"
+        fromto="0 0 0 0 0 -0.4"
+        mass="0.01"
+      />
+
+      <geom
+        type="box"
+        size="0.05 0.05 0.05"
+        pos="0 0 0.2"
+        mass="0.001"
+      />
+    </body>
+
+    <body name="agent1" pos="1 0 1">
+      <joint type="slide" axis="1 0 0" />
+      <joint type="slide" axis="0 1 0" />
+      <joint type="slide" axis="0 0 1" />
+      <joint type="hinge" axis="0 0 1" stiffness="1"/>
+
+      <geom
+        name="agent1_geom"
+        type="capsule"
+        size="0.06"
+        fromto="0 0 0 0 0 -0.4"
+        mass="0.01"
+      />
+
+      <geom
+        type="box"
+        size="0.05 0.05 0.05"
+        pos="0 0 0.2"
         mass="0.001"
       />
     </body>
@@ -68,8 +194,7 @@ RAMP_30 = """
         type="capsule"
         size="0.06"
         fromto="0 0 0 0 0 -0.4"
-        solimp="0.9 0.995 0.001 1 1000"
-        friction="0.001 0.001 0.0001"
+        
         mass="0.01"
       />
 
@@ -77,8 +202,7 @@ RAMP_30 = """
         type="box"
         size="0.05 0.05 0.05"
         pos="0 0 0.2"
-        solimp="0.9 0.995 0.001 1 1000"
-        friction="0.001 0.001 0.0001"
+        
         mass="0.001"
       />
     </body>
@@ -114,8 +238,7 @@ RAMP_45 = """
         type="capsule"
         size="0.06"
         fromto="0 0 0 0 0 -0.4"
-        solimp="0.9 0.995 0.001 1 1000"
-        friction="0.001 0.001 0.0001"
+        
         mass="0.01"
       />
 
@@ -123,8 +246,7 @@ RAMP_45 = """
         type="box"
         size="0.05 0.05 0.05"
         pos="0 0 0.2"
-        solimp="0.9 0.995 0.001 1 1000"
-        friction="0.001 0.001 0.0001"
+        
         mass="0.001"
       />
     </body>
@@ -160,8 +282,7 @@ RAMP_60 = """
         type="capsule"
         size="0.06"
         fromto="0 0 0 0 0 -0.4"
-        solimp="0.9 0.995 0.001 1 1000"
-        friction="0.001 0.001 0.0001"
+        
         mass="0.01"
       />
 
@@ -169,8 +290,7 @@ RAMP_60 = """
         type="box"
         size="0.05 0.05 0.05"
         pos="0 0 0.2"
-        solimp="0.9 0.995 0.001 1 1000"
-        friction="0.001 0.001 0.0001"
+        
         mass="0.001"
       />
     </body>
