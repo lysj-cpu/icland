@@ -36,14 +36,13 @@ def test_agent_translation(
 ) -> None:
     """Test agent movement in ICLand environment."""
 
+    # Create the ICLand environment
     mj_model = mujoco.MjModel.from_xml_string(EMPTY_WORLD)
-
     icland_params = ICLandParams(
         mj_model,
         None,
         1
     )
-
     icland_state = icland.init(key, icland_params)
     body_id = icland_state.agent_data.body_id[0]
 
@@ -73,4 +72,55 @@ def test_agent_translation(
     assert jnp.allclose(normalised_displacement, expected_direction), (
         f"{name} failed: Expected displacement {expected_direction}, "
         f"Actual displacement {normalised_displacement}"
+    )
+
+@pytest.mark.parametrize(
+    "name, policy, expected_orientation",
+    [
+        ("Clockwise Rotation", CLOCKWISE_POLICY, 1),
+        ("Anti-clockwise Rotation", ANTI_CLOCKWISE_POLICY, -1),
+        ("No Rotation", NOOP_POLICY, 0),
+    ],
+)
+def test_agent_rotation(
+    key: jax.Array,
+    name: str,
+    policy: jnp.ndarray,
+    expected_orientation: jnp.ndarray,
+) -> None:
+    """Test agent movement in ICLand environment."""
+
+    # Create the ICLand environment
+    mj_model = mujoco.MjModel.from_xml_string(EMPTY_WORLD)
+    icland_params = ICLandParams(
+        mj_model,
+        None,
+        1
+    )
+    icland_state = icland.init(key, icland_params)
+
+    # Get initial orientation
+    initial_orientation = icland_state.mjx_data.qpos[3]
+
+    # Step the environment to update the agents angular velocity
+    icland_state = icland.step(key, icland_state, None, policy)
+
+    # Check if the correct angular velocity was applied
+    angular_velocity = icland_state.mjx_data.qvel[3]
+    normalised_angular_velocity = angular_velocity / (jnp.linalg.norm(angular_velocity) + 1e-10)
+    assert jnp.allclose(normalised_angular_velocity, expected_orientation), (
+        f"{name} failed: Expected angular velocity {expected_orientation}, "
+        f"Actual angular velocity {normalised_angular_velocity}"
+    )
+
+    # Step the environment to update the agents orientation via the angular velocity
+    icland_state = icland.step(key, icland_state, None, NOOP_POLICY)
+
+    # Get new orientation
+    new_orientation = icland_state.mjx_data.qpos[3]
+    orientation_delta = new_orientation - initial_orientation
+    normalised_orientation_delta = orientation_delta / (jnp.linalg.norm(orientation_delta) + 1e-10)
+    assert jnp.allclose(normalised_orientation_delta, expected_orientation), (
+        f"{name} failed: Expected orientation {expected_orientation}, "
+        f"Actual orientation {normalised_orientation_delta}"
     )
