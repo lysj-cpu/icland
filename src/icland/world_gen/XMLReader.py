@@ -254,18 +254,6 @@ class XMLReader:
                 cardinality = 4
                 a = lambda i: (i + 1) % 4
                 b = lambda i: i if (i % 2 == 0) else 4 - i
-            elif sym == "I":
-                cardinality = 2
-                a = lambda i: 1 - i
-                b = lambda i: i
-            elif sym == "\\":
-                cardinality = 2
-                a = lambda i: 1 - i
-                b = lambda i: 1 - i
-            elif sym == "F":
-                cardinality = 8
-                a = lambda i: (i + 1) % 4 if i < 4 else 4 + ((i - 1) % 4)
-                b = lambda i: i + 4 if i < 4 else i - 4
             else:
                 # 'X' or any unspecified
                 cardinality = 1
@@ -310,59 +298,38 @@ class XMLReader:
                 actions.append(map_t[t])
 
             # Next, we load the actual pixel data.
-            # The original code checks "unique" to see if we have separate PNGs for each rotation.
-            if unique:
-                # Each orientation is stored in a separate file, e.g. "<tilename> 0.png", "<tilename> 1.png", etc.
-                for t in range(cardinality):
-                    bitmap, w_img, h_img = load_bitmap(
-                        os.path.abspath(
-                            os.path.join(
-                                os.path.join(xml_path, os.pardir), f"{tilename} {t}.png"
-                            )
-                        )
-                    )
-                    # Usually, w_img == h_img => tile is square
-                    if self.tilesize == 0:
-                        self.tilesize = w_img
-                    self.tiles.append(bitmap)
-                    self.tilenames.append(f"{tilename} {t}")
-
-                    self.tilecodes.append(self.__tilename_to_code(tilename, t))
-            else:
-                # Single PNG for the base tile
-                bitmap, w_img, h_img = load_bitmap(
-                    os.path.abspath(
-                        os.path.join(
-                            os.path.join(xml_path, os.pardir), f"{tilename}.png"
-                        )
-                    )
+            # Single PNG for the base tiles
+            bitmap, w_img, h_img = load_bitmap(
+                os.path.abspath(
+                    os.path.join(os.path.join(xml_path, os.pardir), f"{tilename}.png")
                 )
-                if self.tilesize == 0:
-                    self.tilesize = w_img
-                base_idx = len(self.tiles)
-                self.tiles.append(bitmap)
-                self.tilenames.append(f"{tilename} 0")
+            )
+            if self.tilesize == 0:
+                self.tilesize = w_img
+            base_idx = len(self.tiles)
+            self.tiles.append(bitmap)
+            self.tilenames.append(f"{tilename} 0")
 
-                self.tilecodes.append(self.__tilename_to_code(tilename, 0))
+            self.tilecodes.append(self.__tilename_to_code(tilename, 0))
 
-                # Then produce the rest by rotate/reflect in code if cardinality > 1
-                for t in range(1, cardinality):
-                    # If t <= 3 => rotate previous tile
-                    if t <= 3:
-                        rotated = rotate(self.tiles[base_idx + t - 1], self.tilesize)
-                        self.tiles.append(rotated)
-                    # If t >= 4 => reflect tile [base_idx + t - 4]
-                    if t >= 4:
-                        reflected = reflect(self.tiles[base_idx + t - 4], self.tilesize)
-                        # Overwrite the just-added tile, or add a new entry
-                        self.tiles[-1] = (
-                            reflected if t <= 3 else self.tiles[-1]
-                        )  # Adjust if needed
-                        # Actually, we should do a separate entry:
-                        self.tiles.append(reflected)
-                    self.tilenames.append(f"{tilename} {t}")
+            # Then produce the rest by rotate/reflect in code if cardinality > 1
+            for t in range(1, cardinality):
+                # If t <= 3 => rotate previous tile
+                if t <= 3:
+                    rotated = rotate(self.tiles[base_idx + t - 1], self.tilesize)
+                    self.tiles.append(rotated)
+                # If t >= 4 => reflect tile [base_idx + t - 4]
+                if t >= 4:
+                    reflected = reflect(self.tiles[base_idx + t - 4], self.tilesize)
+                    # Overwrite the just-added tile, or add a new entry
+                    self.tiles[-1] = (
+                        reflected if t <= 3 else self.tiles[-1]
+                    )  # Adjust if needed
+                    # Actually, we should do a separate entry:
+                    self.tiles.append(reflected)
+                self.tilenames.append(f"{tilename} {t}")
 
-                    self.tilecodes.append(self.__tilename_to_code(tilename, t))
+                self.tilecodes.append(self.__tilename_to_code(tilename, t))
 
             # Weighted for each orientation
             for _ in range(cardinality):
@@ -388,7 +355,7 @@ class XMLReader:
 
         # Parse neighbors from the <neighbors> section
         neighbors_elem = xroot.find("neighbors")
-        if neighbors_elem:
+        if neighbors_elem is not None:
             for xneighbor in neighbors_elem.findall("neighbor"):
                 left_str = get_xml_attribute(xneighbor, "left", cast_type=str)
                 right_str = get_xml_attribute(xneighbor, "right", cast_type=str)

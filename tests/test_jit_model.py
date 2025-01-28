@@ -113,7 +113,7 @@ def test_model_init(model: JITModel) -> None:
     assert model.MY == 10
     assert model.T == 158
     assert model.N == 1
-    assert model.periodic == False
+    assert not model.periodic
     assert model.heuristic == 1
 
     # Check that the wave is initialized to all True
@@ -174,11 +174,11 @@ def test_model_observe(model: JITModel) -> None:
     # Verify that all other patterns at the observed node are banned
     for pattern in range(model.T):
         if pattern != chosen_pattern:
-            assert observed_model.wave[node, pattern] == False, (
+            assert not observed_model.wave[node, pattern], (
                 f"Pattern {pattern} should be banned."
             )
         else:
-            assert observed_model.wave[node, pattern] == True, (
+            assert observed_model.wave[node, pattern], (
                 f"Pattern {pattern} should be the chosen pattern."
             )
 
@@ -191,7 +191,7 @@ def test_model_ban(model: JITModel) -> None:
 
     updated_model = _ban(model, i, jnp.array(t))
 
-    assert updated_model.wave.at[i, t].get() == False, (
+    assert not updated_model.wave.at[i, t].get(), (
         f"Pattern {t} at cell {i} should be banned."
     )
 
@@ -362,7 +362,7 @@ def test_model_clear(model: JITModel) -> None:
     updated_model = _clear(model)
 
     # Test that 'wave' is reset to all True
-    assert jnp.all(updated_model.wave == True), "Wave should be all True."
+    assert jnp.all(updated_model.wave), "Wave should be all True."
 
     # Test that 'observed' is reset to -1
     assert jnp.all(updated_model.observed == -1), "Observed should be all -1."

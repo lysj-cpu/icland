@@ -26,6 +26,13 @@ def xml_reader() -> XMLReader:
     return XMLReader(xml_file)
 
 
+@pytest.fixture
+def xml_reader_with_subset() -> XMLReader:
+    """Fixture to create XMLReader instance with subset."""
+    xml_file = "src/icland/world_gen/tilemap/data.xml"
+    return XMLReader(xml_file, "two_levels")
+
+
 def test_load_bitmap() -> None:
     """Test loading bitmap function for debugging tilemaps.
 
@@ -138,8 +145,8 @@ def test_get_xml_attribute() -> None:
     assert get_xml_attribute(elem, "attr2", cast_type=float) == 3.14
 
     # Test boolean casting
-    assert get_xml_attribute(elem, "attr3", cast_type=bool) is True
-    assert get_xml_attribute(elem, "attr4", cast_type=bool) is False
+    assert get_xml_attribute(elem, "attr3", cast_type=bool)
+    assert not get_xml_attribute(elem, "attr4", cast_type=bool)
 
     # Test string (default, no casting)
     assert get_xml_attribute(elem, "attr5") == "some_text"
@@ -194,12 +201,12 @@ def test_get_xml_attribute_bool_edge_cases() -> None:
     )
 
     # Test boolean edge cases
-    assert get_xml_attribute(elem, "true_attr", cast_type=bool) is True
-    assert get_xml_attribute(elem, "false_attr", cast_type=bool) is False
-    assert get_xml_attribute(elem, "numeric_true", cast_type=bool) is True
-    assert get_xml_attribute(elem, "numeric_false", cast_type=bool) is False
-    assert (
-        get_xml_attribute(elem, "unexpected_value", cast_type=bool) is False
+    assert get_xml_attribute(elem, "true_attr", cast_type=bool)
+    assert not get_xml_attribute(elem, "false_attr", cast_type=bool)
+    assert get_xml_attribute(elem, "numeric_true", cast_type=bool)
+    assert not get_xml_attribute(elem, "numeric_false", cast_type=bool)
+    assert not (
+        get_xml_attribute(elem, "unexpected_value", cast_type=bool)
     )  # Default for unexpected values
 
 
@@ -214,6 +221,7 @@ def test_get_xml_attribute_no_attribute() -> None:
     assert get_xml_attribute(elem, "missing_attr", default="default") == "default"
 
 
+@pytest.mark.usefixtures("xml_reader")
 def test_get_tilemap_data(xml_reader: XMLReader) -> None:
     """Test the get_tilemap_data method of the XMLReader class."""
     T, j_weights, j_propagator, j_tilecodes = xml_reader.get_tilemap_data()
@@ -231,6 +239,7 @@ def test_get_tilemap_data(xml_reader: XMLReader) -> None:
     assert j_tilecodes.shape[0] == T
 
 
+@pytest.mark.usefixtures("xml_reader")
 def test_save(xml_reader: XMLReader, tmp_path: Path) -> None:
     """Test the save method of the XMLReader class."""
     width, height = 2, 2
@@ -248,6 +257,7 @@ def test_save(xml_reader: XMLReader, tmp_path: Path) -> None:
         assert img.format == "PNG"
 
 
+@pytest.mark.usefixtures("xml_reader")
 def test_xml_reader(xml_reader: XMLReader) -> None:
     """Test the XMLReader class attributes and data integrity.
 
@@ -286,3 +296,10 @@ def test_xml_reader(xml_reader: XMLReader) -> None:
     assert xml_reader.j_propagator.at[2, 0, 1].get() == xml_reader.tilenames.index(
         "square_boundary_1 2"
     )
+
+
+@pytest.mark.usefixtures("xml_reader_with_subset")
+def test_xml_reader_with_subset(xml_reader_with_subset: XMLReader) -> None:
+    """Checks if the `T` attribute of the `xml_reader_with_subset` object is equal to a predefined number."""
+    NUM_ACTIONS_SUBSET = 34
+    assert xml_reader_with_subset.T == NUM_ACTIONS_SUBSET
