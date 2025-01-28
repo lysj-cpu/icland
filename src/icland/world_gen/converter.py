@@ -60,13 +60,18 @@ def __get_rotation_matrix(rotation: jax.Array) -> jax.Array:
     return jnp.array([[cos_t, -sin_t, 0], [sin_t, cos_t, 0], [0, 0, 1]])
 
 
-ROTATION_MATRICES = jnp.stack([__get_rotation_matrix(jnp.array(r, dtype=jnp.int32)) for r in range(4)])
+ROTATION_MATRICES = jnp.stack(
+    [__get_rotation_matrix(jnp.array(r, dtype=jnp.int32)) for r in range(4)]
+)
 
 # Maximum number of triangles per column
 MAX_TRIANGLES = 72  # 6 levels * 12 triangles per level
 
 
-def pad_triangles(triangles: jax.Array, max_triangles: jax.Array = jnp.array(MAX_TRIANGLES, dtype=jnp.int32)) -> jax.Array:
+def pad_triangles(
+    triangles: jax.Array,
+    max_triangles: jax.Array = jnp.array(MAX_TRIANGLES, dtype=jnp.int32),
+) -> jax.Array:
     """Pad triangle array to fixed size using dynamic padding."""
     triangles = triangles.astype("float32")
     current_triangles = triangles.shape[0]
@@ -99,7 +104,9 @@ def make_block_column(x: jax.Array, y: jax.Array, level: jax.Array) -> jax.Array
     return pad_triangles(blocks)
 
 
-def make_ramp_column(x: jax.Array, y: jax.Array, level: jax.Array, rotation: jax.Array) -> jax.Array:
+def make_ramp_column(
+    x: jax.Array, y: jax.Array, level: jax.Array, rotation: jax.Array
+) -> jax.Array:
     """Ramp generation with fixed output size."""
     # Base blocks
     base_blocks = make_block_column(x, y, level - 1)[: ((level - 1) * 12)]
@@ -114,7 +121,13 @@ def make_ramp_column(x: jax.Array, y: jax.Array, level: jax.Array, rotation: jax
     return pad_triangles(combined)
 
 
-def make_vramp_column(x: jax.Array, y: jax.Array, from_level: jax.Array, to_level: jax.Array, rotation: jax.Array) -> jax.Array:
+def make_vramp_column(
+    x: jax.Array,
+    y: jax.Array,
+    from_level: jax.Array,
+    to_level: jax.Array,
+    rotation: jax.Array,
+) -> jax.Array:
     """Vertical ramp generation with fixed output size."""
     # Base blocks
     base_blocks = make_block_column(x, y, from_level)[: from_level * 12]

@@ -1,8 +1,8 @@
 """Test scripts for world generation part of the pipeline."""
 
 import os
-from pathlib import Path
 import tempfile
+from pathlib import Path
 from xml.etree.ElementTree import Element
 
 import jax

@@ -1,6 +1,7 @@
 """Test for our JIT-able model in world generation."""
 
 from typing import cast
+
 import jax
 import jax.numpy as jnp
 import pytest
@@ -15,7 +16,6 @@ from icland.world_gen.JITModel import (
     _observe,
     _propagate,
     _random_index_from_distribution,
-    _run,
 )
 from icland.world_gen.XMLReader import XMLReader
 
@@ -72,7 +72,9 @@ def tilemap(xml_reader: XMLReader) -> jax.Array:
         ),  # rand_value=1 should select index 1 (should never actually return 1, but we're testing edge cases)
     ],
 )
-def test_random_index_from_distribution(distribution: jax.Array, rand_value: jax.Array, expected_result: jax.Array) -> None:
+def test_random_index_from_distribution(
+    distribution: jax.Array, rand_value: jax.Array, expected_result: jax.Array
+) -> None:
     """Test the random_index_from_distribution function."""
     # JIT compile the function
     jit_func = jax.jit(_random_index_from_distribution)

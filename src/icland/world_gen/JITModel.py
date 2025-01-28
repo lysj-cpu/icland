@@ -12,7 +12,9 @@ from icland.world_gen.tile_data import NUM_ACTIONS, PROPAGATOR, TILECODES, WEIGH
 
 
 @jax.jit
-def _random_index_from_distribution(distribution: jax.Array, rand_value: jax.Array) -> jax.Array:
+def _random_index_from_distribution(
+    distribution: jax.Array, rand_value: jax.Array
+) -> jax.Array:
     """Select an index from 'distribution' proportionally to the values in 'distribution'.
 
     Args:
@@ -253,7 +255,9 @@ def _ban(model: JITModel, i: jax.Array, t1: jax.Array) -> JITModel:
     return cast(JITModel, jax.lax.cond(condition_1, identity, process_ban, model))
 
 
-def _run(model: JITModel, max_steps: jax.Array=jnp.array(1000, dtype=jnp.int32)) -> tuple[JITModel, bool]:
+def _run(
+    model: JITModel, max_steps: jax.Array = jnp.array(1000, dtype=jnp.int32)
+) -> tuple[JITModel, bool]:
     """Run the WaveFunctionCollapse algorithm with the given seed and iteration limit."""
     # Pre: the model is freshly initialized
 
@@ -278,14 +282,18 @@ def _run(model: JITModel, max_steps: jax.Array=jnp.array(1000, dtype=jnp.int32))
         model, node = _next_unobserved_node(model)
 
         # Use lax.cond instead of if/else
-        def handle_node(args: tuple[JITModel, jax.Array]) -> tuple[JITModel, jax.Array, jax.Array]:
+        def handle_node(
+            args: tuple[JITModel, jax.Array],
+        ) -> tuple[JITModel, jax.Array, jax.Array]:
             model, node = args
             # Observe and propagate
             model = _observe(model, node)
             model, success = _propagate(model)
             return model, jnp.logical_not(success), success
 
-        def handle_completion(args: tuple[JITModel, jax.Array]) -> tuple[JITModel, jax.Array, jax.Array]:
+        def handle_completion(
+            args: tuple[JITModel, jax.Array],
+        ) -> tuple[JITModel, jax.Array, jax.Array]:
             model, node = args
 
             # Final observation assignment
@@ -354,7 +362,8 @@ def _next_unobserved_node(model: JITModel) -> tuple[JITModel, jax.Array]:
                     jnp.logical_or(model.periodic, x + N <= MX),
                     jnp.logical_or(model.periodic, y + N <= MY),
                 ]
-            ), axis=0
+            ),
+            axis=0,
         )
 
     all_indices = jnp.arange(model.wave.shape[0])
@@ -385,12 +394,15 @@ def _next_unobserved_node(model: JITModel) -> tuple[JITModel, jax.Array]:
                 next_node,
             )
 
-        return cast(tuple[JITModel, jax.Array], jax.lax.cond(
-            jnp.any(valid_scanline_nodes_with_choices),
-            process_node,
-            lambda _: (model, -1),
-            operand=None,  # No operand needed for this condition
-        ))
+        return cast(
+            tuple[JITModel, jax.Array],
+            jax.lax.cond(
+                jnp.any(valid_scanline_nodes_with_choices),
+                process_node,
+                lambda _: (model, -1),
+                operand=None,  # No operand needed for this condition
+            ),
+        )
 
     def entropy_mrv_heuristic(_: None) -> tuple[JITModel, jax.Array]:
         node_entropies = jax.lax.cond(
@@ -421,19 +433,25 @@ def _next_unobserved_node(model: JITModel) -> tuple[JITModel, jax.Array]:
                 key=key,
             ), min_entropy_idx
 
-        return cast(tuple[JITModel, jax.Array], jax.lax.cond(
-            jnp.any(node_entropies_mask),
-            process_node,
-            lambda _: (model, -1),
-            operand=node_entropies,
-        ))
+        return cast(
+            tuple[JITModel, jax.Array],
+            jax.lax.cond(
+                jnp.any(node_entropies_mask),
+                process_node,
+                lambda _: (model, -1),
+                operand=node_entropies,
+            ),
+        )
 
-    return cast(tuple[JITModel, jax.Array], jax.lax.cond(
-        heuristic == Heuristic.SCANLINE.value,
-        scanline_heuristic,
-        entropy_mrv_heuristic,
-        operand=entropies,  # No operand needed for this condition
-    ))
+    return cast(
+        tuple[JITModel, jax.Array],
+        jax.lax.cond(
+            heuristic == Heuristic.SCANLINE.value,
+            scanline_heuristic,
+            entropy_mrv_heuristic,
+            operand=entropies,  # No operand needed for this condition
+        ),
+    )
 
 
 @jax.jit
@@ -493,7 +511,9 @@ def _propagate(model: JITModel) -> tuple[JITModel, jax.Array]:
     identity = lambda m, x, y, d, t: m
     identity_2 = lambda m, i, t: m
 
-    def proc_propagate_tile(model: JITModel, x2: jax.Array, y2: jax.Array, d: jax.Array, t1: jax.Array) -> JITModel:
+    def proc_propagate_tile(
+        model: JITModel, x2: jax.Array, y2: jax.Array, d: jax.Array, t1: jax.Array
+    ) -> JITModel:
         x2 = jax.lax.cond(
             x2 < 0,
             lambda y: y + model.MX,
@@ -521,7 +541,9 @@ def _propagate(model: JITModel) -> tuple[JITModel, jax.Array]:
                 comp = model.compatible.at[i2, t2.astype(jnp.int32), d].subtract(1)
                 model = model.replace(compatible=comp)
                 pred = comp.at[i2, t2.astype(jnp.int32), d].get() == 0
-                return cast(JITModel, jax.lax.cond(pred, _ban, identity_2, model, i2, t2))
+                return cast(
+                    JITModel, jax.lax.cond(pred, _ban, identity_2, model, i2, t2)
+                )
 
             model = jax.lax.cond(pred_2, process_p, identity_2, model, i2, t2)
 
@@ -571,7 +593,14 @@ def export(model: JITModel, tile_map: jax.Array, width: int, height: int) -> jax
 
 
 @partial(jax.jit, static_argnums=[0, 1, 2])
-def sample_world(width: jax.Array, height: jax.Array, max_steps: jax.Array, key: jax.Array, periodic: jax.Array, heuristic: jax.Array) -> tuple[JITModel, jax.Array]:
+def sample_world(
+    width: jax.Array,
+    height: jax.Array,
+    max_steps: jax.Array,
+    key: jax.Array,
+    periodic: jax.Array,
+    heuristic: jax.Array,
+) -> tuple[JITModel, jax.Array]:
     """Samples a world such that its complete and has a playable area."""
     model = _init(
         width, height, NUM_ACTIONS, 1, periodic, heuristic, WEIGHTS, PROPAGATOR, key
@@ -586,7 +615,10 @@ def sample_world(width: jax.Array, height: jax.Array, max_steps: jax.Array, key:
         model = model.replace(key=key)
         return (model, b)
 
-    return cast(tuple[JITModel, jax.Array], jax.lax.while_loop(condition, body_func, (model, success))[0])
+    return cast(
+        tuple[JITModel, jax.Array],
+        jax.lax.while_loop(condition, body_func, (model, success))[0],
+    )
 
 
 model = sample_world(10, 10, 1000, jax.random.key(42), True, 1)

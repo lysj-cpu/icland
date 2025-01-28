@@ -3,13 +3,13 @@
 import os
 import xml.etree.ElementTree as ET
 from enum import Enum
+from typing import Any, Callable, Tuple
 
+import jax
 import jax.numpy as jnp
 import numpy as np
-from PIL import Image
-from typing import Any, Callable, Tuple
 from numpy.typing import NDArray
-import jax
+from PIL import Image
 
 
 class Heuristic(Enum):
@@ -81,7 +81,9 @@ def save_bitmap(data: list[int], width: int, height: int, filename: str) -> None
 
 
 # Helper to get XML attribute with a default (similar to xelem.Get<T>(...))
-def get_xml_attribute(xelem: ET.Element, attribute: str, default:Any=None, cast_type:Any=None) -> Any:
+def get_xml_attribute(
+    xelem: ET.Element, attribute: str, default: Any = None, cast_type: Any = None
+) -> Any:
     """Returns the value of 'attribute' from the XML element xelem.
 
     If the attribute is not present, returns 'default'.
@@ -149,7 +151,7 @@ class XMLReader:
 
         return tile_type_num, rotation, from_num, to_num
 
-    def __init__(self, xml_path: str, subsetName:(str|None)=None) -> None:
+    def __init__(self, xml_path: str, subsetName: (str | None) = None) -> None:
         """Initializes the XMLReader by parsing the tilemap XML file.
 
         Argumentss:
@@ -374,7 +376,9 @@ class XMLReader:
         # Build the propagator arrays: self.propagator[d][t] = list of tile indices that can appear
         # in direction d next to tile t.
         # We'll do a 3D structure: [4][T][variable-size list], same as in the C# code.
-        self.propagator: list[list[list[int]]] = [[[] for _ in range(self.T)] for _ in range(4)]  # !
+        self.propagator: list[list[list[int]]] = [
+            [[] for _ in range(self.T)] for _ in range(4)
+        ]  # !
 
         # We'll build a "densePropagator[d][t1][t2] = True/False" for adjacency, then convert
         # to a sparse list of valid t2's for each t1.
