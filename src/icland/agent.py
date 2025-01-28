@@ -9,7 +9,7 @@ from .types import *
 
 @jax.jit
 def step_agent(
-    mjx_data: MjxStateType, action: jnp.ndarray, agent_data: AgentData
+    mjx_data: MjxStateType, action: jnp.ndarray, agent_data: jnp.ndarray
 ) -> MjxStateType:
     """Perform a simulation step for the agent.
 
@@ -29,6 +29,8 @@ def step_agent(
     the agent's current orientation.
     """
     movement_direction = action[:2]
+
+    body_id, geom_id = agent_data
 
     # Hinge angle about z is in qpos[3]
     angle = mjx_data.qpos[3]
@@ -59,8 +61,8 @@ def step_agent(
         slope_mag = jnp.linalg.norm(slope_component)
 
         is_agent_collision = jnp.logical_or(
-            mjx_data.contact.geom1[nth_contact] == agent_data.geom_id,
-            mjx_data.contact.geom2[nth_contact] == agent_data.geom_id,
+            mjx_data.contact.geom1[nth_contact] == geom_id,
+            mjx_data.contact.geom2[nth_contact] == geom_id,
         )
 
         is_touching = mjx_data.contact.dist[nth_contact] < 0.0
@@ -81,9 +83,7 @@ def step_agent(
     Apply the calculated linear force to the agent.
     """
     mjx_data = mjx_data.replace(
-        xfrc_applied=mjx_data.xfrc_applied.at[agent_data.body_id, :3].set(
-            movement_direction
-        )
+        xfrc_applied=mjx_data.xfrc_applied.at[body_id, :3].set(movement_direction)
     )
 
     # --------------------------------------------------------------------------

@@ -79,7 +79,7 @@ def render_video(
     mujoco.mjv_defaultCamera(cam)
 
     cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
-    cam.trackbodyid = icland_state.agent_data.body_id[0]
+    cam.trackbodyid = icland_state.component_ids[0, 0]
     cam.distance = 3
     cam.azimuth = 90.0
     cam.elevation = -40.0

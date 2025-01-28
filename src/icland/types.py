@@ -6,6 +6,7 @@ It includes types for model parameters, state, and action sets used in the proje
 from typing import Optional, TypeAlias
 
 import jax
+import jax.numpy as jnp
 import mujoco
 from mujoco.mjx._src.dataclasses import PyTreeNode
 
@@ -38,42 +39,15 @@ class ICLandParams(PyTreeNode):  # type: ignore[misc]
         return f"ICLandParams(model={type(self.model).__name__}, game={self.game}, agent_count={self.agent_count})"
 
 
-class AgentData(PyTreeNode):  # type: ignore[misc]
-    r"""\Agent in the ICLand environment.
-
-    Attributes:
-        body_id: Body IDs of the agents.
-        geom_id: Geometry IDs of the agents.
-    """
-
-    body_id: jax.Array
-    geom_id: jax.Array
-
-
 class ICLandState(PyTreeNode):  # type: ignore[misc]
     r"""\State of the ICLand environment.
 
     Attributes:
         mjx_model: JAX-compatible Mujoco model.
         mjx_data: JAX-compatible Mujoco data.
-        object_ids: Array of body and geometry IDs for agents.
+        component_ids: Array of body and geometry IDs for agents. (agent_count, [body_ids, geom_ids])
     """
 
     mjx_model: MjxModelType
     mjx_data: MjxStateType
-    agent_data: AgentData
-
-
-class ICLandActionSet(PyTreeNode):  # type: ignore[misc]
-    r"""\Actions taken by agents in the ICLand environment.
-
-    Attributes:
-        actions: Array representing the actions taken by each agent.
-
-    Example for 2 agents:
-     agent ID | forwards/backwards | left/right | rotate left/right
-      0       | -1                 | 0          | 1
-      1       | 1                  | 1          | -1
-    """
-
-    actions: jax.Array
+    component_ids: jnp.ndarray

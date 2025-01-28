@@ -18,6 +18,7 @@ def key() -> jax.Array:
     """Fixture to provide a consistent PRNG key for tests."""
     return jax.random.PRNGKey(42)
 
+
 @pytest.mark.parametrize(
     "name, policy, expected_direction",
     [
@@ -38,13 +39,9 @@ def test_agent_translation(
 
     # Create the ICLand environment
     mj_model = mujoco.MjModel.from_xml_string(EMPTY_WORLD)
-    icland_params = ICLandParams(
-        mj_model,
-        None,
-        1
-    )
+    icland_params = ICLandParams(mj_model, None, 1)
     icland_state = icland.init(key, icland_params)
-    body_id = icland_state.agent_data.body_id[0]
+    body_id = icland_state.component_ids[0, 0]
 
     # Get initial position, without height
     initial_pos = icland_state.mjx_data.xpos[body_id][:2]
@@ -65,7 +62,7 @@ def test_agent_translation(
 
     # Get new position
     new_position = icland_state.mjx_data.xpos[body_id][:2]
-    
+
     # Check if the agent moved in the expected direction
     displacement = new_position - initial_pos
     normalised_displacement = displacement / (jnp.linalg.norm(displacement) + 1e-10)
@@ -73,6 +70,7 @@ def test_agent_translation(
         f"{name} failed: Expected displacement {expected_direction}, "
         f"Actual displacement {normalised_displacement}"
     )
+
 
 @pytest.mark.parametrize(
     "name, policy, expected_orientation",
@@ -92,11 +90,7 @@ def test_agent_rotation(
 
     # Create the ICLand environment
     mj_model = mujoco.MjModel.from_xml_string(EMPTY_WORLD)
-    icland_params = ICLandParams(
-        mj_model,
-        None,
-        1
-    )
+    icland_params = ICLandParams(mj_model, None, 1)
     icland_state = icland.init(key, icland_params)
 
     # Get initial orientation
@@ -107,7 +101,9 @@ def test_agent_rotation(
 
     # Check if the correct angular velocity was applied
     angular_velocity = icland_state.mjx_data.qvel[3]
-    normalised_angular_velocity = angular_velocity / (jnp.linalg.norm(angular_velocity) + 1e-10)
+    normalised_angular_velocity = angular_velocity / (
+        jnp.linalg.norm(angular_velocity) + 1e-10
+    )
     assert jnp.allclose(normalised_angular_velocity, expected_orientation), (
         f"{name} failed: Expected angular velocity {expected_orientation}, "
         f"Actual angular velocity {normalised_angular_velocity}"
@@ -119,7 +115,9 @@ def test_agent_rotation(
     # Get new orientation
     new_orientation = icland_state.mjx_data.qpos[3]
     orientation_delta = new_orientation - initial_orientation
-    normalised_orientation_delta = orientation_delta / (jnp.linalg.norm(orientation_delta) + 1e-10)
+    normalised_orientation_delta = orientation_delta / (
+        jnp.linalg.norm(orientation_delta) + 1e-10
+    )
     assert jnp.allclose(normalised_orientation_delta, expected_orientation), (
         f"{name} failed: Expected orientation {expected_orientation}, "
         f"Actual orientation {normalised_orientation_delta}"
