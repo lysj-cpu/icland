@@ -604,7 +604,7 @@ def sample_world(
     key: jax.Array,
     periodic: jax.Array,
     heuristic: jax.Array,
-) -> tuple[JITModel, jax.Array]: # pragma: no cover
+) -> tuple[JITModel, jax.Array]:  # pragma: no cover
     """Samples a world such that its complete and has a playable area."""
     model = _init(
         width, height, NUM_ACTIONS, 1, periodic, heuristic, WEIGHTS, PROPAGATOR, key

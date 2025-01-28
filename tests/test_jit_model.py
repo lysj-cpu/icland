@@ -337,6 +337,7 @@ def test_next_unobserved_node_all_determined(model: JITModel) -> None:
     new_model, chosen_index = _next_unobserved_node(model)
     assert chosen_index == -1, "Expected -1 when all are determined"
 
+
 # TODO: Not sure what chosen_index should be now, because it is a bit random
 # def test_next_unobserved_node_periodic(model):
 #     """Demonstrate what happens if periodic=True, so more cells might be in-bounds.
