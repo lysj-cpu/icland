@@ -2,7 +2,7 @@
 
 from enum import Enum
 from functools import partial
-from typing import Any, cast
+from typing import TypedDict, cast
 
 import jax
 import jax.numpy as jnp
@@ -255,21 +255,26 @@ def _ban(model: JITModel, i: jax.Array, t1: jax.Array) -> JITModel:
     return cast(JITModel, jax.lax.cond(condition_1, identity, process_ban, model))
 
 
+RunState = TypedDict(
+    "RunState", {"model": JITModel, "steps": int, "done": bool, "success": bool}
+)
+
+
 def _run(
     model: JITModel, max_steps: jax.Array = jnp.array(1000, dtype=jnp.int32)
 ) -> tuple[JITModel, bool]:
     """Run the WaveFunctionCollapse algorithm with the given seed and iteration limit."""
     # Pre: the model is freshly initialized
 
-    # Define the loop state
     model = _clear(model)
-    init_state = {"model": model, "steps": 0, "done": False, "success": True}
+    # Define the loop state
+    init_state: RunState = {"model": model, "steps": 0, "done": False, "success": True}
 
-    def cond_fun(state: dict[str, Any]) -> Any:
+    def cond_fun(state: RunState) -> jax.Array:
         """Condition function for the while loop."""
         return (~state["done"]) & (state["steps"] < max_steps)
 
-    def body_fun(state: dict[str, Any]) -> dict[str, Any]:
+    def body_fun(state: RunState) -> RunState:
         """Body function for the while loop."""
         model = state["model"]
         steps = state["steps"]
@@ -322,7 +327,6 @@ def _run(
             )
             return model, jnp.array(True, dtype=bool), jnp.array(True, dtype=bool)
 
-        print("Node: ", node)
         model, done, success = jax.lax.cond(
             node >= 0, handle_node, handle_completion, (model, node)
         )
@@ -331,9 +335,9 @@ def _run(
 
     # Run the while loop
     final_state = jax.lax.while_loop(cond_fun, body_fun, init_state)
-    final_model: JITModel = cast(JITModel, final_state["model"])
+    final_model: JITModel = final_state["model"]
 
-    success: bool = cast(bool, final_state["success"])
+    success: bool = final_state["success"]
 
     return final_model, success
 
@@ -600,7 +604,7 @@ def sample_world(
     key: jax.Array,
     periodic: jax.Array,
     heuristic: jax.Array,
-) -> tuple[JITModel, jax.Array]:
+) -> tuple[JITModel, jax.Array]: # pragma: no cover
     """Samples a world such that its complete and has a playable area."""
     model = _init(
         width, height, NUM_ACTIONS, 1, periodic, heuristic, WEIGHTS, PROPAGATOR, key
@@ -621,6 +625,7 @@ def sample_world(
     )
 
 
-model = sample_world(10, 10, 1000, jax.random.key(42), True, 1)
-one_hot = export(model, TILECODES, 10, 10)
-print(one_hot.tolist())
+if __name__ == "__main__":  # Drive code used for testing.
+    model = sample_world(10, 10, 1000, jax.random.key(42), True, 1)
+    one_hot = export(model, TILECODES, 10, 10)
+    print(one_hot.tolist())

@@ -191,7 +191,6 @@ def export_stl(pieces: jax.Array, filename: str) -> mesh.Mesh:
     triangles = np.array(pieces_reshaped)
     # Invert the normals
     triangles = triangles[:, ::-1, :]
-    print(triangles)
 
     # Ensure the array is contiguous and in float32 format
     # numpy-stl expects float32 data

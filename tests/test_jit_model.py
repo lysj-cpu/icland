@@ -16,6 +16,7 @@ from icland.world_gen.JITModel import (
     _observe,
     _propagate,
     _random_index_from_distribution,
+    _run,
 )
 from icland.world_gen.XMLReader import XMLReader
 
@@ -80,7 +81,7 @@ def test_random_index_from_distribution(
     jit_func = jax.jit(_random_index_from_distribution)
 
     # Call the function and check the result
-    result = jit_func(distribution, rand_value)
+    result = _random_index_from_distribution(distribution, rand_value)
 
     # Assert that the result matches the expected result
     assert result == expected_result, f"Expected {expected_result}, but got {result}"
@@ -244,28 +245,24 @@ def test_model_run(model: JITModel) -> None:
     key = jax.random.PRNGKey(0)
 
     # Run the function
-
-    # for k in range(10):
-    #     key, subkey = jax.random.split(model.key)
-    #     model = _clear(model)
-    #     model = model.replace(key=key)
-    #     model, success = _run(model, max_steps=100)
-
-    #     if success:
-    #         print("DONE")
-    #         # Save result
-    #     else:
-    #         print("CONTRADICTION")
-
-    assert True
+    for k in range(10):
+        key, subkey = jax.random.split(model.key)
+        model = _clear(model)
+        model = model.replace(key=key)
+        model, success = _run(model, max_steps=jnp.array(100, dtype=jnp.int32))
+        if success:
+            # Save result
+            break
 
     # Verify model updates
     # print("observed: ", final_model.observed)
-    # assert jnp.all(final_model.observed >= 0), "Not all nodes were observed"
-    # assert final_model.key is not None, "Final model has no key"
+    assert jnp.all(model.observed >= 0), "Not all nodes were observed"
+    assert jnp.count_nonzero(model.wave) == model.MX * model.MY, (
+        "Not all nodes were collapsed"
+    )
 
     # # Ensure no infinite loop (e.g., reached max_steps)
-    # assert final_model.key != key, "Algorithm did not run properly"
+    assert model.key != key, "Algorithm did not run properly"
 
 
 def test_model_propagate(model: JITModel) -> None:
@@ -339,7 +336,6 @@ def test_next_unobserved_node_all_determined(model: JITModel) -> None:
     model = model.replace(heuristic=Heuristic.ENTROPY.value, sums_of_ones=sums_of_ones)
     new_model, chosen_index = _next_unobserved_node(model)
     assert chosen_index == -1, "Expected -1 when all are determined"
-
 
 # TODO: Not sure what chosen_index should be now, because it is a bit random
 # def test_next_unobserved_node_periodic(model):
