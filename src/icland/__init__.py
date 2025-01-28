@@ -116,7 +116,7 @@ def init(key: jax.Array, params: ICLandParams) -> ICLandState:
         >>> key = jax.random.key(42)
         >>> params = sample(key)
         >>> init(key, params)
-        ICLandState(mjx_model=Model(...), mjx_data=Data(...), agent_data=jnp.ndarray(...))
+        ICLandState(mjx_model=Model(...), mjx_data=Data(...), component_ids=Array(...))
     """
     # Unpack params
     mj_model = params.model
@@ -175,7 +175,7 @@ def step(
         >>> params = sample(key)
         >>> state = init(key, params)
         >>> step(key, state, params, forward_policy)
-        ICLandState(mjx_model=Model(...), mjx_data=Data(...), agent_data=jnp.ndarray(...))
+        ICLandState(mjx_model=Model(...), mjx_data=Data(...), component_ids=Array(...))
     """
     # Unpack state
     mjx_model = state.mjx_model
