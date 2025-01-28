@@ -13,14 +13,14 @@ EMPTY_WORLD = """
     <light name="main_light" pos="0 0 1" dir="0 0 -1"
            diffuse="1 1 1" specular="0.1 0.1 0.1"/>
 
-    <body name="agent1" pos="0 0 1">
+    <body name="agent0" pos="0 0 1">
       <joint type="slide" axis="1 0 0" />
       <joint type="slide" axis="0 1 0" />
       <joint type="slide" axis="0 0 1" />
       <joint type="hinge" axis="0 0 1" stiffness="1"/>
 
       <geom
-        name="agent1_geom"
+        name="agent0_geom"
         type="capsule"
         size="0.06"
         fromto="0 0 0 0 0 -0.4"
@@ -57,14 +57,14 @@ RAMP_30 = """
     <light name="main_light" pos="0 0 1" dir="0 0 -1"
            diffuse="1 1 1" specular="0.1 0.1 0.1"/>
 
-    <body name="agent1" pos="0 0 1">
+    <body name="agent0" pos="0 0 1">
       <joint type="slide" axis="1 0 0" />
       <joint type="slide" axis="0 1 0" />
       <joint type="slide" axis="0 0 1" />
       <joint type="hinge" axis="0 0 1" stiffness="1"/>
 
       <geom
-        name="agent1_geom"
+        name="agent0_geom"
         type="capsule"
         size="0.06"
         fromto="0 0 0 0 0 -0.4"
@@ -103,14 +103,14 @@ RAMP_45 = """
     <light name="main_light" pos="0 0 1" dir="0 0 -1"
            diffuse="1 1 1" specular="0.1 0.1 0.1"/>
 
-    <body name="agent1" pos="0 0 1">
+    <body name="agent0" pos="0 0 1">
       <joint type="slide" axis="1 0 0" />
       <joint type="slide" axis="0 1 0" />
       <joint type="slide" axis="0 0 1" />
       <joint type="hinge" axis="0 0 1" stiffness="1"/>
 
       <geom
-        name="agent1_geom"
+        name="agent0_geom"
         type="capsule"
         size="0.06"
         fromto="0 0 0 0 0 -0.4"
@@ -149,14 +149,14 @@ RAMP_60 = """
     <light name="main_light" pos="0 0 1" dir="0 0 -1"
            diffuse="1 1 1" specular="0.1 0.1 0.1"/>
 
-    <body name="agent1" pos="0 0 1">
+    <body name="agent0" pos="0 0 1">
       <joint type="slide" axis="1 0 0" />
       <joint type="slide" axis="0 1 0" />
       <joint type="slide" axis="0 0 1" />
       <joint type="hinge" axis="0 0 1" stiffness="1"/>
 
       <geom
-        name="agent1_geom"
+        name="agent0_geom"
         type="capsule"
         size="0.06"
         fromto="0 0 0 0 0 -0.4"
