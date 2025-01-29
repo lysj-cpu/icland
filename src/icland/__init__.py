@@ -25,6 +25,7 @@ import mujoco
 from mujoco import mjx
 
 from .agent import step_agent
+from .constants import *
 from .types import *
 
 TEST_XML_STRING: str = """
@@ -33,14 +34,14 @@ TEST_XML_STRING: str = """
     <light name="main_light" pos="0 0 1" dir="0 0 -1"
            diffuse="1 1 1" specular="0.1 0.1 0.1"/>
 
-    <body name="agent1" pos="0 0 1">
+    <body name="agent0" pos="0 0 1">
       <joint type="slide" axis="1 0 0" />
       <joint type="slide" axis="0 1 0" />
       <joint type="slide" axis="0 0 1" />
       <joint type="hinge" axis="0 0 1" stiffness="1"/>
 
       <geom
-        name="agent1_geom"
+        name="agent0_geom"
         type="capsule"
         size="0.06"
         fromto="0 0 0 0 0 -0.4"
@@ -115,34 +116,38 @@ def init(key: jax.Array, params: ICLandParams) -> ICLandState:
         >>> key = jax.random.key(42)
         >>> params = sample(key)
         >>> init(key, params)
-        ICLandState(mjx_model=Model(...), mjx_data=Data(...), agent_data=AgentData(...))
+        ICLandState(mjx_model=Model(...), mjx_data=Data(...), component_ids=Array(...))
     """
+    # Unpack params
     mj_model = params.model
     agent_count = params.agent_count
     mj_data: mujoco.MjData = mujoco.MjData(mj_model)
 
+    # Put Mujoco model and data into JAX-compatible format
     mjx_model = mjx.put_model(mj_model)
     mjx_data = mjx.put_data(mj_model, mj_data)
 
     # Collect object IDs for all agents
-    body_ids = []
-    geom_ids = []
+    agent_components = jnp.empty(
+        (agent_count, AGENT_COMPONENT_IDS_DIM), dtype=jnp.int32
+    )
 
     for agent_id in range(agent_count):
-        body_ids.append(
-            mujoco.mj_name2id(
-                mj_model, mujoco.mjtObj.mjOBJ_BODY, f"agent{agent_id + 1}"
-            )
-        )
-        geom_ids.append(
-            mujoco.mj_name2id(
-                mj_model, mujoco.mjtObj.mjOBJ_GEOM, f"agent{agent_id + 1}_geom"
-            )
+        body_id = mujoco.mj_name2id(
+            mj_model, mujoco.mjtObj.mjOBJ_BODY, f"agent{agent_id}"
         )
 
-    return ICLandState(
-        mjx_model, mjx_data, AgentData(jnp.array(body_ids), jnp.array(geom_ids))
-    )
+        geom_id = mujoco.mj_name2id(
+            mj_model, mujoco.mjtObj.mjOBJ_GEOM, f"agent{agent_id}_geom"
+        )
+
+        dof_address = mjx_model.body_dofadr[body_id]
+
+        agent_components = agent_components.at[agent_id].set(
+            [body_id, geom_id, dof_address]
+        )
+
+    return ICLandState(mjx_model, mjx_data, agent_components)
 
 
 @jax.jit
@@ -170,25 +175,42 @@ def step(
         >>> params = sample(key)
         >>> state = init(key, params)
         >>> step(key, state, params, forward_policy)
-        ICLandState(mjx_model=Model(...), mjx_data=Data(...), agent_data=AgentData(...))
+        ICLandState(mjx_model=Model(...), mjx_data=Data(...), component_ids=Array(...))
     """
+    # Unpack state
     mjx_model = state.mjx_model
     mjx_data = state.mjx_data
-    agent_data = state.agent_data
+    agent_components = state.component_ids
 
+    # Ensure actions are in the correct shape
+    actions = actions.reshape(-1, AGENT_ACTION_SPACE_DIM)
+
+    # Define a function to step a single agent
     def step_single_agent(
-        carry: Tuple[MjxStateType, jax.Array], inputs: AgentData
+        carry: Tuple[MjxStateType, jax.Array],
+        agent_components: Tuple[jnp.ndarray, jnp.ndarray],
     ) -> Tuple[Tuple[MjxStateType, jax.Array], None]:
         mjx_data, action = carry
-        mjx_data = step_agent(mjx_data, action, inputs)
+
+        agent_component, agent_index = agent_components
+
+        #  Reshape agent_component to (1, 2) to match the expected shape of step_agent
+        agent_component = agent_component.reshape(-1, AGENT_COMPONENT_IDS_DIM)
+
+        # Step the agent
+        mjx_data = step_agent(
+            mjx_data, action[agent_index], agent_component[agent_index]
+        )
         return (mjx_data, action), None
 
     # Use `jax.lax.scan` to iterate through agents and step each one
     (updated_data, _), _ = jax.lax.scan(
-        step_single_agent, (mjx_data, actions), agent_data
+        step_single_agent,
+        (mjx_data, actions),
+        (agent_components, jnp.arange(agent_components.shape[0], dtype=jnp.int32)),
     )
 
     # Step the environment after applying all agent actions
     updated_data = mjx.step(mjx_model, updated_data)
 
-    return ICLandState(mjx_model, updated_data, agent_data)
+    return ICLandState(mjx_model, updated_data, agent_components)

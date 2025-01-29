@@ -4,10 +4,8 @@ These constants include debug camera settings, agent movement parameters,
 and other small values.
 """
 
-DEBUG_CAMERA_DISTANCE = 3.0
-DEBUG_CAMERA_AZIMUTH = 90.0
-DEBUG_CAMERA_ELEVATION = -40.0
-DEBUG_CAMERA_VIS_FLAGS = ["mjVIS_JOINT", "mjVIS_CONTACTFORCE"]
+AGENT_ACTION_SPACE_DIM = 3
+AGENT_COMPONENT_IDS_DIM = 3
 
 AGENT_MAX_MOVEMENT_SPEED = 1.0
 AGENT_MAX_ROTATION_SPEED = 5.0
