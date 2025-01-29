@@ -1,0 +1,652 @@
+<set>
+    <tiles>
+        <tile name="ramp_1_2" symmetry="T" weight="3"/>
+        <tile name="ramp_2_3" symmetry="T" weight="2"/>
+        <tile name="ramp_3_4" symmetry="T" weight="1"/>
+        <tile name="ramp_4_5" symmetry="T" weight="0.5"/>
+        <tile name="ramp_5_6" symmetry="T" weight="0.25"/>
+        <tile name="square_1" symmetry="X" weight="10"/>
+        <tile name="square_2" symmetry="X" weight="5"/>
+        <tile name="square_3" symmetry="X" weight="5"/>
+        <tile name="square_4" symmetry="X"/>
+        <tile name="square_5" symmetry="X"/>
+        <tile name="square_6" symmetry="X"/>
+        <tile name="vramp_1_2" symmetry="L" weight="1"/>
+        <tile name="vramp_1_3" symmetry="L" weight="1"/>
+        <tile name="vramp_1_4" symmetry="L" weight="0.5"/>
+        <tile name="vramp_1_5" symmetry="L" weight="0.5"/>
+        <tile name="vramp_1_6" symmetry="L" weight="0.1"/>
+        <tile name="vramp_2_3" symmetry="L" weight="1"/>
+        <tile name="vramp_2_4" symmetry="L" weight="0.5"/>
+        <tile name="vramp_2_5" symmetry="L" weight="0.1"/>
+        <tile name="vramp_2_6" symmetry="L" weight="0.1"/>
+        <tile name="vramp_3_4" symmetry="L" weight="1"/>
+        <tile name="vramp_3_5" symmetry="L" weight="0.5"/>
+        <tile name="vramp_3_6" symmetry="L" weight="0.1"/>
+        <tile name="vramp_4_5" symmetry="L" weight="0.5"/>
+        <tile name="vramp_4_6" symmetry="L" weight="0.1"/>
+        <tile name="vramp_5_6" symmetry="L" weight="0.1"/>
+        <tile name="square_boundary_1" symmetry="T"/>
+        <tile name="square_boundary_2" symmetry="T"/>
+        <tile name="square_boundary_3" symmetry="T"/>
+        <tile name="square_boundary_4" symmetry="T"/>
+        <tile name="square_boundary_5" symmetry="T"/>
+        <tile name="square_boundary_6" symmetry="T"/>
+        <tile name="square_corner_1" symmetry="L"/>
+        <tile name="square_corner_2" symmetry="L"/>
+        <tile name="square_corner_3" symmetry="L"/>
+        <tile name="square_corner_4" symmetry="L"/>
+        <tile name="square_corner_5" symmetry="L"/>
+        <tile name="square_corner_6" symmetry="L"/>
+        <tile name="square_turn_1" symmetry="L" weight="0.1"/>
+        <tile name="square_turn_2" symmetry="L" weight="0.1"/>
+        <tile name="square_turn_3" symmetry="L" weight="0.5"/>
+        <tile name="square_turn_4" symmetry="L" weight="0.05"/>
+        <tile name="square_turn_5" symmetry="L" weight="0.01"/>
+        <tile name="square_turn_6" symmetry="L" weight="0.01"/>
+    </tiles>
+    <neighbors>
+        <!-- VRamp constraints. -->
+        <neighbor left="vramp_1_2 2" right="square_boundary_2 2"/>
+        <neighbor left="vramp_1_2" right="square_corner_2 1"/>
+        <neighbor left="vramp_1_2" right="square_corner_2 2"/>
+        <neighbor left="vramp_1_2" right="square_turn_2 2"/>
+        <neighbor left="vramp_1_2" right="square_boundary_1 2"/>
+        <neighbor left="vramp_1_2" right="square_corner_1 1"/>
+        <neighbor left="vramp_1_2" right="square_corner_1 2"/>
+        <neighbor left="vramp_1_2" right="square_turn_1 2"/>
+        <neighbor left="vramp_1_2 1" right="square_boundary_2"/>
+        <neighbor left="vramp_1_2" right="square_corner_2 2"/>
+        <neighbor left="vramp_1_2" right="square_corner_2 1"/>
+        <neighbor left="vramp_1_2" right="square_turn_2 1"/>
+        <neighbor left="vramp_1_2 3" right="square_boundary_1"/>
+        <neighbor left="vramp_1_2" right="square_corner_1 2"/>
+        <neighbor left="vramp_1_2" right="square_corner_1 1"/>
+        <neighbor left="vramp_1_2" right="square_turn_1 1"/>
+        <neighbor left="vramp_1_3 2" right="square_boundary_3 2"/>
+        <neighbor left="vramp_1_3" right="square_corner_3 1"/>
+        <neighbor left="vramp_1_3" right="square_corner_3 2"/>
+        <neighbor left="vramp_1_3" right="square_turn_3 2"/>
+        <neighbor left="vramp_1_3" right="square_boundary_1 2"/>
+        <neighbor left="vramp_1_3" right="square_corner_1 1"/>
+        <neighbor left="vramp_1_3" right="square_corner_1 2"/>
+        <neighbor left="vramp_1_3" right="square_turn_1 2"/>
+        <neighbor left="vramp_1_3 1" right="square_boundary_3"/>
+        <neighbor left="vramp_1_3" right="square_corner_3 2"/>
+        <neighbor left="vramp_1_3" right="square_corner_3 1"/>
+        <neighbor left="vramp_1_3" right="square_turn_3 1"/>
+        <neighbor left="vramp_1_3 3" right="square_boundary_1"/>
+        <neighbor left="vramp_1_3" right="square_corner_1 2"/>
+        <neighbor left="vramp_1_3" right="square_corner_1 1"/>
+        <neighbor left="vramp_1_3" right="square_turn_1 1"/>
+        <neighbor left="vramp_1_4 2" right="square_boundary_4 2"/>
+        <neighbor left="vramp_1_4" right="square_corner_4 1"/>
+        <neighbor left="vramp_1_4" right="square_corner_4 2"/>
+        <neighbor left="vramp_1_4" right="square_turn_4 2"/>
+        <neighbor left="vramp_1_4" right="square_boundary_1 2"/>
+        <neighbor left="vramp_1_4" right="square_corner_1 1"/>
+        <neighbor left="vramp_1_4" right="square_corner_1 2"/>
+        <neighbor left="vramp_1_4" right="square_turn_1 2"/>
+        <neighbor left="vramp_1_4 1" right="square_boundary_4"/>
+        <neighbor left="vramp_1_4" right="square_corner_4 2"/>
+        <neighbor left="vramp_1_4" right="square_corner_4 1"/>
+        <neighbor left="vramp_1_4" right="square_turn_4 1"/>
+        <neighbor left="vramp_1_4 3" right="square_boundary_1"/>
+        <neighbor left="vramp_1_4" right="square_corner_1 2"/>
+        <neighbor left="vramp_1_4" right="square_corner_1 1"/>
+        <neighbor left="vramp_1_4" right="square_turn_1 1"/>
+        <neighbor left="vramp_1_5 2" right="square_boundary_5 2"/>
+        <neighbor left="vramp_1_5" right="square_corner_5 1"/>
+        <neighbor left="vramp_1_5" right="square_corner_5 2"/>
+        <neighbor left="vramp_1_5" right="square_turn_5 2"/>
+        <neighbor left="vramp_1_5" right="square_boundary_1 2"/>
+        <neighbor left="vramp_1_5" right="square_corner_1 1"/>
+        <neighbor left="vramp_1_5" right="square_corner_1 2"/>
+        <neighbor left="vramp_1_5" right="square_turn_1 2"/>
+        <neighbor left="vramp_1_5 1" right="square_boundary_5"/>
+        <neighbor left="vramp_1_5" right="square_corner_5 2"/>
+        <neighbor left="vramp_1_5" right="square_corner_5 1"/>
+        <neighbor left="vramp_1_5" right="square_turn_5 1"/>
+        <neighbor left="vramp_1_5 3" right="square_boundary_1"/>
+        <neighbor left="vramp_1_5" right="square_corner_1 2"/>
+        <neighbor left="vramp_1_5" right="square_corner_1 1"/>
+        <neighbor left="vramp_1_5" right="square_turn_1 1"/>
+        <neighbor left="vramp_1_6 2" right="square_boundary_6 2"/>
+        <neighbor left="vramp_1_6" right="square_corner_6 1"/>
+        <neighbor left="vramp_1_6" right="square_corner_6 2"/>
+        <neighbor left="vramp_1_6" right="square_turn_6 2"/>
+        <neighbor left="vramp_1_6" right="square_boundary_1 2"/>
+        <neighbor left="vramp_1_6" right="square_corner_1 1"/>
+        <neighbor left="vramp_1_6" right="square_corner_1 2"/>
+        <neighbor left="vramp_1_6" right="square_turn_1 2"/>
+        <neighbor left="vramp_1_6 1" right="square_boundary_6"/>
+        <neighbor left="vramp_1_6" right="square_corner_6 2"/>
+        <neighbor left="vramp_1_6" right="square_corner_6 1"/>
+        <neighbor left="vramp_1_6" right="square_turn_6 1"/>
+        <neighbor left="vramp_1_6 3" right="square_boundary_1"/>
+        <neighbor left="vramp_1_6" right="square_corner_1 2"/>
+        <neighbor left="vramp_1_6" right="square_corner_1 1"/>
+        <neighbor left="vramp_1_6" right="square_turn_1 1"/>
+        <neighbor left="vramp_2_3 2" right="square_boundary_3 2"/>
+        <neighbor left="vramp_2_3" right="square_corner_3 1"/>
+        <neighbor left="vramp_2_3" right="square_corner_3 2"/>
+        <neighbor left="vramp_2_3" right="square_turn_3 2"/>
+        <neighbor left="vramp_2_3" right="square_boundary_2 2"/>
+        <neighbor left="vramp_2_3" right="square_corner_2 1"/>
+        <neighbor left="vramp_2_3" right="square_corner_2 2"/>
+        <neighbor left="vramp_2_3" right="square_turn_2 2"/>
+        <neighbor left="vramp_2_3 1" right="square_boundary_3"/>
+        <neighbor left="vramp_2_3" right="square_corner_3 2"/>
+        <neighbor left="vramp_2_3" right="square_corner_3 1"/>
+        <neighbor left="vramp_2_3" right="square_turn_3 1"/>
+        <neighbor left="vramp_2_3 3" right="square_boundary_2"/>
+        <neighbor left="vramp_2_3" right="square_corner_2 2"/>
+        <neighbor left="vramp_2_3" right="square_corner_2 1"/>
+        <neighbor left="vramp_2_3" right="square_turn_2 1"/>
+        <neighbor left="vramp_2_4 2" right="square_boundary_4 2"/>
+        <neighbor left="vramp_2_4" right="square_corner_4 1"/>
+        <neighbor left="vramp_2_4" right="square_corner_4 2"/>
+        <neighbor left="vramp_2_4" right="square_turn_4 2"/>
+        <neighbor left="vramp_2_4" right="square_boundary_2 2"/>
+        <neighbor left="vramp_2_4" right="square_corner_2 1"/>
+        <neighbor left="vramp_2_4" right="square_corner_2 2"/>
+        <neighbor left="vramp_2_4" right="square_turn_2 2"/>
+        <neighbor left="vramp_2_4 1" right="square_boundary_4"/>
+        <neighbor left="vramp_2_4" right="square_corner_4 2"/>
+        <neighbor left="vramp_2_4" right="square_corner_4 1"/>
+        <neighbor left="vramp_2_4" right="square_turn_4 1"/>
+        <neighbor left="vramp_2_4 3" right="square_boundary_2"/>
+        <neighbor left="vramp_2_4" right="square_corner_2 2"/>
+        <neighbor left="vramp_2_4" right="square_corner_2 1"/>
+        <neighbor left="vramp_2_4" right="square_turn_2 1"/>
+        <neighbor left="vramp_2_5 2" right="square_boundary_5 2"/>
+        <neighbor left="vramp_2_5" right="square_corner_5 1"/>
+        <neighbor left="vramp_2_5" right="square_corner_5 2"/>
+        <neighbor left="vramp_2_5" right="square_turn_5 2"/>
+        <neighbor left="vramp_2_5" right="square_boundary_2 2"/>
+        <neighbor left="vramp_2_5" right="square_corner_2 1"/>
+        <neighbor left="vramp_2_5" right="square_corner_2 2"/>
+        <neighbor left="vramp_2_5" right="square_turn_2 2"/>
+        <neighbor left="vramp_2_5 1" right="square_boundary_5"/>
+        <neighbor left="vramp_2_5" right="square_corner_5 2"/>
+        <neighbor left="vramp_2_5" right="square_corner_5 1"/>
+        <neighbor left="vramp_2_5" right="square_turn_5 1"/>
+        <neighbor left="vramp_2_5 3" right="square_boundary_2"/>
+        <neighbor left="vramp_2_5" right="square_corner_2 2"/>
+        <neighbor left="vramp_2_5" right="square_corner_2 1"/>
+        <neighbor left="vramp_2_5" right="square_turn_2 1"/>
+        <neighbor left="vramp_2_6 1" right="square_boundary_6 2"/>
+        <neighbor left="vramp_2_6" right="square_corner_6 1"/>
+        <neighbor left="vramp_2_6" right="square_corner_6 2"/>
+        <neighbor left="vramp_2_6" right="square_turn_6 2"/>
+        <neighbor left="vramp_2_6" right="square_boundary_2 2"/>
+        <neighbor left="vramp_2_6" right="square_corner_2 1"/>
+        <neighbor left="vramp_2_6" right="square_corner_2 2"/>
+        <neighbor left="vramp_2_6" right="square_turn_2 2"/>
+        <neighbor left="vramp_2_6 1" right="square_boundary_6"/>
+        <neighbor left="vramp_2_6" right="square_corner_6 2"/>
+        <neighbor left="vramp_2_6" right="square_corner_6 1"/>
+        <neighbor left="vramp_2_6" right="square_turn_6 1"/>
+        <neighbor left="vramp_2_6 3" right="square_boundary_2"/>
+        <neighbor left="vramp_2_6" right="square_corner_2 2"/>
+        <neighbor left="vramp_2_6" right="square_corner_2 1"/>
+        <neighbor left="vramp_2_6" right="square_turn_2 1"/>
+        <neighbor left="vramp_3_4 2" right="square_boundary_4 2"/>
+        <neighbor left="vramp_3_4" right="square_corner_4 1"/>
+        <neighbor left="vramp_3_4" right="square_corner_4 2"/>
+        <neighbor left="vramp_3_4" right="square_turn_4 2"/>
+        <neighbor left="vramp_3_4" right="square_boundary_3 2"/>
+        <neighbor left="vramp_3_4" right="square_corner_3 1"/>
+        <neighbor left="vramp_3_4" right="square_corner_3 2"/>
+        <neighbor left="vramp_3_4" right="square_turn_3 2"/>
+        <neighbor left="vramp_3_4 1" right="square_boundary_4"/>
+        <neighbor left="vramp_3_4" right="square_corner_4 2"/>
+        <neighbor left="vramp_3_4" right="square_corner_4 1"/>
+        <neighbor left="vramp_3_4" right="square_turn_4 1"/>
+        <neighbor left="vramp_3_4 3" right="square_boundary_3"/>
+        <neighbor left="vramp_3_4" right="square_corner_3 2"/>
+        <neighbor left="vramp_3_4" right="square_corner_3 1"/>
+        <neighbor left="vramp_3_4" right="square_turn_3 1"/>
+        <neighbor left="vramp_3_5 2" right="square_boundary_5 2"/>
+        <neighbor left="vramp_3_5" right="square_corner_5 1"/>
+        <neighbor left="vramp_3_5" right="square_corner_5 2"/>
+        <neighbor left="vramp_3_5" right="square_turn_5 2"/>
+        <neighbor left="vramp_3_5" right="square_boundary_3 2"/>
+        <neighbor left="vramp_3_5" right="square_corner_3 1"/>
+        <neighbor left="vramp_3_5" right="square_corner_3 2"/>
+        <neighbor left="vramp_3_5" right="square_turn_3 2"/>
+        <neighbor left="vramp_3_5 1" right="square_boundary_5"/>
+        <neighbor left="vramp_3_5" right="square_corner_5 2"/>
+        <neighbor left="vramp_3_5" right="square_corner_5 1"/>
+        <neighbor left="vramp_3_5" right="square_turn_5 1"/>
+        <neighbor left="vramp_3_5 3" right="square_boundary_3"/>
+        <neighbor left="vramp_3_5" right="square_corner_3 2"/>
+        <neighbor left="vramp_3_5" right="square_corner_3 1"/>
+        <neighbor left="vramp_3_5" right="square_turn_3 1"/>
+        <neighbor left="vramp_3_6 2" right="square_boundary_6 2"/>
+        <neighbor left="vramp_3_6" right="square_corner_6 1"/>
+        <neighbor left="vramp_3_6" right="square_corner_6 2"/>
+        <neighbor left="vramp_3_6" right="square_turn_6 2"/>
+        <neighbor left="vramp_3_6" right="square_boundary_3 2"/>
+        <neighbor left="vramp_3_6" right="square_corner_3 1"/>
+        <neighbor left="vramp_3_6" right="square_corner_3 2"/>
+        <neighbor left="vramp_3_6" right="square_turn_3 2"/>
+        <neighbor left="vramp_3_6 1" right="square_boundary_6"/>
+        <neighbor left="vramp_3_6" right="square_corner_6 2"/>
+        <neighbor left="vramp_3_6" right="square_corner_6 1"/>
+        <neighbor left="vramp_3_6" right="square_turn_6 1"/>
+        <neighbor left="vramp_3_6 3" right="square_boundary_3"/>
+        <neighbor left="vramp_3_6" right="square_corner_3 2"/>
+        <neighbor left="vramp_3_6" right="square_corner_3 1"/>
+        <neighbor left="vramp_3_6" right="square_turn_3 1"/>
+        <neighbor left="vramp_4_5 2" right="square_boundary_5 2"/>
+        <neighbor left="vramp_4_5" right="square_corner_5 1"/>
+        <neighbor left="vramp_4_5" right="square_corner_5 2"/>
+        <neighbor left="vramp_4_5" right="square_turn_5 2"/>
+        <neighbor left="vramp_4_5" right="square_boundary_4 2"/>
+        <neighbor left="vramp_4_5" right="square_corner_4 1"/>
+        <neighbor left="vramp_4_5" right="square_corner_4 2"/>
+        <neighbor left="vramp_4_5" right="square_turn_4 2"/>
+        <neighbor left="vramp_4_5 1" right="square_boundary_5"/>
+        <neighbor left="vramp_4_5" right="square_corner_5 2"/>
+        <neighbor left="vramp_4_5" right="square_corner_5 1"/>
+        <neighbor left="vramp_4_5" right="square_turn_5 1"/>
+        <neighbor left="vramp_4_5 3" right="square_boundary_4"/>
+        <neighbor left="vramp_4_5" right="square_corner_4 2"/>
+        <neighbor left="vramp_4_5" right="square_corner_4 1"/>
+        <neighbor left="vramp_4_5" right="square_turn_4 1"/>
+        <neighbor left="vramp_4_6 2" right="square_boundary_6 2"/>
+        <neighbor left="vramp_4_6" right="square_corner_6 1"/>
+        <neighbor left="vramp_4_6" right="square_corner_6 2"/>
+        <neighbor left="vramp_4_6" right="square_turn_6 2"/>
+        <neighbor left="vramp_4_6" right="square_boundary_4 2"/>
+        <neighbor left="vramp_4_6" right="square_corner_4 1"/>
+        <neighbor left="vramp_4_6" right="square_corner_4 2"/>
+        <neighbor left="vramp_4_6" right="square_turn_4 2"/>
+        <neighbor left="vramp_4_6 1" right="square_boundary_6"/>
+        <neighbor left="vramp_4_6" right="square_corner_6 2"/>
+        <neighbor left="vramp_4_6" right="square_corner_6 1"/>
+        <neighbor left="vramp_4_6" right="square_turn_6 1"/>
+        <neighbor left="vramp_4_6 3" right="square_boundary_4"/>
+        <neighbor left="vramp_4_6" right="square_corner_4 2"/>
+        <neighbor left="vramp_4_6" right="square_corner_4 1"/>
+        <neighbor left="vramp_4_6" right="square_turn_4 1"/>
+        <neighbor left="vramp_5_6 2" right="square_boundary_6 2"/>
+        <neighbor left="vramp_5_6" right="square_corner_6 1"/>
+        <neighbor left="vramp_5_6" right="square_corner_6 2"/>
+        <neighbor left="vramp_5_6" right="square_turn_6 2"/>
+        <neighbor left="vramp_5_6" right="square_boundary_5 2"/>
+        <neighbor left="vramp_5_6" right="square_corner_5 1"/>
+        <neighbor left="vramp_5_6" right="square_corner_5 2"/>
+        <neighbor left="vramp_5_6" right="square_turn_5 2"/>
+        <neighbor left="vramp_5_6 1" right="square_boundary_6"/>
+        <neighbor left="vramp_5_6" right="square_corner_6 2"/>
+        <neighbor left="vramp_5_6" right="square_corner_6 1"/>
+        <neighbor left="vramp_5_6" right="square_turn_6 1"/>
+        <neighbor left="vramp_5_6 3" right="square_boundary_5"/>
+        <neighbor left="vramp_5_6" right="square_corner_5 2"/>
+        <neighbor left="vramp_5_6" right="square_corner_5 1"/>
+        <neighbor left="vramp_5_6" right="square_turn_5 1"/>
+
+        <!-- Square boundary constraints. -->
+        <neighbor left="square_boundary_1" right="square_boundary_1"/>
+        <neighbor left="square_boundary_1" right="square_corner_1 2"/>
+        <neighbor left="square_boundary_1" right="square_turn_1 1"/>
+        <neighbor left="square_boundary_1" right="square_corner_1 1"/>
+        <neighbor left="square_boundary_1 1" right="square_boundary_1 3"/>
+        <neighbor left="square_boundary_1 1" right="square_1"/>
+        <neighbor left="square_boundary_1 2" right="square_boundary_1 2"/>
+        <neighbor left="square_boundary_1 2" right="square_corner_1 1"/>
+        <neighbor left="square_boundary_1 2" right="square_turn_1 2"/>
+        <neighbor left="square_boundary_1 2" right="square_corner_1 2"/>
+        <neighbor left="square_boundary_1 3" right="square_boundary_2 1"/>
+        <neighbor left="square_boundary_1 3" right="square_boundary_3 1"/>
+        <neighbor left="square_boundary_1 3" right="square_boundary_4 1"/>
+        <neighbor left="square_boundary_1 3" right="square_boundary_5 1"/>
+        <neighbor left="square_boundary_1 3" right="square_boundary_6 1"/>
+        <neighbor left="square_boundary_1 3" right="square_corner_2"/>
+        <neighbor left="square_boundary_1 3" right="square_corner_3"/>
+        <neighbor left="square_boundary_1 3" right="square_corner_4"/>
+        <neighbor left="square_boundary_1 3" right="square_corner_5"/>
+        <neighbor left="square_boundary_1 3" right="square_corner_6"/>
+        <neighbor left="square_boundary_1 3" right="square_corner_2 3"/>
+        <neighbor left="square_boundary_1 3" right="square_corner_3 3"/>
+        <neighbor left="square_boundary_1 3" right="square_corner_4 3"/>
+        <neighbor left="square_boundary_1 3" right="square_corner_5 3"/>
+        <neighbor left="square_boundary_1 3" right="square_corner_6 3"/>
+        <neighbor left="square_boundary_2" right="square_boundary_2"/>
+        <neighbor left="square_boundary_2" right="square_corner_2 2"/>
+        <neighbor left="square_boundary_2" right="square_turn_2 1"/>
+        <neighbor left="square_boundary_2" right="square_corner_2 1"/>
+        <neighbor left="square_boundary_2 1" right="square_boundary_2 3"/>
+        <neighbor left="square_boundary_2 1" right="square_2"/>
+        <neighbor left="square_boundary_2 2" right="square_boundary_2 2"/>
+        <neighbor left="square_boundary_2 2" right="square_corner_2 1"/>
+        <neighbor left="square_boundary_2 2" right="square_turn_2 2"/>
+        <neighbor left="square_boundary_2 2" right="square_corner_2 2"/>
+        <neighbor left="square_boundary_2 3" right="square_boundary_3 1"/>
+        <neighbor left="square_boundary_2 3" right="square_boundary_4 1"/>
+        <neighbor left="square_boundary_2 3" right="square_boundary_5 1"/>
+        <neighbor left="square_boundary_2 3" right="square_boundary_6 1"/>
+        <neighbor left="square_boundary_2 3" right="square_corner_3"/>
+        <neighbor left="square_boundary_2 3" right="square_corner_4"/>
+        <neighbor left="square_boundary_2 3" right="square_corner_5"/>
+        <neighbor left="square_boundary_2 3" right="square_corner_6"/>
+        <neighbor left="square_boundary_2 3" right="square_corner_3 3"/>
+        <neighbor left="square_boundary_2 3" right="square_corner_4 3"/>
+        <neighbor left="square_boundary_2 3" right="square_corner_5 3"/>
+        <neighbor left="square_boundary_2 3" right="square_corner_6 3"/>
+        <neighbor left="square_boundary_3" right="square_boundary_3"/>
+        <neighbor left="square_boundary_3" right="square_corner_3 2"/>
+        <neighbor left="square_boundary_3" right="square_turn_3 1"/>
+        <neighbor left="square_boundary_3" right="square_corner_3 1"/>
+        <neighbor left="square_boundary_3 1" right="square_boundary_3 3"/>
+        <neighbor left="square_boundary_3 1" right="square_3"/>
+        <neighbor left="square_boundary_3 2" right="square_boundary_3 2"/>
+        <neighbor left="square_boundary_3 2" right="square_corner_3 1"/>
+        <neighbor left="square_boundary_3 2" right="square_turn_3 2"/>
+        <neighbor left="square_boundary_3 2" right="square_corner_3 2"/>
+        <neighbor left="square_boundary_3 3" right="square_boundary_4 1"/>
+        <neighbor left="square_boundary_3 3" right="square_boundary_5 1"/>
+        <neighbor left="square_boundary_3 3" right="square_boundary_6 1"/>
+        <neighbor left="square_boundary_3 3" right="square_corner_4"/>
+        <neighbor left="square_boundary_3 3" right="square_corner_5"/>
+        <neighbor left="square_boundary_3 3" right="square_corner_6"/>
+        <neighbor left="square_boundary_3 3" right="square_corner_4 3"/>
+        <neighbor left="square_boundary_3 3" right="square_corner_5 3"/>
+        <neighbor left="square_boundary_3 3" right="square_corner_6 3"/>
+        <neighbor left="square_boundary_4" right="square_boundary_4"/>
+        <neighbor left="square_boundary_4" right="square_corner_4 2"/>
+        <neighbor left="square_boundary_4" right="square_turn_4 1"/>
+        <neighbor left="square_boundary_4" right="square_corner_4 1"/>
+        <neighbor left="square_boundary_4 1" right="square_boundary_4 3"/>
+        <neighbor left="square_boundary_4 1" right="square_4"/>
+        <neighbor left="square_boundary_4 2" right="square_boundary_4 2"/>
+        <neighbor left="square_boundary_4 2" right="square_corner_4 1"/>
+        <neighbor left="square_boundary_4 2" right="square_turn_4 2"/>
+        <neighbor left="square_boundary_4 2" right="square_corner_4 2"/>
+        <neighbor left="square_boundary_4 3" right="square_boundary_5 1"/>
+        <neighbor left="square_boundary_4 3" right="square_boundary_6 1"/>
+        <neighbor left="square_boundary_4 3" right="square_corner_5"/>
+        <neighbor left="square_boundary_4 3" right="square_corner_6"/>
+        <neighbor left="square_boundary_4 3" right="square_corner_5 3"/>
+        <neighbor left="square_boundary_4 3" right="square_corner_6 3"/>
+        <neighbor left="square_boundary_5" right="square_boundary_5"/>
+        <neighbor left="square_boundary_5" right="square_corner_5 2"/>
+        <neighbor left="square_boundary_5" right="square_turn_5 1"/>
+        <neighbor left="square_boundary_5" right="square_corner_5 1"/>
+        <neighbor left="square_boundary_5 1" right="square_boundary_5 3"/>
+        <neighbor left="square_boundary_5 1" right="square_5"/>
+        <neighbor left="square_boundary_5 2" right="square_boundary_5 2"/>
+        <neighbor left="square_boundary_5 2" right="square_corner_5 1"/>
+        <neighbor left="square_boundary_5 2" right="square_turn_5 2"/>
+        <neighbor left="square_boundary_5 2" right="square_corner_5 2"/>
+        <neighbor left="square_boundary_5 3" right="square_boundary_6 1"/>
+        <neighbor left="square_boundary_5 3" right="square_corner_5"/>
+        <neighbor left="square_boundary_5 3" right="square_corner_6 3"/>
+        <neighbor left="square_boundary_6" right="square_boundary_6"/>
+        <neighbor left="square_boundary_6" right="square_corner_6 2"/>
+        <neighbor left="square_boundary_6" right="square_turn_6 1"/>
+        <neighbor left="square_boundary_6" right="square_corner_6 1"/>
+        <neighbor left="square_boundary_6 1" right="square_boundary_6 3"/>
+        <neighbor left="square_boundary_6 1" right="square_6"/>
+        <neighbor left="square_boundary_6 2" right="square_boundary_6 2"/>
+        <neighbor left="square_boundary_6 2" right="square_corner_6 1"/>
+        <neighbor left="square_boundary_6 2" right="square_turn_6 2"/>
+        <neighbor left="square_boundary_6 2" right="square_corner_6 2"/>
+
+        <!-- Square corner constraints. -->
+        <neighbor left="square_corner_1" right="square_corner_1 1"/>
+        <neighbor left="square_corner_1" right="square_corner_1 2"/>
+        <neighbor left="square_corner_2" right="square_corner_2 1"/>
+        <neighbor left="square_corner_2" right="square_corner_2 2"/>
+        <neighbor left="square_corner_3" right="square_corner_3 1"/>
+        <neighbor left="square_corner_3" right="square_corner_3 2"/>
+        <neighbor left="square_corner_4" right="square_corner_4 1"/>
+        <neighbor left="square_corner_4" right="square_corner_4 2"/>
+        <neighbor left="square_corner_5" right="square_corner_5 1"/>
+        <neighbor left="square_corner_5" right="square_corner_5 2"/>
+        <neighbor left="square_corner_6" right="square_corner_6 1"/>
+        <neighbor left="square_corner_6" right="square_corner_6 2"/>
+        <neighbor left="square_corner_1 1" right="square_corner_2"/>
+        <neighbor left="square_corner_1 1" right="square_corner_3"/>
+        <neighbor left="square_corner_1 1" right="square_corner_4"/>
+        <neighbor left="square_corner_1 1" right="square_corner_5"/>
+        <neighbor left="square_corner_1 1" right="square_corner_6"/>
+        <neighbor left="square_corner_2 1" right="square_corner_1"/>
+        <neighbor left="square_corner_2 1" right="square_corner_3"/>
+        <neighbor left="square_corner_2 1" right="square_corner_4"/>
+        <neighbor left="square_corner_2 1" right="square_corner_5"/>
+        <neighbor left="square_corner_2 1" right="square_corner_6"/>
+        <neighbor left="square_corner_3 1" right="square_corner_1"/>
+        <neighbor left="square_corner_3 1" right="square_corner_2"/>
+        <neighbor left="square_corner_3 1" right="square_corner_4"/>
+        <neighbor left="square_corner_3 1" right="square_corner_5"/>
+        <neighbor left="square_corner_3 1" right="square_corner_6"/>
+        <neighbor left="square_corner_4 1" right="square_corner_1"/>
+        <neighbor left="square_corner_4 1" right="square_corner_2"/>
+        <neighbor left="square_corner_4 1" right="square_corner_3"/>
+        <neighbor left="square_corner_4 1" right="square_corner_5"/>
+        <neighbor left="square_corner_4 1" right="square_corner_6"/>
+        <neighbor left="square_corner_5 1" right="square_corner_1"/>
+        <neighbor left="square_corner_5 1" right="square_corner_2"/>
+        <neighbor left="square_corner_5 1" right="square_corner_3"/>
+        <neighbor left="square_corner_5 1" right="square_corner_4"/>
+        <neighbor left="square_corner_5 1" right="square_corner_6"/>
+        <neighbor left="square_corner_6 1" right="square_corner_1"/>
+        <neighbor left="square_corner_6 1" right="square_corner_2"/>
+        <neighbor left="square_corner_6 1" right="square_corner_3"/>
+        <neighbor left="square_corner_6 1" right="square_corner_4"/>
+        <neighbor left="square_corner_6 1" right="square_corner_5"/>
+        <neighbor left="square_corner_1 1" right="square_corner_2 3"/>
+        <neighbor left="square_corner_1 1" right="square_corner_3 3"/>
+        <neighbor left="square_corner_1 1" right="square_corner_4 3"/>
+        <neighbor left="square_corner_1 1" right="square_corner_5 3"/>
+        <neighbor left="square_corner_1 1" right="square_corner_6 3"/>
+        <neighbor left="square_corner_2 1" right="square_corner_1 3"/>
+        <neighbor left="square_corner_2 1" right="square_corner_3 3"/>
+        <neighbor left="square_corner_2 1" right="square_corner_4 3"/>
+        <neighbor left="square_corner_2 1" right="square_corner_5 3"/>
+        <neighbor left="square_corner_2 1" right="square_corner_6 3"/>
+        <neighbor left="square_corner_3 1" right="square_corner_1 3"/>
+        <neighbor left="square_corner_3 1" right="square_corner_2 3"/>
+        <neighbor left="square_corner_3 1" right="square_corner_4 3"/>
+        <neighbor left="square_corner_3 1" right="square_corner_5 3"/>
+        <neighbor left="square_corner_3 1" right="square_corner_6 3"/>
+        <neighbor left="square_corner_4 1" right="square_corner_1 3"/>
+        <neighbor left="square_corner_4 1" right="square_corner_2 3"/>
+        <neighbor left="square_corner_4 1" right="square_corner_3 3"/>
+        <neighbor left="square_corner_4 1" right="square_corner_5 3"/>
+        <neighbor left="square_corner_4 1" right="square_corner_6 3"/>
+        <neighbor left="square_corner_5 1" right="square_corner_1 3"/>
+        <neighbor left="square_corner_5 1" right="square_corner_2 3"/>
+        <neighbor left="square_corner_5 1" right="square_corner_3 3"/>
+        <neighbor left="square_corner_5 1" right="square_corner_4 3"/>
+        <neighbor left="square_corner_5 1" right="square_corner_6 3"/>
+        <neighbor left="square_corner_6 1" right="square_corner_1 3"/>
+        <neighbor left="square_corner_6 1" right="square_corner_2 3"/>
+        <neighbor left="square_corner_6 1" right="square_corner_3 3"/>
+        <neighbor left="square_corner_6 1" right="square_corner_4 3"/>
+        <neighbor left="square_corner_6 1" right="square_corner_5 3"/>
+        <neighbor left="square_corner_1 3" right="square_corner_1 1"/>
+        <neighbor left="square_corner_2 3" right="square_corner_2 1"/>
+        <neighbor left="square_corner_3 3" right="square_corner_3 1"/>
+        <neighbor left="square_corner_4 3" right="square_corner_4 1"/>
+        <neighbor left="square_corner_5 3" right="square_corner_5 1"/>
+        <neighbor left="square_corner_6 3" right="square_corner_6 1"/>
+        <neighbor left="square_corner_1 3" right="square_corner_1 2"/>
+        <neighbor left="square_corner_2 3" right="square_corner_2 2"/>
+        <neighbor left="square_corner_3 3" right="square_corner_3 2"/>
+        <neighbor left="square_corner_4 3" right="square_corner_4 2"/>
+        <neighbor left="square_corner_5 3" right="square_corner_5 2"/>
+        <neighbor left="square_corner_6 3" right="square_corner_6 2"/>
+        <neighbor left="square_corner_1 2" right="square_corner_2"/>
+        <neighbor left="square_corner_1 2" right="square_corner_3"/>
+        <neighbor left="square_corner_1 2" right="square_corner_4"/>
+        <neighbor left="square_corner_1 2" right="square_corner_5"/>
+        <neighbor left="square_corner_1 2" right="square_corner_6"/>
+        <neighbor left="square_corner_2 2" right="square_corner_1"/>
+        <neighbor left="square_corner_2 2" right="square_corner_3"/>
+        <neighbor left="square_corner_2 2" right="square_corner_4"/>
+        <neighbor left="square_corner_2 2" right="square_corner_5"/>
+        <neighbor left="square_corner_2 2" right="square_corner_6"/>
+        <neighbor left="square_corner_3 2" right="square_corner_1"/>
+        <neighbor left="square_corner_3 2" right="square_corner_2"/>
+        <neighbor left="square_corner_3 2" right="square_corner_4"/>
+        <neighbor left="square_corner_3 2" right="square_corner_5"/>
+        <neighbor left="square_corner_3 2" right="square_corner_6"/>
+        <neighbor left="square_corner_4 2" right="square_corner_1"/>
+        <neighbor left="square_corner_4 2" right="square_corner_2"/>
+        <neighbor left="square_corner_4 2" right="square_corner_3"/>
+        <neighbor left="square_corner_4 2" right="square_corner_5"/>
+        <neighbor left="square_corner_4 2" right="square_corner_6"/>
+        <neighbor left="square_corner_5 2" right="square_corner_1"/>
+        <neighbor left="square_corner_5 2" right="square_corner_2"/>
+        <neighbor left="square_corner_5 2" right="square_corner_3"/>
+        <neighbor left="square_corner_5 2" right="square_corner_4"/>
+        <neighbor left="square_corner_5 2" right="square_corner_6"/>
+        <neighbor left="square_corner_6 2" right="square_corner_1"/>
+        <neighbor left="square_corner_6 2" right="square_corner_2"/>
+        <neighbor left="square_corner_6 2" right="square_corner_3"/>
+        <neighbor left="square_corner_6 2" right="square_corner_4"/>
+        <neighbor left="square_corner_6 2" right="square_corner_5"/>
+        <neighbor left="square_corner_1 2" right="square_corner_2 3"/>
+        <neighbor left="square_corner_1 2" right="square_corner_3 3"/>
+        <neighbor left="square_corner_1 2" right="square_corner_4 3"/>
+        <neighbor left="square_corner_1 2" right="square_corner_5 3"/>
+        <neighbor left="square_corner_1 2" right="square_corner_6 3"/>
+        <neighbor left="square_corner_2 2" right="square_corner_1 3"/>
+        <neighbor left="square_corner_2 2" right="square_corner_3 3"/>
+        <neighbor left="square_corner_2 2" right="square_corner_4 3"/>
+        <neighbor left="square_corner_2 2" right="square_corner_5 3"/>
+        <neighbor left="square_corner_2 2" right="square_corner_6 3"/>
+        <neighbor left="square_corner_3 2" right="square_corner_1 3"/>
+        <neighbor left="square_corner_3 2" right="square_corner_2 3"/>
+        <neighbor left="square_corner_3 2" right="square_corner_4 3"/>
+        <neighbor left="square_corner_3 2" right="square_corner_5 3"/>
+        <neighbor left="square_corner_3 2" right="square_corner_6 3"/>
+        <neighbor left="square_corner_4 2" right="square_corner_1 3"/>
+        <neighbor left="square_corner_4 2" right="square_corner_2 3"/>
+        <neighbor left="square_corner_4 2" right="square_corner_3 3"/>
+        <neighbor left="square_corner_4 2" right="square_corner_5 3"/>
+        <neighbor left="square_corner_4 2" right="square_corner_6 3"/>
+        <neighbor left="square_corner_5 2" right="square_corner_1 3"/>
+        <neighbor left="square_corner_5 2" right="square_corner_2 3"/>
+        <neighbor left="square_corner_5 2" right="square_corner_3 3"/>
+        <neighbor left="square_corner_5 2" right="square_corner_4 3"/>
+        <neighbor left="square_corner_5 2" right="square_corner_6 3"/>
+        <neighbor left="square_corner_6 2" right="square_corner_1 3"/>
+        <neighbor left="square_corner_6 2" right="square_corner_2 3"/>
+        <neighbor left="square_corner_6 2" right="square_corner_3 3"/>
+        <neighbor left="square_corner_6 2" right="square_corner_4 3"/>
+        <neighbor left="square_corner_6 2" right="square_corner_5 3"/>
+        
+        <neighbor left="square_turn_1" right="square_corner_1 2"/>
+        <neighbor left="square_turn_1 1" right="square_1"/>
+        <neighbor left="square_turn_1 2" right="square_1"/>
+        <neighbor left="square_turn_1 3" right="square_corner_1 1"/>
+        <neighbor left="square_turn_2" right="square_corner_2 2"/>
+        <neighbor left="square_turn_2 1" right="square_2"/>
+        <neighbor left="square_turn_2 2" right="square_2"/>
+        <neighbor left="square_turn_2 3" right="square_corner_2 1"/>
+        <neighbor left="square_turn_3" right="square_corner_3 2"/>
+        <neighbor left="square_turn_3 1" right="square_3"/>
+        <neighbor left="square_turn_3 2" right="square_3"/>
+        <neighbor left="square_turn_3 3" right="square_corner_3 1"/>
+        <neighbor left="square_turn_4" right="square_corner_4 2"/>
+        <neighbor left="square_turn_4 1" right="square_4"/>
+        <neighbor left="square_turn_4 2" right="square_4"/>
+        <neighbor left="square_turn_4 3" right="square_corner_4 1"/>
+        <neighbor left="square_turn_5" right="square_corner_5 2"/>
+        <neighbor left="square_turn_5 1" right="square_5"/>
+        <neighbor left="square_turn_5 2" right="square_5"/>
+        <neighbor left="square_turn_5 3" right="square_corner_5 1"/>
+        <neighbor left="square_turn_6" right="square_corner_6 2"/>
+        <neighbor left="square_turn_6 1" right="square_6"/>
+        <neighbor left="square_turn_6 2" right="square_6"/>
+        <neighbor left="square_turn_6 3" right="square_corner_6 1"/>
+
+        <neighbor left="ramp_1_2" right="ramp_1_2"/>
+        <neighbor left="ramp_1_2 1" right="ramp_2_3 1"/>
+        <neighbor left="ramp_1_2 2" right="ramp_1_2 2"/>
+
+        <neighbor left="ramp_2_3" right="ramp_2_3"/>
+        <neighbor left="ramp_2_3 1" right="ramp_3_4 1"/>
+        <neighbor left="ramp_2_3 2" right="ramp_2_3 2"/>
+        <neighbor left="ramp_2_3 3" right="ramp_1_2 3"/>
+        <neighbor left="ramp_3_4" right="ramp_3_4"/>
+        <neighbor left="ramp_3_4 1" right="ramp_4_5 1"/>
+        <neighbor left="ramp_3_4 2" right="ramp_3_4 2"/>
+        <neighbor left="ramp_3_4 3" right="ramp_2_3 3"/>
+        <neighbor left="ramp_4_5" right="ramp_4_5"/>
+        <neighbor left="ramp_4_5 1" right="ramp_5_6 1"/>
+        <neighbor left="ramp_4_5 2" right="ramp_4_5 2"/>
+        <neighbor left="ramp_4_5 3" right="ramp_3_4 3"/>
+        <neighbor left="ramp_5_6" right="ramp_5_6"/>
+
+        <neighbor left="ramp_5_6 2" right="ramp_5_6 2"/>
+        <neighbor left="ramp_5_6 3" right="ramp_4_5 3"/>
+
+        <neighbor left="ramp_1_2" right="square_boundary_1 2"/>
+        <neighbor left="ramp_1_2" right="square_corner_1 1"/>
+        <neighbor left="ramp_1_2 1" right="square_boundary_2 1"/>
+        <neighbor left="ramp_1_2 1" right="square_corner_2"/>
+        <neighbor left="ramp_1_2 1" right="square_corner_2 3"/>
+        <neighbor left="ramp_1_2 2" right="square_corner_1 2"/>
+        <neighbor left="ramp_1_2 2" right="square_boundary_1"/>
+        <neighbor left="ramp_1_2 3" right="square_1"/>
+        <neighbor left="ramp_2_3" right="square_boundary_2 2"/>
+        <neighbor left="ramp_2_3" right="square_corner_2 1"/>
+        <neighbor left="ramp_2_3 1" right="square_boundary_3 1"/>
+        <neighbor left="ramp_2_3 1" right="square_corner_3"/>
+        <neighbor left="ramp_2_3 1" right="square_corner_3 3"/>
+        <neighbor left="ramp_2_3 2" right="square_corner_2 2"/>
+        <neighbor left="ramp_2_3 2" right="square_boundary_2"/>
+        <neighbor left="ramp_2_3 3" right="square_2"/>
+        <neighbor left="ramp_3_4" right="square_boundary_3 2"/>
+        <neighbor left="ramp_3_4" right="square_corner_3 1"/>
+        <neighbor left="ramp_3_4 1" right="square_boundary_4 1"/>
+        <neighbor left="ramp_3_4 1" right="square_corner_4"/>
+        <neighbor left="ramp_3_4 1" right="square_corner_4 3"/>
+        <neighbor left="ramp_3_4 2" right="square_corner_3 2"/>
+        <neighbor left="ramp_3_4 2" right="square_boundary_3"/>
+        <neighbor left="ramp_3_4 3" right="square_3"/>
+        <neighbor left="ramp_4_5" right="square_boundary_4 2"/>
+        <neighbor left="ramp_4_5" right="square_corner_4 1"/>
+        <neighbor left="ramp_4_5 1" right="square_boundary_5 1"/>
+        <neighbor left="ramp_4_5 1" right="square_corner_5"/>
+        <neighbor left="ramp_4_5 1" right="square_corner_5 3"/>
+        <neighbor left="ramp_4_5 2" right="square_corner_4 2"/>
+        <neighbor left="ramp_4_5 2" right="square_boundary_4"/>
+        <neighbor left="ramp_4_5 3" right="square_4"/>
+        <neighbor left="ramp_5_6" right="square_boundary_5 2"/>
+        <neighbor left="ramp_5_6" right="square_corner_5 1"/>
+        <neighbor left="ramp_5_6 1" right="square_boundary_6 1"/>
+        <neighbor left="ramp_5_6 1" right="square_corner_6"/>
+        <neighbor left="ramp_5_6 1" right="square_corner_6 3"/>
+        <neighbor left="ramp_5_6 2" right="square_corner_5 2"/>
+        <neighbor left="ramp_5_6 2" right="square_boundary_5"/>
+        <neighbor left="ramp_5_6 3" right="square_5"/>
+
+        <neighbor left="square_1" right="square_1"/>
+        <neighbor left="square_2" right="square_2"/>
+        <neighbor left="square_3" right="square_3"/>
+        <neighbor left="square_4" right="square_4"/>
+        <neighbor left="square_5" right="square_5"/>
+        <neighbor left="square_6" right="square_6"/>
+    </neighbors>
+    <subsets>
+        <subset name="two_levels">
+            <tile name="square_1"/>
+            <tile name="square_2"/>
+            <tile name="square_boundary_2"/>
+            <tile name="square_boundary_1"/>
+            <tile name="square_corner_1"/>
+            <tile name="square_corner_2"/>
+            <tile name="square_turn_1"/>
+            <tile name="square_turn_2"/>
+            <tile name="ramp_1_2"/>
+            <tile name="vramp_1_2"/>
+        </subset>
+    </subsets>
+</set>
