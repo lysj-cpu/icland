@@ -10,6 +10,8 @@ dependencies = [
     "jax[cuda12]>=0.4.38",
     "mujoco>=3.2.6",
     "mujoco-mjx>=3.2.6",
+    "matplotlib",
+    "jaxrenderer @ git+https://github.com/chaihahaha/jaxrenderer.git"
 ]
 
 [build-system]
@@ -24,6 +26,9 @@ dev = [
     "pytest-cov>=6.0.0",
     "ruff>=0.9.1",
 ]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.ruff]
 target-version = "py313"
