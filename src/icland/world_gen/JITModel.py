@@ -9,7 +9,12 @@ import jax
 import jax.numpy as jnp
 from flax import struct
 
-from icland.world_gen.tile_data import NUM_ACTIONS, PROPAGATOR, TILECODES, WEIGHTS
+from icland.world_gen.converter import (
+    create_world,
+    export_stls,
+    generate_mjcf_from_meshes,
+)
+from icland.world_gen.tile_data import NUM_ACTIONS, PROPAGATOR, WEIGHTS
 
 
 @jax.jit
@@ -648,6 +653,12 @@ def sample_world(
 
 
 if __name__ == "__main__":  # Drive code used for testing.
-    model = sample_world(10, 10, 1000, jax.random.key(42), True, 1)
-    one_hot = export(model, TILECODES, 10, 10)
-    print(one_hot.tolist())
+    # model = sample_world(10, 10, 1000, jax.random.key(42), True, 1)
+    # one_hot = export(model, TILECODES, 10, 10)
+    # one_hot = jnp.array([[[0, 0, 0, 2], [0, 2, 0, 2], [0, 2, 0, 2], [0, 1, 0, 2], [0, 0, 0, 5], [0, 2, 0, 5], [0, 1, 0, 5], [0, 0, 0, 3], [0, 2, 0, 3], [0, 1, 0, 3]], [[0, 3, 0, 3], [0, 0, 0, 3], [0, 2, 0, 3], [0, 3, 0, 4], [0, 2, 0, 4], [0, 3, 0, 5], [0, 0, 0, 5], [0, 2, 0, 5], [0, 3, 0, 6], [0, 2, 0, 6]], [[0, 1, 0, 3], [0, 0, 0, 3], [1, 1, 3, 4], [0, 0, 0, 4], [0, 1, 0, 4], [0, 0, 0, 5], [0, 2, 0, 5], [0, 1, 0, 5], [0, 0, 0, 6], [0, 1, 0, 6]], [[1, 3, 3, 4], [0, 0, 0, 3], [0, 3, 0, 3], [0, 3, 0, 6], [0, 2, 0, 6], [0, 3, 0, 4], [0, 0, 0, 4], [1, 2, 4, 5], [0, 0, 0, 4], [0, 2, 0, 4]], [[0, 1, 0, 3], [0, 0, 0, 3], [0, 3, 0, 3], [0, 0, 0, 6], [0, 1, 0, 6], [0, 1, 0, 4], [0, 0, 0, 4], [0, 0, 0, 4], [0, 0, 0, 4], [0, 3, 0, 4]], [[1, 3, 3, 4], [0, 0, 0, 3], [0, 0, 0, 3], [0, 2, 0, 3], [0, 3, 0, 4], [0, 1, 0, 4], [0, 0, 0, 4], [0, 3, 0, 4], [0, 2, 0, 4], [0, 1, 0, 4]], [[0, 1, 0, 3], [0, 0, 0, 3], [0, 0, 0, 3], [0, 3, 0, 3], [0, 1, 0, 4], [0, 0, 0, 4], [0, 3, 0, 4], [2, 1, 4, 6], [0, 0, 0, 6], [0, 2, 0, 6]], [[0, 1, 0, 3], [0, 0, 0, 3], [0, 0, 0, 3], [1, 1, 3, 4], [0, 1, 0, 4], [0, 0, 0, 4], [0, 3, 0, 4], [0, 1, 0, 6], [0, 0, 0, 6], [0, 3, 0, 6]], [[0, 0, 0, 3], [0, 2, 0, 3], [0, 2, 0, 3], [0, 1, 0, 3], [0, 0, 0, 4], [0, 2, 0, 4], [0, 1, 0, 4], [0, 0, 0, 6], [0, 2, 0, 6], [0, 1, 0, 6]], [[0, 3, 0, 2], [0, 0, 0, 2], [0, 0, 0, 2], [0, 2, 0, 2], [0, 3, 0, 5], [0, 0, 0, 5], [0, 2, 0, 5], [0, 3, 0, 3], [0, 0, 0, 3], [0, 2, 0, 3]]])
+    one_hot = jnp.full((10, 10, 4), jnp.array([0, 0, 0, 3]))
+    world_mesh = create_world(one_hot)
+    export_stls(world_mesh, "meshes2/world")
+    generate_mjcf_from_meshes(
+        one_hot, output_file="generated_mjcf_flat.xml", mesh_dir="meshes2/"
+    )
