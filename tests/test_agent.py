@@ -50,7 +50,7 @@ def test_agent_translation(
     pipeline_state = icland_state.pipeline_state
 
     # Check if the correct velocity was applied
-    velocity = icland_state.mjx_data.qvel[:2]
+    velocity = pipeline_state.mjx_data.qvel[:2]
     normalised_velocity = velocity / (jnp.linalg.norm(velocity) + SMALL_VALUE)
 
     assert jnp.allclose(normalised_velocity, expected_direction), (
