@@ -147,7 +147,16 @@ def init(key: jax.Array, params: ICLandParams) -> ICLandState:
             [body_id, geom_id, dof_address]
         )
 
-    return ICLandState(mjx_model, mjx_data, agent_components)
+    pipeline_state = PipelineState(mjx_model, mjx_data, agent_components)
+
+    return ICLandState(
+        pipeline_state,
+        jnp.zeros((agent_count, AGENT_OBSERVATION_DIM)),
+        jnp.zeros((agent_count, AGENT_OBSERVATION_DIM)),
+        jnp.zeros((agent_count, AGENT_OBSERVATION_DIM)),
+        jnp.zeros((agent_count, AGENT_OBSERVATION_DIM)),
+        jnp.zeros((agent_count, AGENT_OBSERVATION_DIM)),
+    )
 
 
 @jax.jit
@@ -178,9 +187,11 @@ def step(
         ICLandState(mjx_model=Model(...), mjx_data=Data(...), component_ids=Array(...))
     """
     # Unpack state
-    mjx_model = state.mjx_model
-    mjx_data = state.mjx_data
-    agent_components = state.component_ids
+    pipeline_state = state.pipeline_state
+
+    mjx_model = pipeline_state.mjx_model
+    mjx_data = pipeline_state.mjx_data
+    agent_components = pipeline_state.component_ids
 
     # Ensure actions are in the correct shape
     actions = actions.reshape(-1, AGENT_ACTION_SPACE_DIM)
@@ -212,5 +223,13 @@ def step(
 
     # Step the environment after applying all agent actions
     updated_data = mjx.step(mjx_model, updated_data)
+    new_pipeline_state = PipelineState(mjx_model, updated_data, agent_components)
 
-    return ICLandState(mjx_model, updated_data, agent_components)
+    # TO BE ADDED
+    observations = jnp.zeros((agent_components.shape[0], AGENT_OBSERVATION_DIM))
+    rewards = jnp.zeros((agent_components.shape[0], AGENT_OBSERVATION_DIM))
+    done = jnp.zeros((agent_components.shape[0], AGENT_OBSERVATION_DIM))
+    metrics = jnp.zeros((agent_components.shape[0], AGENT_OBSERVATION_DIM))
+    infos = jnp.zeros((agent_components.shape[0], AGENT_OBSERVATION_DIM))
+
+    return ICLandState(new_pipeline_state, observations, rewards, done, metrics, infos)
