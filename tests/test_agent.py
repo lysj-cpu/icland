@@ -39,17 +39,20 @@ def test_agent_translation(
     mj_model = mujoco.MjModel.from_xml_string(EMPTY_WORLD)
     icland_params = ICLandParams(mj_model, None, 1)
     icland_state = icland.init(key, icland_params)
-    body_id = icland_state.component_ids[0, 0]
+    pipeline_state = icland_state.pipeline_state
+    body_id = pipeline_state.component_ids[0, 0]
 
     # Get initial position, without height
-    initial_pos = icland_state.mjx_data.xpos[body_id][:2]
+    initial_pos = pipeline_state.mjx_data.xpos[body_id][:2]
 
     # Step the environment to update the agents velocty
     icland_state = icland.step(key, icland_state, None, policy)
+    pipeline_state = icland_state.pipeline_state
 
     # Check if the correct velocity was applied
     velocity = icland_state.mjx_data.qvel[:2]
     normalised_velocity = velocity / (jnp.linalg.norm(velocity) + SMALL_VALUE)
+
     assert jnp.allclose(normalised_velocity, expected_direction), (
         f"{name} failed: Expected velocity {expected_direction}, "
         f"Actual velocity {normalised_velocity}"
@@ -57,9 +60,10 @@ def test_agent_translation(
 
     # Step the environment to update the agents position via the velocity
     icland_state = icland.step(key, icland_state, None, NOOP_POLICY)
+    pipeline_state = icland_state.pipeline_state
 
     # Get new position
-    new_position = icland_state.mjx_data.xpos[body_id][:2]
+    new_position = pipeline_state.mjx_data.xpos[body_id][:2]
 
     # Check if the agent moved in the expected direction
     displacement = new_position - initial_pos
@@ -91,15 +95,17 @@ def test_agent_rotation(
     mj_model = mujoco.MjModel.from_xml_string(EMPTY_WORLD)
     icland_params = ICLandParams(mj_model, None, 1)
     icland_state = icland.init(key, icland_params)
+    pipeline_state = icland_state.pipeline_state
 
     # Get initial orientation
-    initial_orientation = icland_state.mjx_data.qpos[3]
+    initial_orientation = pipeline_state.mjx_data.qpos[3]
 
     # Step the environment to update the agents angular velocity
     icland_state = icland.step(key, icland_state, None, policy)
+    pipeline_state = icland_state.pipeline_state
 
     # Check if the correct angular velocity was applied
-    angular_velocity = icland_state.mjx_data.qvel[3]
+    angular_velocity = pipeline_state.mjx_data.qvel[3]
     normalised_angular_velocity = angular_velocity / (
         jnp.linalg.norm(angular_velocity) + SMALL_VALUE
     )
@@ -112,7 +118,7 @@ def test_agent_rotation(
     icland_state = icland.step(key, icland_state, None, NOOP_POLICY)
 
     # Get new orientation
-    new_orientation = icland_state.mjx_data.qpos[3]
+    new_orientation = pipeline_state.mjx_data.qpos[3]
     orientation_delta = new_orientation - initial_orientation
     normalised_orientation_delta = orientation_delta / (
         jnp.linalg.norm(orientation_delta) + SMALL_VALUE
@@ -136,21 +142,24 @@ def test_two_agents(key: jax.Array, name: str, policies: jnp.ndarray) -> None:
     mj_model = mujoco.MjModel.from_xml_string(TWO_AGENT_EMPTY_WORLD)
     icland_params = ICLandParams(mj_model, None, 2)
     icland_state = icland.init(key, icland_params)
+    pipeline_state = icland_state.pipeline_state
 
     # Simulate 2 seconds
-    while icland_state.mjx_data.time < 2:
+    while pipeline_state.mjx_data.time < 2:
         icland_state = icland.step(key, icland_state, None, policies)
+        pipeline_state = icland_state.pipeline_state
 
     # Get the positions of the two agents
-    body_id_1, body_id_2 = icland_state.component_ids[:, 0]
-    agent_1_pos = icland_state.mjx_data.xpos[body_id_1][:2]
-    agent_2_pos = icland_state.mjx_data.xpos[body_id_2][:2]
+    body_id_1, body_id_2 = pipeline_state.component_ids[:, 0]
+    agent_1_pos = pipeline_state.mjx_data.xpos[body_id_1][:2]
+    agent_2_pos = pipeline_state.mjx_data.xpos[body_id_2][:2]
 
     # Simulate one more step.
     icland_state = icland.step(key, icland_state, None, NOOP_POLICY)
+    pipeline_state = icland_state.pipeline_state
 
-    agent_1_new_pos = icland_state.mjx_data.xpos[body_id_1][:2]
-    agent_2_new_pos = icland_state.mjx_data.xpos[body_id_2][:2]
+    agent_1_new_pos = pipeline_state.mjx_data.xpos[body_id_1][:2]
+    agent_2_new_pos = pipeline_state.mjx_data.xpos[body_id_2][:2]
 
     # Get the displacements
     displacement_1 = agent_1_new_pos - agent_1_pos

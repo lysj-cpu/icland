@@ -38,6 +38,9 @@ import icland
 from icland.types import *
 
 SIMULATION_PRESETS: List[Dict[str, Any]] = [
+    {"name": "ramp_30", "world": RAMP_30, "policy": FORWARD_POLICY, "duration": 4},
+    {"name": "ramp_45", "world": RAMP_45, "policy": FORWARD_POLICY, "duration": 4},
+    {"name": "ramp_60", "world": RAMP_60, "policy": FORWARD_POLICY, "duration": 4},
     {
         "name": "two_agent_move_collide",
         "world": TWO_AGENT_EMPTY_WORLD_COLLIDE,
@@ -91,7 +94,7 @@ def render_video(
 
     icland_state = icland.init(key, icland_params)
     icland_state = icland.step(key, icland_state, None, policy)
-    mjx_data = icland_state.mjx_data
+    mjx_data = icland_state.pipeline_state.mjx_data
 
     third_person_frames: List[Any] = []
 
@@ -99,7 +102,7 @@ def render_video(
     mujoco.mjv_defaultCamera(cam)
 
     cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
-    cam.trackbodyid = icland_state.component_ids[0, 0]
+    cam.trackbodyid = icland_state.pipeline_state.component_ids[0, 0]
     cam.distance = 1.5
     cam.azimuth = 90.0
     cam.elevation = -40.0
@@ -117,7 +120,7 @@ def render_video(
                 print(f"Time: {mjx_data.time:.1f}")
                 last_printed_time = mjx_data.time
             icland_state = icland.step(key, icland_state, None, policy)
-            mjx_data = icland_state.mjx_data
+            mjx_data = icland_state.pipeline_state.mjx_data
             if len(third_person_frames) < mjx_data.time * 30:
                 mj_data = mjx.get_data(mj_model, mjx_data)
                 mujoco.mjv_updateScene(
