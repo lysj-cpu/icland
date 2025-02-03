@@ -45,6 +45,9 @@ SIMULATION_PRESETS: List[Dict[str, Any]] = [
         "duration": 4,
         "agent_count": 2,
     },
+    {"name": "ramp_60", "world": RAMP_60, "policy": FORWARD_POLICY, "duration": 4},
+    {"name": "ramp_30", "world": RAMP_30, "policy": FORWARD_POLICY, "duration": 4},
+    {"name": "ramp_45", "world": RAMP_45, "policy": FORWARD_POLICY, "duration": 4},
     {
         "name": "two_agent_move_parallel",
         "world": TWO_AGENT_EMPTY_WORLD,
@@ -58,9 +61,6 @@ SIMULATION_PRESETS: List[Dict[str, Any]] = [
         "policy": FORWARD_POLICY,
         "duration": 4,
     },
-    {"name": "ramp_30", "world": RAMP_30, "policy": FORWARD_POLICY, "duration": 4},
-    {"name": "ramp_45", "world": RAMP_45, "policy": FORWARD_POLICY, "duration": 4},
-    {"name": "ramp_60", "world": RAMP_60, "policy": FORWARD_POLICY, "duration": 4},
 ]
 
 key = jax.random.PRNGKey(42)
@@ -108,9 +108,14 @@ def render_video(
     opt.flags[mujoco.mjtVisFlag.mjVIS_JOINT] = True
     opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = True
 
+    print(f"Starting simulation: {video_name}")
+    last_printed_time = -0.1
+
     with mujoco.Renderer(mj_model) as renderer:
         while mjx_data.time < duration:
-            print(mjx_data.time)
+            if int(mjx_data.time * 10) != int(last_printed_time * 10):
+                print(f"Time: {mjx_data.time:.1f}")
+                last_printed_time = mjx_data.time
             icland_state = icland.step(key, icland_state, None, policy)
             mjx_data = icland_state.mjx_data
             if len(third_person_frames) < mjx_data.time * 30:
@@ -131,6 +136,7 @@ def render_video(
 
 if __name__ == "__main__":
     for i, preset in enumerate(SIMULATION_PRESETS):
+        print(f"Running preset {i + 1}/{len(SIMULATION_PRESETS)}: {preset['name']}")
         render_video(
             preset["world"],
             preset["policy"],
