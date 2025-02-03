@@ -1,8 +1,9 @@
 """This file contains the base Model class for WaveFunctionCollapse and helper functions."""
 
+from dataclasses import dataclass
 from enum import Enum
 from functools import partial
-from typing import TypedDict, cast
+from typing import Tuple, TypedDict, cast
 
 import jax
 import jax.numpy as jnp
@@ -260,24 +261,48 @@ RunState = TypedDict(
 )
 
 
+@dataclass
+class RunState:
+    """Class for storing the run state of the model."""
+
+    model: JITModel
+    steps: jnp.int32
+    done: jnp.bool_
+    success: jnp.bool_
+
+    def tree_flatten(self):
+        """Function to flatten the tree to a list of tuples."""
+        return ((self.model, self.steps, self.done, self.success), ())
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        """Function to unflatten the tree."""
+        return cls(*children)
+
+
+jax.tree_util.register_pytree_node_class(RunState)
+
+
+@jax.jit
 def _run(
     model: JITModel, max_steps: jax.Array = jnp.array(1000, dtype=jnp.int32)
-) -> tuple[JITModel, bool]:
+) -> Tuple[JITModel, bool]:
     """Run the WaveFunctionCollapse algorithm with the given seed and iteration limit."""
     # Pre: the model is freshly initialized
-
     model = _clear(model)
-    # Define the loop state
-    init_state: RunState = {"model": model, "steps": 0, "done": False, "success": True}
+
+    # Initialise state using JAX-compatible dataclass
+    init_state = RunState(
+        model=model, steps=jnp.int32(0), done=jnp.bool_(False), success=jnp.bool_(True)
+    )
 
     def cond_fun(state: RunState) -> jax.Array:
         """Condition function for the while loop."""
-        return (~state["done"]) & (state["steps"] < max_steps)
+        return jnp.logical_and(jnp.logical_not(state.done), state.steps < max_steps)
 
     def body_fun(state: RunState) -> RunState:
         """Body function for the while loop."""
-        model = state["model"]
-        steps = state["steps"]
+        model, steps = state.model, state.steps
 
         # Generate new key for this iteration
         key, _ = jax.random.split(model.key)
@@ -288,8 +313,8 @@ def _run(
 
         # Use lax.cond instead of if/else
         def handle_node(
-            args: tuple[JITModel, jax.Array],
-        ) -> tuple[JITModel, jax.Array, jax.Array]:
+            args: Tuple[JITModel, jax.Array],
+        ) -> Tuple[JITModel, jax.Array, jax.Array]:
             model, node = args
             # Observe and propagate
             model = _observe(model, node)
@@ -297,8 +322,8 @@ def _run(
             return model, jnp.logical_not(success), success
 
         def handle_completion(
-            args: tuple[JITModel, jax.Array],
-        ) -> tuple[JITModel, jax.Array, jax.Array]:
+            args: Tuple[JITModel, jax.Array],
+        ) -> Tuple[JITModel, jax.Array, jax.Array]:
             model, node = args
 
             # Final observation assignment
@@ -325,24 +350,21 @@ def _run(
             model = jax.lax.fori_loop(
                 0, model.wave.shape[0], handle_completion_inner, model
             )
-            return model, jnp.array(True, dtype=bool), jnp.array(True, dtype=bool)
+            return model, jnp.bool_(True), jnp.bool_(True)
 
         model, done, success = jax.lax.cond(
             node >= 0, handle_node, handle_completion, (model, node)
         )
-
-        return {"model": model, "steps": steps + 1, "done": done, "success": success}
+        return RunState(model=model, steps=steps + 1, done=done, success=success)
 
     # Run the while loop
     final_state = jax.lax.while_loop(cond_fun, body_fun, init_state)
-    final_model: JITModel = final_state["model"]
 
-    success: bool = final_state["success"]
-
-    return final_model, success
+    return final_state.model, final_state.success
 
 
-def _next_unobserved_node(model: JITModel) -> tuple[JITModel, jax.Array]:
+@jax.jit
+def _next_unobserved_node(model: JITModel) -> Tuple[JITModel, jax.Array]:
     """Selects the next cell to observe according to the chosen heuristic (Scanline, Entropy, or MRV).
 
     Returns:
@@ -373,7 +395,7 @@ def _next_unobserved_node(model: JITModel) -> tuple[JITModel, jax.Array]:
     all_indices = jnp.arange(model.wave.shape[0])
     valid_nodes_mask = jax.vmap(within_bounds)(all_indices)
 
-    def scanline_heuristic(_: None) -> tuple[JITModel, jax.Array]:
+    def scanline_heuristic(_: None) -> Tuple[JITModel, jax.Array]:
         observed_mask = all_indices >= observed_so_far
         sum_of_ones_mask = model.sums_of_ones[all_indices] > 1
 
@@ -384,7 +406,7 @@ def _next_unobserved_node(model: JITModel) -> tuple[JITModel, jax.Array]:
         )
 
         # Use lax.dynamic_slice_in_dim to select the first element
-        def process_node(_: None) -> tuple[JITModel, jax.Array]:
+        def process_node(_: None) -> Tuple[JITModel, jax.Array]:
             indices = jnp.nonzero(
                 valid_scanline_nodes_with_choices,
                 size=model.wave.shape[0],
@@ -399,7 +421,7 @@ def _next_unobserved_node(model: JITModel) -> tuple[JITModel, jax.Array]:
             )
 
         return cast(
-            tuple[JITModel, jax.Array],
+            Tuple[JITModel, jax.Array],
             jax.lax.cond(
                 jnp.any(valid_scanline_nodes_with_choices),
                 process_node,
@@ -408,7 +430,7 @@ def _next_unobserved_node(model: JITModel) -> tuple[JITModel, jax.Array]:
             ),
         )
 
-    def entropy_mrv_heuristic(_: None) -> tuple[JITModel, jax.Array]:
+    def entropy_mrv_heuristic(_: None) -> Tuple[JITModel, jax.Array]:
         node_entropies = jax.lax.cond(
             heuristic == Heuristic.ENTROPY.value,
             lambda _: entropies,
@@ -422,7 +444,7 @@ def _next_unobserved_node(model: JITModel) -> tuple[JITModel, jax.Array]:
             jnp.logical_and(valid_nodes_mask, sum_of_ones_mask)
         )
 
-        def process_node(node_entropies: jax.Array) -> tuple[JITModel, jax.Array]:
+        def process_node(node_entropies: jax.Array) -> Tuple[JITModel, jax.Array]:
             key, subkey = jax.random.split(model.key)
             node_entropies = node_entropies + 1e-6 * jax.random.normal(
                 subkey, shape=node_entropies.shape
@@ -438,7 +460,7 @@ def _next_unobserved_node(model: JITModel) -> tuple[JITModel, jax.Array]:
             ), min_entropy_idx
 
         return cast(
-            tuple[JITModel, jax.Array],
+            Tuple[JITModel, jax.Array],
             jax.lax.cond(
                 jnp.any(node_entropies_mask),
                 process_node,
@@ -448,7 +470,7 @@ def _next_unobserved_node(model: JITModel) -> tuple[JITModel, jax.Array]:
         )
 
     return cast(
-        tuple[JITModel, jax.Array],
+        Tuple[JITModel, jax.Array],
         jax.lax.cond(
             heuristic == Heuristic.SCANLINE.value,
             scanline_heuristic,
@@ -505,7 +527,7 @@ def _clear(model: JITModel) -> JITModel:
 
 
 @jax.jit
-def _propagate(model: JITModel) -> tuple[JITModel, jax.Array]:
+def _propagate(model: JITModel) -> Tuple[JITModel, jax.Array]:
     """Propagates constraints across the wave."""
     dx = jnp.array([-1, 0, 1, 0])
     dy = jnp.array([0, 1, 0, -1])
@@ -604,7 +626,7 @@ def sample_world(
     key: jax.Array,
     periodic: jax.Array,
     heuristic: jax.Array,
-) -> tuple[JITModel, jax.Array]:  # pragma: no cover
+) -> Tuple[JITModel, jax.Array]:  # pragma: no cover
     """Samples a world such that its complete and has a playable area."""
     model = _init(
         width, height, NUM_ACTIONS, 1, periodic, heuristic, WEIGHTS, PROPAGATOR, key
@@ -612,7 +634,7 @@ def sample_world(
     condition = lambda x: jnp.logical_not(x[1])
     success = False
 
-    def body_func(state: tuple[JITModel, bool]) -> tuple[JITModel, bool]:
+    def body_func(state: Tuple[JITModel, bool]) -> Tuple[JITModel, bool]:
         model, b = state
         model, b = _run(model)
         key, _ = jax.random.split(model.key)
@@ -620,7 +642,7 @@ def sample_world(
         return (model, b)
 
     return cast(
-        tuple[JITModel, jax.Array],
+        Tuple[JITModel, jax.Array],
         jax.lax.while_loop(condition, body_func, (model, success))[0],
     )
 
