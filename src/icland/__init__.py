@@ -154,8 +154,10 @@ def init(key: jax.Array, params: ICLandParams) -> ICLandState:
         jnp.zeros((agent_count, AGENT_OBSERVATION_DIM)),
         jnp.zeros((agent_count, AGENT_OBSERVATION_DIM)),
         jnp.zeros((agent_count, AGENT_OBSERVATION_DIM)),
-        jnp.zeros((agent_count, AGENT_OBSERVATION_DIM)),
-        jnp.zeros((agent_count, AGENT_OBSERVATION_DIM)),
+        # jnp.zeros((agent_count, AGENT_OBSERVATION_DIM)),
+        # jnp.zeros((agent_count, AGENT_OBSERVATION_DIM)),
+        {},
+        {},
     )
 
 
@@ -229,7 +231,9 @@ def step(
     observations = jnp.zeros((agent_components.shape[0], AGENT_OBSERVATION_DIM))
     rewards = jnp.zeros((agent_components.shape[0], AGENT_OBSERVATION_DIM))
     done = jnp.zeros((agent_components.shape[0], AGENT_OBSERVATION_DIM))
-    metrics = jnp.zeros((agent_components.shape[0], AGENT_OBSERVATION_DIM))
-    infos = jnp.zeros((agent_components.shape[0], AGENT_OBSERVATION_DIM))
+    # metrics = jnp.zeros((agent_components.shape[0], AGENT_OBSERVATION_DIM))
+    # infos = jnp.zeros((agent_components.shape[0], AGENT_OBSERVATION_DIM))
+    metrics: dict[str, jax.Array] = {}
+    infos: dict[str, jax.Array] = {}
 
     return ICLandState(new_pipeline_state, observations, rewards, done, metrics, infos)

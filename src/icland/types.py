@@ -69,5 +69,7 @@ class ICLandState(PyTreeNode):  # type: ignore[misc]
     observation: jax.Array
     reward: jax.Array
     done: jax.Array
-    metrics: jax.Array  # These were Dict[str, jax.Array] = struct.field(default_factory=dict) but we need to install flax
-    info: jax.Array  # These were Dict[str, Any] = struct.field(default_factory=dict) but we need to install flax
+    # metrics: jax.Array  # These were Dict[str, jax.Array] = struct.field(default_factory=dict) but we need to install flax
+    # info: jax.Array  # These were Dict[str, Any] = struct.field(default_factory=dict) but we need to install flax
+    metrics: dict[str, jax.Array]
+    info: dict[str, jax.Array]
