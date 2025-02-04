@@ -17,10 +17,17 @@ def step_agent(
 ) -> MjxStateType:
     """Perform a simulation step for the agent (optimized).
 
+    This updated version no longer applies a rotational torque. Instead, it
+    directly updates the agent's rotation in `qpos` (the hinge angle about z
+    at index 3) using the rotation command provided by `action[3]`. This avoids
+    rotational inertia. The translational movement is handled exactly as before.
+
     Args:
         mjx_data: The simulation data object.
-        action: The action to be performed by the agent.
-        agent_data: The body and geometry IDs of the agent.
+        action: The action to be performed by the agent. The first two components
+            define the local XY movement, and `action[3]` is an integer in {-1, 0, 1}
+            representing rotation (anticlockwise for positive, clockwise for negative).
+        agent_data: The body and geometry IDs of the agent, and the agent's DOF address.
 
     Returns:
         Updated simulation data object.
@@ -28,7 +35,7 @@ def step_agent(
     # --------------------------------------------------------------------------
     # (A) Determine local movement and rotate it to world frame
     # --------------------------------------------------------------------------
-    # Extract agent info: body id, geometry id, and dof address.
+    # Extract agent info: body id, geometry id, and DOF address.
     body_id, geom_id, dof_address = agent_data
 
     # Extract the intended local movement (XY) from the action.
@@ -51,12 +58,9 @@ def step_agent(
     # --------------------------------------------------------------------------
     # (B) Adjust movement based on contacts (handle slopes)
     # --------------------------------------------------------------------------
-    # Since the number of contacts is fixed, we vectorize the computation.
     ncon = mjx_data.ncon
 
     # Extract contact normals for the first ncon contacts.
-    # Here, if the second geometry in the contact equals the agent's geom_id,
-    # we keep the normal as is; otherwise, we flip its sign.
     normals = jnp.where(
         (mjx_data.contact.geom[:ncon, 1] == geom_id)[:, None],
         mjx_data.contact.frame[:ncon, 0, :],
@@ -68,9 +72,8 @@ def step_agent(
     slope_components = movement_direction - dots[:, None] * normals
     slope_mags = jnp.linalg.norm(slope_components, axis=1)
 
-    # Determine valid collisions:
-    # A valid collision occurs if the agent's geom_id appears in either geom,
-    # and the contact distance is negative (touching).
+    # Determine valid collisions: a valid collision occurs if the agent's geom_id
+    # appears in either geom, and the contact distance is negative (touching).
     is_agent_collision = jnp.logical_or(
         mjx_data.contact.geom[:ncon, 0] == geom_id,
         mjx_data.contact.geom[:ncon, 1] == geom_id,
@@ -78,11 +81,8 @@ def step_agent(
     is_touching = mjx_data.contact.dist[:ncon] < 0.0
     valid_mask = is_agent_collision & is_touching
 
-    # If any valid collision is found, update movement_direction accordingly.
-    # If the slope component is large (mag > 0.7), normalize it;
-    # otherwise, set the movement direction to zero.
     def collision_true(_: Any) -> Any:
-        # Use argmax to pick the first valid collision (safe since at most one is valid).
+        # Use argmax to pick the first valid collision.
         idx = jnp.argmax(valid_mask)
         mag = slope_mags[idx]
         new_dir = jnp.where(
@@ -110,17 +110,20 @@ def step_agent(
     )
 
     # --------------------------------------------------------------------------
-    # (D) Apply rotation torque about the z hinge (update qfrc_applied)
+    # (D) Directly update the agent's rotation in qpos (avoiding torque/inertia)
     # --------------------------------------------------------------------------
-    rotation_torque = action[3] * jnp.pi
-    new_qfrc_applied = mjx_data.qfrc_applied.at[3].set(
-        mjx_data.qfrc_applied[3] + rotation_torque
-    )
+    # The rotation command is in action[3] (an int in {-1, 0, 1}). We update the
+    # hinge angle (qpos[3]) directly, scaled by AGENT_ROTATION_SPEED.
+    new_angle = mjx_data.qpos[3] - AGENT_ROTATION_SPEED * action[3]
+    new_qpos = mjx_data.qpos.at[3].set(new_angle)
+
+    # Since we are directly setting the rotation, we do not want any angular inertia.
+    # We leave qfrc_applied unchanged (i.e. no torque is applied).
+    new_qfrc_applied = mjx_data.qfrc_applied
 
     # --------------------------------------------------------------------------
     # (E) Clamp linear speed in the XY plane
     # --------------------------------------------------------------------------
-    # Extract the agent's XY velocity from qvel.
     vel_2d = jax.lax.dynamic_slice(mjx_data.qvel, (dof_address,), (2,))
     speed = jnp.linalg.norm(vel_2d)
     scale = jnp.where(
@@ -134,7 +137,7 @@ def step_agent(
     )
 
     # --------------------------------------------------------------------------
-    # (F) Clamp angular velocity about z
+    # (F) Clamp angular velocity about z (for other potential dynamics)
     # --------------------------------------------------------------------------
     omega = qvel_updated[dof_address + 3]
     new_omega = jnp.where(
@@ -153,10 +156,16 @@ def step_agent(
     )
 
     # --------------------------------------------------------------------------
+    # (H) Remove rotational inertia by zeroing the angular velocity about z.
+    # --------------------------------------------------------------------------
+    qvel_updated = qvel_updated.at[dof_address + 3].set(0.0)
+
+    # --------------------------------------------------------------------------
     # Combine updates and return the new state
     # --------------------------------------------------------------------------
     return mjx_data.replace(
         xfrc_applied=new_xfrc_applied,
         qfrc_applied=new_qfrc_applied,
         qvel=qvel_updated,
+        qpos=new_qpos,
     )
