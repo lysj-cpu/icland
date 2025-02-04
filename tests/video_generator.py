@@ -38,9 +38,9 @@ import icland
 from icland.types import *
 
 SIMULATION_PRESETS: List[Dict[str, Any]] = [
+    {"name": "ramp_60", "world": RAMP_60, "policy": FORWARD_POLICY, "duration": 4},
     {"name": "ramp_30", "world": RAMP_30, "policy": FORWARD_POLICY, "duration": 4},
     {"name": "ramp_45", "world": RAMP_45, "policy": FORWARD_POLICY, "duration": 4},
-    {"name": "ramp_60", "world": RAMP_60, "policy": FORWARD_POLICY, "duration": 4},
     {
         "name": "two_agent_move_collide",
         "world": TWO_AGENT_EMPTY_WORLD_COLLIDE,
@@ -48,9 +48,12 @@ SIMULATION_PRESETS: List[Dict[str, Any]] = [
         "duration": 4,
         "agent_count": 2,
     },
-    {"name": "ramp_60", "world": RAMP_60, "policy": FORWARD_POLICY, "duration": 4},
-    {"name": "ramp_30", "world": RAMP_30, "policy": FORWARD_POLICY, "duration": 4},
-    {"name": "ramp_45", "world": RAMP_45, "policy": FORWARD_POLICY, "duration": 4},
+    {
+        "name": "world_42_convex",
+        "world": WORLD_42_CONVEX,
+        "policy": FORWARD_POLICY,
+        "duration": 4,
+    },
     {
         "name": "two_agent_move_parallel",
         "world": TWO_AGENT_EMPTY_WORLD,
