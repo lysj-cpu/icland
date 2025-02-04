@@ -16,6 +16,7 @@ dependencies = [
     "mujoco-mjx>=3.2.6",
     "numpy>=2.2.2",
     "numpy-stl>=3.2.0",
+    "pip>=25.0",
     "scipy>=1.15.1",
     "types-setuptools>=75.8.0.20250110",
 ]

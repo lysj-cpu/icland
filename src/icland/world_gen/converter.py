@@ -1,6 +1,7 @@
 """The code defines functions to generate block, ramp, and vertical ramp columns in a 3D world using JAX arrays and exports the generated mesh to an STL file."""
 
 import os
+from typing import Tuple
 
 import jax
 import jax.numpy as jnp
@@ -74,7 +75,7 @@ def __make_block_column(  # pragma: no cover
     x: jax.Array, y: jax.Array, level: jax.Array
 ) -> tuple[jax.Array, jax.Array]:
     """Block column generation with fixed output size."""
-    return jnp.zeros((12, 3, 3)), (
+    return (
         jnp.array(
             [
                 # Bottom face
@@ -98,7 +99,7 @@ def __make_block_column(  # pragma: no cover
             ]
         )
         + jnp.array([x, y, 0])[None, None, :]
-    )
+    ), jnp.zeros((12, 3, 3))
 
 
 def __make_ramp_column(  # pragma: no cover
@@ -132,7 +133,7 @@ def __make_ramp_column(  # pragma: no cover
     )
     rotated = jnp.einsum("ijk,kl->ijl", centered, ROTATION_MATRICES[rotation])
     final_ramp = rotated + 0.5
-    return jnp.zeros((12, 3, 3)), (final_ramp + jnp.array([x, y, 0])[None, None, :])
+    return (final_ramp + jnp.array([x, y, 0])[None, None, :]), jnp.zeros((12, 3, 3))
 
 
 def __make_vramp_column(  # pragma: no cover
@@ -144,7 +145,7 @@ def __make_vramp_column(  # pragma: no cover
 ) -> tuple[jax.Array, jax.Array]:
     """Vertical ramp generation with fixed output size."""
     vramp_count = to_level - from_level + 1
-    column = __make_block_column(x, y, from_level)[1]
+    column = __make_block_column(x, y, from_level)[0]
     centered = (
         jnp.array(
             [
@@ -173,7 +174,7 @@ def __make_vramp_column(  # pragma: no cover
         .at[:8]
         .set(rotated + 0.5 + jnp.array([x, y, from_level - 1])[None, None, :])
     )
-    return vramp, column
+    return column, vramp
 
 
 def create_world(tile_map: jax.Array) -> jax.Array:  # pragma: no cover
@@ -186,7 +187,7 @@ def create_world(tile_map: jax.Array) -> jax.Array:  # pragma: no cover
 
     coords = jnp.concatenate([i_indices, j_indices, tile_map], axis=-1)
 
-    def process_tile(entry: jax.Array) -> jax.Array:
+    def process_tile(entry: jax.Array) -> Tuple[jax.Array, jax.Array]:
         x, y, block, rotation, frm, to = entry
         if block == TileType.SQUARE.value:
             return __make_block_column(x, y, to)
@@ -197,15 +198,13 @@ def create_world(tile_map: jax.Array) -> jax.Array:  # pragma: no cover
         else:
             raise RuntimeError("Unknown tile type. Please check XMLReader")
 
-    pieces = jnp.zeros((tile_map.shape[0] * tile_map.shape[1] * 2, 12, 3, 3))
-    tile_start, pieces_start = 0, 0
+    pieces = jnp.zeros((tile_map.shape[0] * tile_map.shape[1], 12, 3, 3))
+    tile_start = 0
     while tile_start < tile_map.shape[0] * tile_map.shape[1]:
         i = tile_start // tile_map.shape[0]
         j = tile_start % tile_map.shape[1]
-        a, b = process_tile(coords.at[i, j].get())
-        pieces = pieces.at[pieces_start].set(a)
-        pieces = pieces.at[pieces_start + 1].set(b)
-        pieces_start += 2
+        a, _ = process_tile(coords.at[i, j].get())
+        pieces = pieces.at[tile_start].set(a)
         tile_start += 1
 
     return pieces
@@ -250,9 +249,9 @@ def export_stls(pieces: jax.Array, file_prefix: str) -> None:  # pragma: no cove
 
     print(triangles.shape)
 
-    n_pieces = pieces.shape[0] // 2
+    n_pieces = pieces.shape[0]
     n_triangles = len(triangles) // n_pieces
-    for i in range(n_pieces):
+    for i in range(0, n_pieces):
         # Create the mesh data structure
         world_mesh = mesh.Mesh(
             np.zeros(n_triangles, dtype=mesh.Mesh.dtype),
@@ -265,13 +264,15 @@ def export_stls(pieces: jax.Array, file_prefix: str) -> None:  # pragma: no cove
 
 
 def generate_mjcf_from_meshes(  # pragma: no cover
-    tile_map: jax.Array, mesh_dir="meshes/", output_file="generated_mjcf.xml"
+    tile_map: jax.Array,
+    mesh_dir: str = "meshes/",
+    output_file: str = "generated_mjcf.xml",
 ) -> None:
     """Generates MJCF file from column meshes that form the world."""
     mesh_files = [f for f in os.listdir(mesh_dir) if f.endswith(".stl")]
 
-    mjcf = """<mujoco model=\"generated_mesh_world\">
-    <compiler meshdir=\"meshes/\"/>
+    mjcf = f"""<mujoco model=\"generated_mesh_world\">
+    <compiler meshdir=\"{mesh_dir}\"/>
     <default>
         <geom type=\"mesh\" contype=\"0\" conaffinity=\"0\"/>
     </default>

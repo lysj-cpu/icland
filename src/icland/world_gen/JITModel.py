@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from functools import partial
-from typing import Tuple, TypedDict, cast
+from typing import Any, Tuple, cast
 
 import jax
 import jax.numpy as jnp
@@ -14,7 +14,7 @@ from icland.world_gen.converter import (
     export_stls,
     generate_mjcf_from_meshes,
 )
-from icland.world_gen.tile_data import NUM_ACTIONS, PROPAGATOR, WEIGHTS
+from icland.world_gen.tile_data import NUM_ACTIONS, PROPAGATOR, TILECODES, WEIGHTS
 
 
 @jax.jit
@@ -261,11 +261,6 @@ def _ban(model: JITModel, i: jax.Array, t1: jax.Array) -> JITModel:
     return cast(JITModel, jax.lax.cond(condition_1, identity, process_ban, model))
 
 
-RunState = TypedDict(
-    "RunState", {"model": JITModel, "steps": int, "done": bool, "success": bool}
-)
-
-
 @dataclass
 class RunState:
     """Class for storing the run state of the model."""
@@ -275,14 +270,16 @@ class RunState:
     done: jnp.bool_
     success: jnp.bool_
 
-    def tree_flatten(self):
+    def tree_flatten(
+        self,
+    ) -> Tuple[Tuple[JITModel, jnp.int32, jnp.bool_, jnp.bool_], Tuple[()]]:
         """Function to flatten the tree to a list of tuples."""
         return ((self.model, self.steps, self.done, self.success), ())
 
     @classmethod
-    def tree_unflatten(cls, aux_data, children):
+    def tree_unflatten(cls, aux_data: Any, children: Any):  # type: ignore
         """Function to unflatten the tree."""
-        return cls(*children)
+        return RunState(*children)
 
 
 jax.tree_util.register_pytree_node_class(RunState)
@@ -653,12 +650,12 @@ def sample_world(
 
 
 if __name__ == "__main__":  # Drive code used for testing.
-    # model = sample_world(10, 10, 1000, jax.random.key(42), True, 1)
-    # one_hot = export(model, TILECODES, 10, 10)
+    model = sample_world(10, 10, 1000, jax.random.key(69), True, 1)
+    one_hot = export(model, TILECODES, 10, 10)
     # one_hot = jnp.array([[[0, 0, 0, 2], [0, 2, 0, 2], [0, 2, 0, 2], [0, 1, 0, 2], [0, 0, 0, 5], [0, 2, 0, 5], [0, 1, 0, 5], [0, 0, 0, 3], [0, 2, 0, 3], [0, 1, 0, 3]], [[0, 3, 0, 3], [0, 0, 0, 3], [0, 2, 0, 3], [0, 3, 0, 4], [0, 2, 0, 4], [0, 3, 0, 5], [0, 0, 0, 5], [0, 2, 0, 5], [0, 3, 0, 6], [0, 2, 0, 6]], [[0, 1, 0, 3], [0, 0, 0, 3], [1, 1, 3, 4], [0, 0, 0, 4], [0, 1, 0, 4], [0, 0, 0, 5], [0, 2, 0, 5], [0, 1, 0, 5], [0, 0, 0, 6], [0, 1, 0, 6]], [[1, 3, 3, 4], [0, 0, 0, 3], [0, 3, 0, 3], [0, 3, 0, 6], [0, 2, 0, 6], [0, 3, 0, 4], [0, 0, 0, 4], [1, 2, 4, 5], [0, 0, 0, 4], [0, 2, 0, 4]], [[0, 1, 0, 3], [0, 0, 0, 3], [0, 3, 0, 3], [0, 0, 0, 6], [0, 1, 0, 6], [0, 1, 0, 4], [0, 0, 0, 4], [0, 0, 0, 4], [0, 0, 0, 4], [0, 3, 0, 4]], [[1, 3, 3, 4], [0, 0, 0, 3], [0, 0, 0, 3], [0, 2, 0, 3], [0, 3, 0, 4], [0, 1, 0, 4], [0, 0, 0, 4], [0, 3, 0, 4], [0, 2, 0, 4], [0, 1, 0, 4]], [[0, 1, 0, 3], [0, 0, 0, 3], [0, 0, 0, 3], [0, 3, 0, 3], [0, 1, 0, 4], [0, 0, 0, 4], [0, 3, 0, 4], [2, 1, 4, 6], [0, 0, 0, 6], [0, 2, 0, 6]], [[0, 1, 0, 3], [0, 0, 0, 3], [0, 0, 0, 3], [1, 1, 3, 4], [0, 1, 0, 4], [0, 0, 0, 4], [0, 3, 0, 4], [0, 1, 0, 6], [0, 0, 0, 6], [0, 3, 0, 6]], [[0, 0, 0, 3], [0, 2, 0, 3], [0, 2, 0, 3], [0, 1, 0, 3], [0, 0, 0, 4], [0, 2, 0, 4], [0, 1, 0, 4], [0, 0, 0, 6], [0, 2, 0, 6], [0, 1, 0, 6]], [[0, 3, 0, 2], [0, 0, 0, 2], [0, 0, 0, 2], [0, 2, 0, 2], [0, 3, 0, 5], [0, 0, 0, 5], [0, 2, 0, 5], [0, 3, 0, 3], [0, 0, 0, 3], [0, 2, 0, 3]]])
-    one_hot = jnp.full((10, 10, 4), jnp.array([0, 0, 0, 3]))
+    # one_hot = jnp.full((10, 10, 4), jnp.array([0, 0, 0, 3]))
     world_mesh = create_world(one_hot)
-    export_stls(world_mesh, "meshes2/world")
+    export_stls(world_mesh, "meshes3/world")
     generate_mjcf_from_meshes(
-        one_hot, output_file="generated_mjcf_flat.xml", mesh_dir="meshes2/"
+        one_hot, output_file="generated_mjcf_new.xml", mesh_dir="meshes3/"
     )

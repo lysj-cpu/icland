@@ -4,13 +4,14 @@ import jax
 import jax.numpy as jnp
 import mujoco
 import numpy as np
-from converter import create_world
 from mujoco import mjx
 
 from icland.types import MjxModelType
 
 
-def create_initial_model(num_meshes=100, tris_per_mesh=24):  # pragma: no cover
+def create_initial_model(
+    num_meshes: int = 100, tris_per_mesh: int = 24
+) -> MjxModelType:  # pragma: no cover
     """Initialize model with placeholder meshes."""
     model = mujoco.MjModel.from_xml_string("""
         <mujoco>
@@ -54,7 +55,9 @@ def create_initial_model(num_meshes=100, tris_per_mesh=24):  # pragma: no cover
     return mj_model
 
 
-def update_meshes(mj_model: MjxModelType, pieces: jax.Array):  # pragma: no cover
+def update_meshes(
+    mj_model: MjxModelType, pieces: jax.Array
+) -> MjxModelType:  # pragma: no cover
     """Update mesh vertices directly from JAX array."""
     # Convert JAX array to numpy and reverse vertex order for normals
     pieces_reshaped = pieces.reshape(-1, *pieces.shape[-2:])
@@ -72,11 +75,3 @@ def update_meshes(mj_model: MjxModelType, pieces: jax.Array):  # pragma: no cove
         mj_model = mj_model.replace(mesh_vert=mesh_vert)
 
     return mj_model
-
-
-if __name__ == "__main__":
-    model = create_initial_model()
-    one_hot = jnp.full((10, 10, 4), jnp.array([0, 0, 0, 3]))
-    world_mesh = create_world(one_hot)
-    mj_model = update_meshes(model, world_mesh)
-    mj_data = mjx.make_data(model)
