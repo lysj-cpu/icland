@@ -25,7 +25,7 @@ EMPTY_WORLD = """
         size="0.06"
         fromto="0 0 0 0 0 -0.4"
         
-        mass="0.01"
+        mass="1"
       />
 
       <geom
@@ -33,7 +33,7 @@ EMPTY_WORLD = """
         size="0.05 0.05 0.05"
         pos="0 0 0.2"
         
-        mass="0.001"
+        mass="0"
       />
     </body>
 
@@ -67,7 +67,7 @@ TWO_AGENT_EMPTY_WORLD = """
         size="0.06"
         fromto="0 0 0 0 0 -0.4"
         
-        mass="0.01"
+        mass="1"
       />
 
       <geom
@@ -75,7 +75,7 @@ TWO_AGENT_EMPTY_WORLD = """
         size="0.05 0.05 0.05"
         pos="0 0 0.2"
         
-        mass="0.001"
+        mass="0"
       />
     </body>
 
@@ -91,7 +91,7 @@ TWO_AGENT_EMPTY_WORLD = """
         size="0.06"
         fromto="0 0 0 0 0 -0.4"
         
-        mass="0.01"
+        mass="1"
       />
 
       <geom
@@ -99,7 +99,7 @@ TWO_AGENT_EMPTY_WORLD = """
         size="0.05 0.05 0.05"
         pos="0 0 0.2"
         
-        mass="0.001"
+        mass="0"
       />
     </body>
 
@@ -132,14 +132,14 @@ TWO_AGENT_EMPTY_WORLD_COLLIDE = """
         type="capsule"
         size="0.06"
         fromto="0 0 0 0 0 -0.4"
-        mass="0.01"
+        mass="1"
       />
 
       <geom
         type="box"
         size="0.05 0.05 0.05"
         pos="0 0 0.2"
-        mass="0.001"
+        mass="0"
       />
     </body>
 
@@ -154,14 +154,14 @@ TWO_AGENT_EMPTY_WORLD_COLLIDE = """
         type="capsule"
         size="0.06"
         fromto="0 0 0 0 0 -0.4"
-        mass="0.01"
+        mass="1"
       />
 
       <geom
         type="box"
         size="0.05 0.05 0.05"
         pos="0 0 0.2"
-        mass="0.001"
+        mass="0"
       />
     </body>
 
@@ -194,16 +194,14 @@ RAMP_30 = """
         type="capsule"
         size="0.06"
         fromto="0 0 0 0 0 -0.4"
-        
-        mass="0.01"
+        mass="1"
       />
 
       <geom
         type="box"
         size="0.05 0.05 0.05"
         pos="0 0 0.2"
-        
-        mass="0.001"
+        mass="0"
       />
     </body>
 
@@ -239,7 +237,7 @@ RAMP_45 = """
         size="0.06"
         fromto="0 0 0 0 0 -0.4"
         
-        mass="0.01"
+        mass="1"
       />
 
       <geom
@@ -247,7 +245,7 @@ RAMP_45 = """
         size="0.05 0.05 0.05"
         pos="0 0 0.2"
         
-        mass="0.001"
+        mass="0"
       />
     </body>
 
@@ -283,15 +281,7 @@ RAMP_60 = """
         size="0.06"
         fromto="0 0 0 0 0 -0.4"
         
-        mass="0.01"
-      />
-
-      <geom
-        type="box"
-        size="0.05 0.05 0.05"
-        pos="0 0 0.2"
-        
-        mass="0.001"
+        mass="1"
       />
     </body>
 
@@ -303,7 +293,7 @@ RAMP_60 = """
       rgba="1 1 1 1"
     />
 
-    <geom type="box" size="1 1 1" pos="2 0 -0.5" euler="0 30 0" rgba="1 0.8 0.8 1" />
+    <geom type="box" size="1 1 1" pos="2 0 -0.5" euler="0 30 0" rgba="1 0.8 0.8 1" name="ramp" />
 
   </worldbody>
 </mujoco>

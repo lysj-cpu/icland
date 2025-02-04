@@ -8,6 +8,7 @@ from assets.policies import *
 from assets.worlds import *
 
 import icland
+from icland.constants import SMALL_VALUE
 from icland.types import *
 
 
@@ -50,7 +51,8 @@ def test_agent_translation(
 
     # Check if the correct velocity was applied
     velocity = pipeline_state.mjx_data.qvel[:2]
-    normalised_velocity = velocity / (jnp.linalg.norm(velocity) + 1e-10)
+    normalised_velocity = velocity / (jnp.linalg.norm(velocity) + SMALL_VALUE)
+
     assert jnp.allclose(normalised_velocity, expected_direction), (
         f"{name} failed: Expected velocity {expected_direction}, "
         f"Actual velocity {normalised_velocity}"
@@ -65,7 +67,9 @@ def test_agent_translation(
 
     # Check if the agent moved in the expected direction
     displacement = new_position - initial_pos
-    normalised_displacement = displacement / (jnp.linalg.norm(displacement) + 1e-10)
+    normalised_displacement = displacement / (
+        jnp.linalg.norm(displacement) + SMALL_VALUE
+    )
     assert jnp.allclose(normalised_displacement, expected_direction), (
         f"{name} failed: Expected displacement {expected_direction}, "
         f"Actual displacement {normalised_displacement}"
@@ -103,7 +107,7 @@ def test_agent_rotation(
     # Check if the correct angular velocity was applied
     angular_velocity = pipeline_state.mjx_data.qvel[3]
     normalised_angular_velocity = angular_velocity / (
-        jnp.linalg.norm(angular_velocity) + 1e-10
+        jnp.linalg.norm(angular_velocity) + SMALL_VALUE
     )
     assert jnp.allclose(normalised_angular_velocity, expected_orientation), (
         f"{name} failed: Expected angular velocity {expected_orientation}, "
@@ -117,7 +121,7 @@ def test_agent_rotation(
     new_orientation = pipeline_state.mjx_data.qpos[3]
     orientation_delta = new_orientation - initial_orientation
     normalised_orientation_delta = orientation_delta / (
-        jnp.linalg.norm(orientation_delta) + 1e-10
+        jnp.linalg.norm(orientation_delta) + SMALL_VALUE
     )
     assert jnp.allclose(normalised_orientation_delta, expected_orientation), (
         f"{name} failed: Expected orientation {expected_orientation}, "
