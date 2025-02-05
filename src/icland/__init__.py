@@ -97,10 +97,10 @@ def sample(key: jax.Array) -> ICLandParams:
         >>> import jax
         >>> key = jax.random.key(42)
         >>> sample(key)
-        ICLandParams(model=MjModel, game=None, agent_count=1)
+        ICLandParams(model=MjModel, game=None, agent_count=1, reward_function=lambda function())
     """
     mj_model: mujoco.MjModel = mujoco.MjModel.from_xml_string(TEST_XML_STRING)
-    return ICLandParams(mj_model, None, 1)
+    return ICLandParams(mj_model, None, 1, lambda: 0)
 
 
 def init(key: jax.Array, params: ICLandParams) -> ICLandState:
@@ -119,7 +119,7 @@ def init(key: jax.Array, params: ICLandParams) -> ICLandState:
         >>> key = jax.random.key(42)
         >>> params = sample(key)
         >>> init(key, params)
-        ICLandState(pipeline_state=PipelineState(...), observation=Array(...), reward=Array(...), done=Array(...), metrics=Array(...), info=Array(...))
+        ICLandState(pipeline_state=PipelineState(...), observation=Array(...), reward=Array(...), done=Array(...), metrics={...}, info={...})
     """
     # Unpack params
     mj_model = params.model
@@ -196,7 +196,7 @@ def step(
         >>> params = sample(key)
         >>> state = init(key, params)
         >>> step(key, state, params, forward_policy)
-        ICLandState(pipeline_state=PipelineState(...), observation=Array(...), reward=Array(...), done=Array(...), metrics=Array(...), info=Array(...))
+        ICLandState(pipeline_state=PipelineState(...), observation=Array(...), reward=Array(...), done=Array(...), metrics={...}, info={...})
     """
     # Unpack state
     pipeline_state = state.pipeline_state

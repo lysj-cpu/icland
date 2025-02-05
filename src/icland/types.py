@@ -3,6 +3,7 @@
 It includes types for model parameters, state, and action sets used in the project.
 """
 
+import inspect
 from typing import Callable, Optional, TypeAlias
 
 import jax
@@ -73,4 +74,14 @@ class ICLandParams(PyTreeNode):  # type: ignore[misc]
     # for users and for testing.
     def __repr__(self) -> str:
         """Return a string representation of the ICLandParams object."""
-        return f"ICLandParams(model={type(self.model).__name__}, game={self.game}, agent_count={self.agent_count}), reward_function={self.reward_function}"
+        if (
+            hasattr(self.reward_function, "__name__")
+            and self.reward_function.__name__ != "<lambda>"
+        ):
+            reward_function_name = self.reward_function.__name__
+        else:
+            reward_function_name = "lambda function"
+
+        reward_function_signature = str(inspect.signature(self.reward_function))
+
+        return f"ICLandParams(model={type(self.model).__name__}, game={self.game}, agent_count={self.agent_count}, reward_function={reward_function_name}{reward_function_signature})"
