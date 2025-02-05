@@ -27,8 +27,9 @@ import jax.numpy as jnp
 import mujoco
 from mujoco import mjx
 
-from .agent import create_agent, step_agent
+from .agent import collect_body_scene_info, create_agent, step_agent
 from .constants import *
+from .game_generator import generate_game
 from .types import *
 
 
@@ -49,7 +50,6 @@ def sample(key: jax.Array) -> ICLandParams:
         >>> sample(key)
         ICLandParams(model=MjModel, reward_function=<function sample.<locals>.<lambda> at 0x...>, agent_count=1)
     """
-
     # Sample the number of agents in the environment
     agent_count: int = jax.random.randint(
         key, (), WORL_MIN_AGENT_COUNT, WORLD_MAX_AGENT_COUNT
@@ -73,7 +73,10 @@ def sample(key: jax.Array) -> ICLandParams:
     # Compile the Mujoco model
     mj_model: mujoco.MjModel = specification.compile()
 
-    return ICLandParams(mj_model, lambda: 0, agent_count)
+    # Generate the reward function
+    reward_function = generate_game(key, agent_count)
+
+    return ICLandParams(mj_model, reward_function, agent_count)
 
 
 def init(key: jax.Array, params: ICLandParams) -> ICLandState:
@@ -92,7 +95,7 @@ def init(key: jax.Array, params: ICLandParams) -> ICLandState:
         >>> key = jax.random.key(42)
         >>> params = sample(key)
         >>> init(key, params)
-        ICLandState(pipeline_state=PipelineState(...), observation=Array(...), reward=Array(...), done=Array(...), metrics={...}, info={...})
+        ICLandState(pipeline_state=PipelineState(...), observation=Array(...), reward=Array(...), done=Array(...), metrics={...}, info=ICLandInfo(...))
     """
     # Unpack params
     mj_model = params.model
@@ -115,7 +118,7 @@ def init(key: jax.Array, params: ICLandParams) -> ICLandState:
         # jnp.zeros((agent_count, AGENT_OBSERVATION_DIM)),
         # jnp.zeros((agent_count, AGENT_OBSERVATION_DIM)),
         {},
-        {},
+        collect_body_scene_info(agent_components, mjx_data),
     )
 
 
@@ -169,7 +172,7 @@ def step(
         >>> params = sample(key)
         >>> state = init(key, params)
         >>> step(key, state, params, forward_policy)
-        ICLandState(pipeline_state=PipelineState(...), observation=Array(...), reward=Array(...), done=Array(...), metrics={...}, info={...})
+        ICLandState(pipeline_state=PipelineState(...), observation=Array(...), reward=Array(...), done=Array(...), metrics={...}, info=ICLandInfo(...))
     """
     # Unpack state
     pipeline_state = state.pipeline_state
@@ -217,6 +220,8 @@ def step(
     # metrics = jnp.zeros((agent_components.shape[0], AGENT_OBSERVATION_DIM))
     # infos = jnp.zeros((agent_components.shape[0], AGENT_OBSERVATION_DIM))
     metrics: dict[str, jax.Array] = {}
-    infos: dict[str, jax.Array] = {}
+    infos: dict[str, jax.Array] = collect_body_scene_info(
+        agent_components, updated_data
+    )
 
     return ICLandState(new_pipeline_state, observations, rewards, done, metrics, infos)

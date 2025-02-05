@@ -1,6 +1,6 @@
 """This module contains functions for simulating agent behavior in a physics environment."""
 
-from typing import Any
+from typing import Any, Dict
 
 import jax
 import jax.numpy as jnp
@@ -20,7 +20,6 @@ def create_agent(id: int, pos: jax.Array, specification: mujoco.MjSpec) -> jnp.n
     Returns:
         The updated Mujoco specification object.
     """
-    
     # Define the agent's body.
     agent = specification.worldbody.add_body(
         name=f"agent{id}",
@@ -85,7 +84,7 @@ def step_agent(
     local_movement = action[:2]
 
     # The hinge angle about z is at qpos[3]
-    angle = mjx_data.qpos[3]
+    angle = mjx_data.qpos[dof_address + 3]
     # Compute cosine and sine of the angle.
     c, s = jnp.cos(angle), jnp.sin(angle)
     # Rotate the local movement directly into the world frame.
@@ -157,8 +156,8 @@ def step_agent(
     # --------------------------------------------------------------------------
     # The rotation command is in action[3] (an int in {-1, 0, 1}). We update the
     # hinge angle (qpos[3]) directly, scaled by AGENT_ROTATION_SPEED.
-    new_angle = mjx_data.qpos[3] - AGENT_ROTATION_SPEED * action[3]
-    new_qpos = mjx_data.qpos.at[3].set(new_angle)
+    new_angle = mjx_data.qpos[dof_address + 3] - AGENT_ROTATION_SPEED * action[3]
+    new_qpos = mjx_data.qpos.at[dof_address + 3].set(new_angle)
 
     # Since we are directly setting the rotation, we do not want any angular inertia.
     # We leave qfrc_applied unchanged (i.e. no torque is applied).
@@ -211,4 +210,48 @@ def step_agent(
         qfrc_applied=new_qfrc_applied,
         qvel=qvel_updated,
         qpos=new_qpos,
+    )
+
+
+@jax.jit
+def collect_body_scene_info(
+    component_ids: jnp.ndarray, mjx_data
+) -> Dict[str, jnp.ndarray]:
+    """Collects information about the bodies in the scene including position and rotation.
+
+    Args:
+        component_ids: Array of shape (num_bodies, 3) with rows [body_id, geom_id, dof_address].
+        mjx_data: Simulation state with attributes:
+                  - xpos: jnp.ndarray of shape (num_bodies, 3), global positions.
+                  - qpos: jnp.ndarray (used here to extract rotation info).
+
+    Returns:
+        A dictionary with:
+            - "pos": jnp.ndarray of positions for the requested bodies.
+            - "rot": jnp.ndarray of rotations extracted from qpos.
+    """
+    # Extract the indices (making sure they are integers)
+    body_ids = component_ids[:, 0].astype(jnp.int32)
+    dof_addresses = component_ids[:, 2].astype(jnp.int32)
+
+    # Vectorized indexing into the simulation state arrays.
+    # This gathers the positions and the corresponding rotations.
+    positions = mjx_data.xpos[body_ids]
+    velocities = jnp.stack(
+        [
+            mjx_data.qvel[dof_addresses],
+            mjx_data.qvel[dof_addresses + 1],
+            mjx_data.qvel[dof_addresses + 2],
+            mjx_data.qvel[dof_addresses + 3],
+        ],
+        axis=1,
+    )
+    rotations = mjx_data.qpos[
+        dof_addresses + 3
+    ]  # Adjusting index for rotation extraction.
+
+    return ICLandInfo(
+        agent_positions=positions,
+        agent_rotations=rotations,
+        agent_velocities=velocities,
     )

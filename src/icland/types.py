@@ -33,6 +33,20 @@ class PipelineState(PyTreeNode):  # type: ignore[misc]
     component_ids: jnp.ndarray
 
 
+class ICLandInfo(PyTreeNode):  # type: ignore[misc]
+    """Information about the ICLand environment.
+
+    Attributes:
+        agent_positions: [[x, y, z]] of agent positions, indexed by agent's body ID.
+        agent_velocities: [[x, y, z]] of agent velocities, indexed by agent's body ID.
+        agent_rotations: Quat of agent rotations, indexed by agent's body ID.
+    """
+
+    agent_positions: jax.Array
+    agent_velocities: jax.Array
+    agent_rotations: jax.Array
+
+
 class ICLandState(PyTreeNode):  # type: ignore[misc]
     """Information regarding the current step.
 
@@ -52,7 +66,7 @@ class ICLandState(PyTreeNode):  # type: ignore[misc]
     # metrics: jax.Array  # These were Dict[str, jax.Array] = struct.field(default_factory=dict) but we need to install flax
     # info: jax.Array  # These were Dict[str, Any] = struct.field(default_factory=dict) but we need to install flax
     metrics: dict[str, jax.Array]
-    info: dict[str, jax.Array]
+    info: ICLandInfo
 
 
 class ICLandParams(PyTreeNode):  # type: ignore[misc]
