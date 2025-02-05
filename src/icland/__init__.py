@@ -16,6 +16,9 @@ else:
     xla_flags += " --xla_gpu_triton_gemm_any=True"
     os.environ["XLA_FLAGS"] = xla_flags
 
+    # See: https://github.com/jax-ml/jax/issues/8916#issuecomment-1101113497
+    os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+
 
 from typing import Tuple
 
@@ -127,25 +130,7 @@ def init(key: jax.Array, params: ICLandParams) -> ICLandState:
     mjx_model = mjx.put_model(mj_model)
     mjx_data = mjx.put_data(mj_model, mj_data)
 
-    # Collect object IDs for all agents
-    agent_components = jnp.empty(
-        (agent_count, AGENT_COMPONENT_IDS_DIM), dtype=jnp.int32
-    )
-
-    for agent_id in range(agent_count):
-        body_id = mujoco.mj_name2id(
-            mj_model, mujoco.mjtObj.mjOBJ_BODY, f"agent{agent_id}"
-        )
-
-        geom_id = mujoco.mj_name2id(
-            mj_model, mujoco.mjtObj.mjOBJ_GEOM, f"agent{agent_id}_geom"
-        )
-
-        dof_address = mjx_model.body_dofadr[body_id]
-
-        agent_components = agent_components.at[agent_id].set(
-            [body_id, geom_id, dof_address]
-        )
+    agent_components = collect_agent_components(mj_model, agent_count)
 
     pipeline_state = PipelineState(mjx_model, mjx_data, agent_components)
 
@@ -159,6 +144,31 @@ def init(key: jax.Array, params: ICLandParams) -> ICLandState:
         {},
         {},
     )
+
+
+# TODO: Original implementation had both mj_model and mjx_model - can we only use one?
+def collect_agent_components(mj_model: mujoco.MjModel, agent_count: int) -> jnp.ndarray:
+    """Collect object IDs for all agents."""
+    agent_components = jnp.empty(
+        (agent_count, AGENT_COMPONENT_IDS_DIM), dtype=jnp.int32
+    )
+
+    for agent_id in range(agent_count):
+        body_id = mujoco.mj_name2id(
+            mj_model, mujoco.mjtObj.mjOBJ_BODY, f"agent{agent_id}"
+        )
+
+        geom_id = mujoco.mj_name2id(
+            mj_model, mujoco.mjtObj.mjOBJ_GEOM, f"agent{agent_id}_geom"
+        )
+
+        dof_address = mj_model.body_dofadr[body_id]
+
+        agent_components = agent_components.at[agent_id].set(
+            [body_id, geom_id, dof_address]
+        )
+
+    return agent_components
 
 
 @jax.jit
