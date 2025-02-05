@@ -1,166 +1,444 @@
-import mujoco
-from flax import struct
+from functools import partial
+from typing import Any, List, Tuple
+
+import imageio
 import jax
 import jax.numpy as jnp
-from types import MjxModelType, MjxStateType, MjxGeomType, MjxObjType
-from typing import Tuple
-from dataclasses import dataclass
-from enum import Enum
+import numpy as np
+from jax._src import pjit
+from mujoco.mjx._src.types import Data as MjxData
+from sdfs import box_sdf, ramp_sdf
 
-@dataclass
-class Object(struct.PyTreeNode): 
-  objType: MjxObjType
-  id: jnp.int32          # Unique idenifier for the object
-  position: jnp.ndarray  # Shape (3, ) for position of object in 3D space (x, y, z)
-  rotation: jnp.ndarray  # Shape (3, 3) for rotation matrix
-  rgba: jnp.ndarray      # Shape (4, ) for RGBA values
+# Constants
+DEFAULT_VIEWSIZE: Tuple[jnp.int32, jnp.int32] = (92, 76)
+DEFAULT_COLOR: jax.Array = jnp.array([0.2588, 0.5294, 0.9607])
+WORLD_UP: jax.Array = jnp.array([0.0, 1.0, 0.0], dtype=jnp.float32)
+NUM_CHANNELS: jnp.int32 = 3
 
-@dataclass
-class Light(struct.PyTreeNode):
-  pos: jnp.ndarray          # Position of the light (x, y, z)
-  dir: jnp.ndarray          # Direction of the light (for directional lights)
-  diffuse: jnp.ndarray      # Diffuse color (RGB)
-  specular: jnp.ndarray     # Specular color (RGB)
-  ambient: jnp.ndarray      # Ambient color (RGB)
-  intensity: jnp.float64    # Light intensity (0 to 1)
-  type: jnp.int32           # Light type (e.g., point, directional, etc.)
 
-@dataclass
-class Camera(struct.PyTreeNode):
-  position: jnp.ndarray  # Camera position in world coordinates (x, y, z)
-  lookat: jnp.ndarray    # Camera target point (x, y, z)
-  up: jnp.ndarray        # Up vector (orientation)
-  fovy: jnp.float64      # Field of view angle in radians
-  znear: jnp.float64     # Near plane distance for clipping
-  zfar: jnp.float64      # Far plane distance for clipping
-  projection: jnp.ndarray  # Projection matrix (4x4 matrix)
-  view: jnp.ndarray       # View matrix (4x4 matrix)
+def __norm(
+    v: jax.Array, axis: Any = -1, keepdims: jnp.bool = False, eps: jnp.float32 = 0.0
+):
+    return jnp.sqrt((v * v).sum(axis, keepdims=keepdims).clip(eps))
 
-@dataclass
-class Perturb(struct.PyTreeNode):
-  selectid: jnp.int32      # ID of the selected object
-  geomid: jnp.int32        # Geometry ID for selection
-  siteid: jnp.int32        # Site ID for selection
-  bodyid: jnp.int32        # Body ID for selection
-  selectpoint: jnp.ndarray # Selection point in world coordinates (x, y, z)
-  selectnormal: jnp.ndarray # Normal of the selection point (x, y, z)
-  selectdir: jnp.ndarray   # Direction vector for the selection (for raycasting)
 
-@dataclass
-class Scene(struct.PyTreeNode):
-  objects: jnp.ndarray    # Array of Object instances
-  camera: Camera
-  lights: jnp.ndarray     # Array of Light instances
-  nobjects: jnp.int32
-  nlights: jnp.int32
-  perturb: Perturb
+def __normalize(v: jax.Array, axis: Any = -1, eps: jnp.float32 = 1e-20):
+    return v / __norm(v, axis, keepdims=True, eps=eps)
 
-@dataclass
-class Option(struct.PyTreeNode):
-    # Camera options
-    camera_position: jnp.ndarray  # Shape (3,), camera position in world coordinates (x, y, z)
-    camera_lookat: jnp.ndarray    # Shape (3,), camera target point (x, y, z)
-    camera_up: jnp.ndarray        # Shape (3,), up vector (orientation)
-    fovy: jnp.float64             # Field of view angle in radians
-    znear: jnp.float64            # Near plane distance for clipping
-    zfar: jnp.float64             # Far plane distance for clipping
-    
-    # Lighting options
-    light_intensity: jnp.float64  # Light intensity (0 to 1)
-    light_position: jnp.ndarray   # Shape (3,), position of the light (x, y, z)
-    
-    # Rendering options
-    render_mode: jnp.int32   
-  
-class Renderer(struct.PyTreeNode):  # type: ignore[no-untyped-call]
-    # Basic config
-    model: MjxModelType
-    height: int
-    width: int
-    max_geom: int
 
-@jax.jit
-def init(
-    model: mujoco.mjx._src.types.Model,
-    height: int = 240,    # Prone to changes
-    width: int = 320,
-    max_geom: int = 10000,
-
-) -> Renderer:
-    buffer_width = model.vis.global_.offwidth
-    buffer_height = model.vis.global_.offheight
-    if width > buffer_width:
-      raise ValueError(f"""
-        Image width {width} > framebuffer width {buffer_width}. Either reduce the image
-        width or specify a larger offscreen framebuffer in the model XML using the
-        clause:
-        <visual>
-          <global offwidth="my_width"/>
-        </visual>""".lstrip())
-
-    if height > buffer_height:
-      raise ValueError(f"""
-Image height {height} > framebuffer height {buffer_height}. Either reduce the
-image height or specify a larger offscreen framebuffer in the model XML using
-the clause:
-<visual>
-  <global offheight="my_height"/>
-</visual>""".lstrip())
-
-    model._width = width
-    model._height = height
-    model._model = model
-
-    model._scene = Scene(model=model, maxgeom=max_geom)
-    model._scene_option = Option()
-
-    model._rect = _render.MjrRect(0, 0, self._width, self._height)
-
-    # Create render contexts.
-    # TODO(nimrod): Figure out why pytype doesn't like gl_context.GLContext
-    self._gl_context = None  # type: ignore
-    if gl_context.GLContext is not None:
-      self._gl_context = gl_context.GLContext(width, height)
-    if self._gl_context:
-      self._gl_context.make_current()
-    self._mjr_context = _render.MjrContext(
-        model, _enums.mjtFontScale.mjFONTSCALE_150.value
+def __process_column(
+    p: jax.Array,
+    x: jnp.float32,
+    y: jnp.float32,
+    rot: jnp.int32,
+    w: jnp.float32,
+    h: jnp.float32,
+) -> pjit.JitWrapped:
+    angle = -jnp.pi * rot / 2
+    cos_t = jnp.cos(angle)
+    sin_t = jnp.sin(angle)
+    transformed = jnp.matmul(
+        jnp.linalg.inv(
+            jnp.array(
+                [
+                    [1, 0, 0, (x + 0.5) * w],
+                    [0, 1, 0, (h * w) / 2],
+                    [0, 0, 1, (y + 0.5) * w],
+                    [0, 0, 0, 1],
+                ]
+            )
+        ),
+        jnp.append(p, 1),
     )
-    _render.mjr_setBuffer(
-        _enums.mjtFramebuffer.mjFB_OFFSCREEN.value, self._mjr_context
+    return box_sdf(transformed[:3], w, (h * w) / 2)
+
+
+def __process_ramp(
+    p: jax.Array,
+    x: jnp.float32,
+    y: jnp.float32,
+    rot: jnp.int32,
+    w: jnp.float32,
+    h: jnp.float32,
+) -> pjit.JitWrapped:
+    angle = -jnp.pi * rot / 2
+    cos_t = jnp.cos(angle)
+    sin_t = jnp.sin(angle)
+    upright = jnp.array([[0, -1, 0, 1], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+    rotation = jnp.matmul(
+        jnp.array(
+            [
+                [cos_t, 0, sin_t, x * h],
+                [0, 1, 0, 0],
+                [-sin_t, 0, cos_t, y * h],
+                [0, 0, 0, 1],
+            ]
+        ),
+        jnp.array([[1, 0, 0, -0.5 * h], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]),
     )
-    self._mjr_context.readDepthMap = _enums.mjtDepthMap.mjDEPTH_ZEROFAR
+    rotation = jnp.matmul(
+        jnp.array([[1, 0, 0, 0.5 * h], [0, 1, 0, 0], [0, 0, 1, 0.5 * h], [0, 0, 0, 1]]),
+        rotation,
+    )
+    transformed = jnp.matmul(
+        jnp.linalg.inv(
+            jnp.matmul(
+                rotation,
+                upright,
+            )
+            # upright
+        ),
+        jnp.append(p, 1),
+    )
+    return ramp_sdf(transformed[:3], w, h)
 
-    # Default render flags.
-    self._depth_rendering = False
-    self._segmentation_rendering = False
 
-    @property
-    def model(self):
-      return self._model
+def __scene_sdf_from_tilemap(tilemap: jax.Array, p: jax.Array, floor_height=0.0):
+    w, h = tilemap.shape[0], tilemap.shape[1]
+    dists = jnp.arange(w * h, dtype=jnp.int32)
+    tile_width = 1
+    process_tile = lambda p, x, y, tile: jax.lax.switch(
+        tile[0],
+        [
+            lambda p, x, y, rot, w, h: __process_column(p, x, y, rot, w, h),
+            lambda p, x, y, rot, w, h: __process_ramp(p, x, y, rot, h, w),
+            lambda p, x, y, rot, w, h: __process_column(p, x, y, rot, w, h),
+        ],
+        p,
+        x,
+        y,
+        tile[1],
+        tile_width,
+        tile[3],
+    )
+    tile_dists = jax.vmap(
+        lambda i: process_tile(p, i // w, i % w, tilemap[i // w, i % w])
+    )(dists)
 
-    @property
-    def scene(self) -> Scene:
-      return self._scene
+    floor_dist = p[1] - floor_height
 
-    @property
-    def height(self):
-      return self._height
+    return jnp.minimum(floor_dist, tile_dists.min())
 
-    @property
-    def width(self):
-      return self._width
 
-def update_scene(
-    renderer: Renderer, 
-    data: MjxStateType, 
-    camera: Union[int, str, Camera] = -1,
-    scene_option: Optional[_structs.MjvOption] = None
-  ) -> Renderer:
+def __raycast(
+    sdf: pjit.JitWrapped, p0: jax.Array, dir: jax.Array, step_n: jnp.int32 = 50
+):
+    def f(_, p):
+        return p + sdf(p) * dir
 
-  pass
+    return jax.lax.fori_loop(0, step_n, f, p0)
 
-def render(renderer: Renderer) -> Tuple[Renderer, jnp.ndarray]:
-  
-  pass
 
+@partial(jax.jit, static_argnames=["w", "h"])
+def __camera_rays(
+    cam_pos: jax.Array,
+    forward: jax.Array,
+    # view_size: tuple[jnp.int32, jnp.int32],
+    w: jnp.int32,
+    h: jnp.int32,
+    fx: float = 0.6,  # Changed type hint to float
+) -> jax.Array:
+    """Finds camera rays."""
+
+    # Define a helper normalization function.
+    def normalize(v):
+        return v / jnp.linalg.norm(v, axis=-1, keepdims=True)
+
+    # Ensure the forward direction is normalized.
+    forward = normalize(forward)
+
+    # Compute the camera's right and "down" directions.
+    # (The original code computed "down" via cross(right, forward).)
+    right = normalize(jnp.cross(forward, WORLD_UP))
+    down = normalize(jnp.cross(right, forward))
+
+    # Build a rotation matrix from camera space to world space.
+    # Rows correspond to the right, down, and forward directions.
+    R = jnp.vstack([right, down, forward])  # shape (3,3)
+
+    # Compute a corresponding vertical field-of-view parameter.
+    fy = fx / w * h
+
+    # Create a grid of pixel coordinates.
+    # We let y vary from fy to -fy so that positive y in the image moves "down" in world space.
+
+    # Use jnp.linspace instead of jp.mgrid for JIT compatibility
+    x = jnp.linspace(-fx, fx, w)
+    y = jnp.linspace(fy, -fy, h)
+    xv, yv = jnp.meshgrid(x, y)
+
+    x = xv.reshape(-1)
+    y = yv.reshape(-1)
+
+    # In camera space, assume the image plane is at z=1.
+    # For each pixel, the unnormalized direction is (x, y, 1).
+    pixel_dirs = jnp.stack([x, y, jnp.ones_like(x)], axis=-1)
+    pixel_dirs = normalize(pixel_dirs)
+
+    # Rotate the pixel directions from camera space into world space.
+    ray_dir = (
+        pixel_dirs @ R
+    )  # shape (num_pixels, 3)  Transpose R for correct multiplication
+
+    # (Optionally, you could also return the ray origins, which would be
+    #  a copy of cam_pos for every pixel.)
+    return ray_dir
+
+
+def __cast_shadow(
+    sdf: pjit.JitWrapped,
+    light_dir: jax.Array,
+    p0: jax.Array,
+    step_n: jnp.int32 = 50,
+    hardness: jnp.float32 = 8.0,
+) -> jax.Array:
+    def f(_: Any, carry: jnp.float32):
+        t, shadow = carry
+        h = sdf(p0 + light_dir * t)
+        return t + h, jnp.clip(hardness * h / t, 0.0, shadow)
+
+    return jax.lax.fori_loop(0, step_n, f, (1e-2, 1.0))[1]
+
+
+def __scene_sdf_from_tilemap_color(
+    tilemap,
+    p,
+    terrain_color: jax.Array = DEFAULT_COLOR,
+    with_color=False,
+    floor_height=0.0,
+):
+    """SDF for the world terrain."""
+    tile_dist = __scene_sdf_from_tilemap(tilemap, p, floor_height - 1)
+    floor_dist = p[1] - floor_height
+    min_dist = jnp.minimum(tile_dist, floor_dist)
+
+    def process_without_color(_):
+        return min_dist, jnp.zeros((3,))
+
+    def process_with_color(_):
+        x, _, z = jnp.tanh(jnp.sin(p * jnp.pi) * 20.0)
+        floor_color = (0.5 + (x * z) * 0.1) * jnp.ones(3)
+        color = jnp.choose(
+            jnp.int32(floor_dist < tile_dist), [terrain_color, floor_color], mode="clip"
+        )
+        return min_dist, color
+
+    return jax.lax.cond(with_color, process_with_color, process_without_color, None)
+
+
+@partial
+def __shade_f(
+    surf_color: jax.Array,
+    shadow: jax.Array,
+    raw_normal: jax.Array,
+    ray_dir: jax.Array,
+    light_dir: jax.Array,
+) -> jax.Array:
+    ambient = __norm(raw_normal)
+    normal = raw_normal / ambient
+    diffuse = normal.dot(light_dir).clip(0.0) * shadow
+    half = __normalize(light_dir - ray_dir)
+    spec = 0.3 * shadow * half.dot(normal).clip(0.0) ** 200.0
+    light = 0.7 * diffuse + 0.2 * ambient
+    return surf_color * light + spec
+
+
+@partial(jax.jit, static_argnames=["view_width", "view_height"])
+def render_frame(
+    cam_pos: jax.Array,
+    cam_dir: jax.Array,
+    tilemap: jax.Array,
+    terrain_color: jax.Array = DEFAULT_COLOR,
+    light_dir: jax.Array = __normalize(jnp.array([5.0, 10.0, 5.0])),
+    view_width: jnp.int32 = DEFAULT_VIEWSIZE[0],
+    view_height: jnp.int32 = DEFAULT_VIEWSIZE[1],
+    # view_size: Tuple[jnp.int32, jnp.int32] = DEFAULT_VIEWSIZE,
+) -> jax.Array:
+    """Renders one frame given camera position, direction, and world terrain."""
+    # Ray casting
+    ray_dir = __camera_rays(cam_pos, cam_dir, view_width, view_height, fx=0.6)
+    sdf = partial(__scene_sdf_from_tilemap, tilemap)
+    hit_pos = jax.vmap(partial(__raycast, sdf, cam_pos))(ray_dir)
+
+    # Shading
+    raw_normal = jax.vmap(jax.grad(sdf))(hit_pos)
+    shadow = jax.vmap(partial(__cast_shadow, sdf, light_dir))(hit_pos)
+    color_sdf = partial(
+        __scene_sdf_from_tilemap_color,
+        tilemap,
+        terrain_color=terrain_color,
+        with_color=True,
+    )
+    _, surf_color = jax.vmap(color_sdf)(hit_pos)
+
+    # Frame export
+    f = partial(__shade_f, light_dir=light_dir)
+    frame = jax.vmap(f)(surf_color, shadow, raw_normal, ray_dir)
+    frame = frame ** (1.0 / 2.2)  # gamma correction
+
+    return frame.reshape((view_height, view_width, NUM_CHANNELS))
+
+
+@partial(jax.jit, static_argnames=["camera_height", "camera_offset"])
+def get_agent_camera_from_mjx(
+    data: MjxData,
+    body_id: int,
+    camera_height: float = 1.5,
+    camera_offset: float = 0.5,
+) -> Tuple[jax.Array, jax.Array]:
+    """Get the camera position and direction from the MuJoCo data."""
+    agent_id = data.component_id[body_id]
+    agent_pos = data.xpos[agent_id][
+        :3
+    ]  # assuming the first three values are x, y, z coords
+    yaw = data.qpos[agent_id][3]
+    forward_dir = jnp.array([jnp.cos(yaw), jnp.sin(yaw), 0.0])
+    camera_pos = (
+        agent_pos + jnp.array([0, camera_height, 0]) - forward_dir * camera_offset
+    )
+    camera_dir = forward_dir  # forward facing camera
+
+    return camera_pos, camera_dir
+
+
+if __name__ == "__main__":  # pragma: no cover
+    tilemap = jnp.array(
+        [
+            [
+                [0, 0, 0, 2],
+                [0, 2, 0, 2],
+                [0, 2, 0, 2],
+                [0, 1, 0, 2],
+                [0, 0, 0, 5],
+                [0, 2, 0, 5],
+                [0, 1, 0, 5],
+                [0, 0, 0, 3],
+                [0, 2, 0, 3],
+                [0, 1, 0, 3],
+            ],
+            [
+                [0, 3, 0, 3],
+                [0, 0, 0, 3],
+                [0, 2, 0, 3],
+                [0, 3, 0, 4],
+                [0, 2, 0, 4],
+                [0, 3, 0, 5],
+                [0, 0, 0, 5],
+                [0, 2, 0, 5],
+                [0, 3, 0, 6],
+                [0, 2, 0, 6],
+            ],
+            [
+                [0, 1, 0, 3],
+                [0, 0, 0, 3],
+                [1, 1, 3, 4],
+                [0, 0, 0, 4],
+                [0, 1, 0, 4],
+                [0, 0, 0, 5],
+                [0, 2, 0, 5],
+                [0, 1, 0, 5],
+                [0, 0, 0, 6],
+                [0, 1, 0, 6],
+            ],
+            [
+                [1, 3, 3, 4],
+                [0, 0, 0, 3],
+                [0, 3, 0, 3],
+                [0, 3, 0, 6],
+                [0, 2, 0, 6],
+                [0, 3, 0, 4],
+                [0, 0, 0, 4],
+                [1, 2, 4, 5],
+                [0, 0, 0, 4],
+                [0, 2, 0, 4],
+            ],
+            [
+                [0, 1, 0, 3],
+                [0, 0, 0, 3],
+                [0, 3, 0, 3],
+                [0, 0, 0, 6],
+                [0, 1, 0, 6],
+                [0, 1, 0, 4],
+                [0, 0, 0, 4],
+                [0, 0, 0, 4],
+                [0, 0, 0, 4],
+                [0, 3, 0, 4],
+            ],
+            [
+                [1, 3, 3, 4],
+                [0, 0, 0, 3],
+                [0, 0, 0, 3],
+                [0, 2, 0, 3],
+                [0, 3, 0, 4],
+                [0, 1, 0, 4],
+                [0, 0, 0, 4],
+                [0, 3, 0, 4],
+                [0, 2, 0, 4],
+                [0, 1, 0, 4],
+            ],
+            [
+                [0, 1, 0, 3],
+                [0, 0, 0, 3],
+                [0, 0, 0, 3],
+                [0, 3, 0, 3],
+                [0, 1, 0, 4],
+                [0, 0, 0, 4],
+                [0, 3, 0, 4],
+                [2, 1, 4, 6],
+                [0, 0, 0, 6],
+                [0, 2, 0, 6],
+            ],
+            [
+                [0, 1, 0, 3],
+                [0, 0, 0, 3],
+                [0, 0, 0, 3],
+                [1, 1, 3, 4],
+                [0, 1, 0, 4],
+                [0, 0, 0, 4],
+                [0, 3, 0, 4],
+                [0, 1, 0, 6],
+                [0, 0, 0, 6],
+                [0, 3, 0, 6],
+            ],
+            [
+                [0, 0, 0, 3],
+                [0, 2, 0, 3],
+                [0, 2, 0, 3],
+                [0, 1, 0, 3],
+                [0, 0, 0, 4],
+                [0, 2, 0, 4],
+                [0, 1, 0, 4],
+                [0, 0, 0, 6],
+                [0, 2, 0, 6],
+                [0, 1, 0, 6],
+            ],
+            [
+                [0, 3, 0, 2],
+                [0, 0, 0, 2],
+                [0, 0, 0, 2],
+                [0, 2, 0, 2],
+                [0, 3, 0, 5],
+                [0, 0, 0, 5],
+                [0, 2, 0, 5],
+                [0, 3, 0, 3],
+                [0, 0, 0, 3],
+                [0, 2, 0, 3],
+            ],
+        ]
+    )
+    frames: List[Any] = []
+    for i in range(72):
+        f = render_frame(
+            cam_pos=jnp.array([5.0, 10.0, -10.0 + (i * 10 / 72)]),
+            cam_dir=jnp.array([0.0, -0.5, 1.0]),
+            tilemap=tilemap,
+            terrain_color=jnp.array([1.0, 0.0, 0.0]),
+            view_width=256,
+            view_height=144,
+        )
+        frames.append(np.array(f))
+        print(f"Rendered frame {i}")
+
+    imageio.mimsave(
+        f"tests/video_output/sdf_world_scene.mp4", frames, fps=24, quality=8
+    )

@@ -44,7 +44,7 @@ def load_bitmap(filepath: str) -> Tuple[list[int], int, int]:
         # Retrieve pixel data in (R, G, B, A) tuples
         pixel_data = list(img.getdata())
 
-        # Convert each RGBA tuple into a single ARGB integer
+        # Convert each RGBA Tuple into a single ARGB integer
         # A in bits 24..31, R in bits 16..23, G in bits 8..15, B in bits 0..7
         result = []
         for r, g, b, a in pixel_data:
@@ -66,7 +66,7 @@ def save_bitmap(data: list[int], width: int, height: int, filename: str) -> None
     # Create a new RGBA image
     img = Image.new("RGBA", (width, height))
 
-    # Convert each ARGB int back into an (R, G, B, A) tuple
+    # Convert each ARGB int back into an (R, G, B, A) Tuple
     rgba_pixels = []
     for argb in data:
         a = (argb >> 24) & 0xFF
@@ -124,7 +124,7 @@ class XMLReader:
         j_tilecodes (jax.numpy.array): JAX-compatible array of tile properties.
     """
 
-    def __tilename_to_code(self, tile: str, rotation: int) -> tuple[int, int, int, int]:
+    def __tilename_to_code(self, tile: str, rotation: int) -> Tuple[int, int, int, int]:
         name_split = tile.split("_")
         tile_type = name_split[0]
         tile_type_num = 0
@@ -167,7 +167,7 @@ class XMLReader:
         self.tilenames: list[str] = []  # Will hold tile names (including variants)
         self.tilesize: int = 0  # Size (width==height) of each tile in pixels
 
-        self.tilecodes = []  # Will hold 4-tuple of (type, rotation, from, to)
+        self.tilecodes = []  # Will hold 4-Tuple of (type, rotation, from, to)
 
         # Prepare optional subset
         subset = None
@@ -480,11 +480,11 @@ class XMLReader:
             filename,
         )
 
-    def get_tilemap_data(self) -> tuple[int, jax.Array, jax.Array, jax.Array]:
+    def get_tilemap_data(self) -> Tuple[int, jax.Array, jax.Array, jax.Array]:
         """Returns relevant tilemap data.
 
         Returns:
-            tuple: (T, j_weights, j_propagator, j_tilecodes)
+            Tuple: (T, j_weights, j_propagator, j_tilecodes)
                 T (int): Number of unique tile variants.
                 j_weights (jax.numpy.array): Array of tile weights.
                 j_propagator (jax.numpy.array): Propagator data.

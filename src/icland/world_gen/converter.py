@@ -207,3 +207,30 @@ def export_stl(pieces: jax.Array, filename: str) -> mesh.Mesh:
     world_mesh.save(filename)
 
     return world_mesh
+
+
+def export_stls(pieces: jax.Array, file_prefix: str) -> None:  # pragma: no cover
+    """Export each piece as an stl."""
+    # # Helper function to filter out padding after JIT compilation
+    pieces_reshaped = pieces.reshape(-1, *pieces.shape[-2:])
+    # Convert from JAX array to numpy
+    triangles = np.array(pieces_reshaped)
+    # Invert the normals
+    triangles = triangles[:, ::-1, :]
+
+    triangles = np.ascontiguousarray(triangles, dtype=np.float32)
+
+    print(triangles.shape)
+
+    n_pieces = pieces.shape[0]
+    n_triangles = len(triangles) // n_pieces
+    for i in range(n_pieces):
+        # Create the mesh data structure
+        world_mesh = mesh.Mesh(
+            np.zeros(n_triangles, dtype=mesh.Mesh.dtype),
+            remove_duplicate_polygons=RemoveDuplicates.NONE,
+        )
+        world_mesh.vectors = triangles[
+            (n_triangles * i) : (n_triangles * i + n_triangles)
+        ]
+        world_mesh.save(file_prefix + "_" + str(i) + ".stl")
