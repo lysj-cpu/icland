@@ -93,7 +93,7 @@ def render_video(
     """
     mj_model = mujoco.MjModel.from_xml_string(model_xml)
 
-    icland_params = ICLandParams(model=mj_model, game=None, agent_count=agent_count)
+    icland_params = ICLandParams(model=mj_model, reward_function=None, agent_count=agent_count)
 
     icland_state = icland.init(key, icland_params)
     icland_state = icland.step(key, icland_state, None, policy)

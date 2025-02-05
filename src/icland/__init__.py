@@ -27,59 +27,9 @@ import jax.numpy as jnp
 import mujoco
 from mujoco import mjx
 
-from .agent import step_agent
+from .agent import create_agent, step_agent
 from .constants import *
 from .types import *
-
-TEST_XML_STRING: str = """
-<mujoco>
-  <worldbody>
-    <light name="main_light" pos="0 0 1" dir="0 0 -1"
-           diffuse="1 1 1" specular="0.1 0.1 0.1"/>
-
-    <body name="agent0" pos="0 0 1">
-      <joint type="slide" axis="1 0 0" />
-      <joint type="slide" axis="0 1 0" />
-      <joint type="slide" axis="0 0 1" />
-      <joint type="hinge" axis="0 0 1" stiffness="1"/>
-
-      <geom
-        name="agent0_geom"
-        type="capsule"
-        size="0.06"
-        fromto="0 0 0 0 0 -0.4"
-        solimp="0.9 0.995 0.001 1 1000"
-        friction="0.001 0.001 0.0001"
-        mass="0.01"
-      />
-
-      <geom
-        type="box"
-        size="0.05 0.05 0.05"
-        pos="0 0 0.2"
-        solimp="0.9 0.995 0.001 1 1000"
-        friction="0.001 0.001 0.0001"
-        mass="0.001"
-      />
-    </body>
-
-    <!-- Ground plane, also with low friction -->
-    <geom
-      name="ground"
-      type="plane"
-      size="0 0 0.01"
-      rgba="1 1 1 1"
-    />
-
-    <geom type="box" size="0.5 1 1" pos="0.45 2 -0.2" euler="0 -5 0"
-          rgba="1 0.8 0.8 1"
-          />
-    <geom type="box" size="0.5 1 1" rgba="1 0.8 0.8 1"
-          pos="1.5 0 0.1" euler="0 45 90"
-          />
-  </worldbody>
-</mujoco>
-"""
 
 
 def sample(key: jax.Array) -> ICLandParams:
@@ -89,7 +39,7 @@ def sample(key: jax.Array) -> ICLandParams:
         ICLandParams: Parameters for the ICLand environment.
 
         - mj_model: Mujoco model of the environment.
-        - game: Game string (placeholder, currently None).
+        - reward_function: Reward function for the environment.
         - agent_count: Number of agents in the environment.
 
     Examples:
@@ -97,10 +47,33 @@ def sample(key: jax.Array) -> ICLandParams:
         >>> import jax
         >>> key = jax.random.key(42)
         >>> sample(key)
-        ICLandParams(model=MjModel, game=None, agent_count=1, reward_function=lambda function())
+        ICLandParams(model=MjModel, reward_function=<function sample.<locals>.<lambda> at 0x...>, agent_count=1)
     """
-    mj_model: mujoco.MjModel = mujoco.MjModel.from_xml_string(TEST_XML_STRING)
-    return ICLandParams(mj_model, None, 1, lambda: 0)
+
+    # Sample the number of agents in the environment
+    agent_count: int = jax.random.randint(
+        key, (), WORL_MIN_AGENT_COUNT, WORLD_MAX_AGENT_COUNT
+    )
+
+    # Create the Mujoco model
+    specification = mujoco.MjSpec()
+
+    # Add the ground plane
+    specification.worldbody.add_geom(
+        name="ground",
+        type=mujoco.mjtGeom.mjGEOM_PLANE,
+        size=[0, 0, 0.01],
+        rgba=[1, 1, 1, 1],
+    )
+
+    # Add the agents
+    for agent_id in range(agent_count):
+        specification = create_agent(agent_id, [agent_id, 0, 0.5], specification)
+
+    # Compile the Mujoco model
+    mj_model: mujoco.MjModel = specification.compile()
+
+    return ICLandParams(mj_model, lambda: 0, agent_count)
 
 
 def init(key: jax.Array, params: ICLandParams) -> ICLandState:

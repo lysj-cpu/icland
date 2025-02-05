@@ -4,7 +4,7 @@ It includes types for model parameters, state, and action sets used in the proje
 """
 
 import inspect
-from typing import Callable, Optional, TypeAlias
+from typing import Callable, TypeAlias
 
 import jax
 import jax.numpy as jnp
@@ -60,14 +60,13 @@ class ICLandParams(PyTreeNode):  # type: ignore[misc]
 
     Attributes:
         model: Mujoco model of the environment.
-        game: Game string (placeholder, currently None).
+        reward_function: Reward function for the environment
         agent_count: Number of agents in the environment.
     """
 
     model: mujoco.MjModel
-    game: Optional[str]
-    agent_count: int
     reward_function: Callable[[ICLandState], jax.Array]
+    agent_count: int
 
     # Without this, model is model=<mujoco._structs.MjModel object at 0x7b61fb18dc70>
     # For some arbitrary memory address. __repr__ provides cleaner output
@@ -84,4 +83,4 @@ class ICLandParams(PyTreeNode):  # type: ignore[misc]
 
         reward_function_signature = str(inspect.signature(self.reward_function))
 
-        return f"ICLandParams(model={type(self.model).__name__}, game={self.game}, agent_count={self.agent_count}, reward_function={reward_function_name}{reward_function_signature})"
+        return f"ICLandParams(model={type(self.model).__name__}, reward_function=<function sample.<locals>.<lambda> at 0x...>, agent_count={self.agent_count})"

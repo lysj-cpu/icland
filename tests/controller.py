@@ -65,7 +65,7 @@ def interactive_simulation(model_xml: str, duration: int, agent_count: int = 1) 
     mj_model = mujoco.MjModel.from_xml_string(model_xml)
 
     # Set up the simulation parameters.
-    icland_params = ICLandParams(model=mj_model, game=None, agent_count=agent_count)
+    icland_params = ICLandParams(model=mj_model, reward_function=None, agent_count=agent_count)
     jax_key = jax.random.PRNGKey(42)
     icland_state = icland.init(jax_key, icland_params)
 

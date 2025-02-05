@@ -9,6 +9,49 @@ from .constants import *
 from .types import *
 
 
+def create_agent(id: int, pos: jax.Array, specification: mujoco.MjSpec) -> jnp.ndarray:
+    """Create an agent in the physics environment.
+
+    Args:
+        id: The ID of the agent.
+        pos: The initial position of the agent.
+        specification: The Mujoco specification object.
+
+    Returns:
+        The updated Mujoco specification object.
+    """
+    
+    # Define the agent's body.
+    agent = specification.worldbody.add_body(
+        name=f"agent{id}",
+        pos=pos,
+    )
+
+    # Add transformational freedom.
+    agent.add_joint(type=mujoco.mjtJoint.mjJNT_SLIDE, axis=[1, 0, 0])
+    agent.add_joint(type=mujoco.mjtJoint.mjJNT_SLIDE, axis=[0, 1, 0])
+    agent.add_joint(type=mujoco.mjtJoint.mjJNT_SLIDE, axis=[0, 0, 1])
+
+    # Add rotational freedom.
+    agent.add_joint(type=mujoco.mjtJoint.mjJNT_HINGE, axis=[0, 0, 1])
+
+    # Add agent's geometry.
+    agent.add_geom(
+        name=f"agent{id}_geom",
+        type=mujoco.mjtGeom.mjGEOM_CAPSULE,
+        size=[0.06, 0.06, 0.06],
+        fromto=[0, 0, 0, 0, 0, -0.4],
+        mass=1,
+    )
+
+    # This is just to make rotation visible.
+    agent.add_geom(
+        type=mujoco.mjtGeom.mjGEOM_BOX, size=[0.05, 0.05, 0.05], pos=[0, 0, 0.2], mass=0
+    )
+
+    return specification
+
+
 @jax.jit
 def step_agent(
     mjx_data: MjxStateType,
