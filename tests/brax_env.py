@@ -3,7 +3,7 @@
 import jax
 from brax.envs import get_environment, register_environment
 
-from icland.brax import ICLand
+from icland.brax_env import ICLand
 
 if __name__ == "__main__":
     # Adapted from https://colab.research.google.com/github/google-deepmind/mujoco/blob/main/mjx/tutorial.ipynb
