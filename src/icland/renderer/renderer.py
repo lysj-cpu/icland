@@ -8,6 +8,7 @@ import numpy as np
 from jax._src import pjit
 from mujoco.mjx._src.types import Data as MjxData
 from sdfs import box_sdf, ramp_sdf
+from icland.types import ICLandState
 
 # Constants
 DEFAULT_VIEWSIZE: Tuple[jnp.int32, jnp.int32] = (92, 76)
@@ -281,13 +282,15 @@ def render_frame(
 
 @partial(jax.jit, static_argnames=["camera_height", "camera_offset"])
 def get_agent_camera_from_mjx(
-    data: MjxData,
-    body_id: int,
+    icland_state: ICLandState,
+    body_id_1: int,
+    body_id_2: int,
     camera_height: float = 1.5,
     camera_offset: float = 0.5,
 ) -> Tuple[jax.Array, jax.Array]:
     """Get the camera position and direction from the MuJoCo data."""
-    agent_id = data.component_id[body_id]
+    data = icland_state.mjx_data
+    agent_id = icland_state.component_id[body_id_1, body_id_2]
     agent_pos = data.xpos[agent_id][
         :3
     ]  # assuming the first three values are x, y, z coords

@@ -147,12 +147,13 @@ def render_video_from_world(
 
     while mjx_data.time < duration:
         print(mjx_data.time)
-        default_agent = 0
+        default_agent_1 = 0
+        default_agent_2 = 0
         icland_state = icland.step(key, icland_state, None, policy)
         mjx_data = icland_state.mjx_data
 
         if len(frames) < mjx_data.time * 30:
-            camera_pos, camera_dir = get_agent_camera_from_mjx(mjx_data, default_agent)
+            camera_pos, camera_dir = get_agent_camera_from_mjx(mjx_data, default_agent_1, default_agent_2)
             f = render_frame(mjx_model, mjx_data, camera_pos, camera_dir, frames)
             frames.append(f)
 
