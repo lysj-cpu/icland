@@ -119,7 +119,7 @@ def init(key: jax.Array, params: ICLandParams) -> ICLandState:
         >>> key = jax.random.key(42)
         >>> params = sample(key)
         >>> init(key, params)
-        ICLandState(pipeline_state=PipelineState(...), observation=Array(...), reward=Array(...), done=Array(...), metrics={...}, info={...})
+        ICLandState(pipeline_state=PipelineState(mjx_model=Model, mjx_data=Data, component_ids=[[1 3 0]]), observation=[[0.]], reward=[[0.]], done=[[0.]], metrics={}, info={})
     """
     # Unpack params
     mj_model = params.model
@@ -196,7 +196,7 @@ def step(
         >>> params = sample(key)
         >>> state = init(key, params)
         >>> step(key, state, params, forward_policy)
-        ICLandState(pipeline_state=PipelineState(...), observation=Array(...), reward=Array(...), done=Array(...), metrics={...}, info={...})
+        ICLandState(pipeline_state=PipelineState(mjx_model=Model, mjx_data=Data, component_ids=[[1 3 0]]), observation=[[0.]], reward=[[0.]], done=[[0.]], metrics={}, info={})
     """
     # Unpack state
     pipeline_state = state.pipeline_state

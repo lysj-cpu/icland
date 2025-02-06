@@ -36,6 +36,10 @@ class PipelineState(PyTreeNode):  # type: ignore[misc]
     mjx_data: MjxStateType
     component_ids: jnp.ndarray
 
+    def __repr__(self) -> str:
+        """Return a string representation of the PipelineState object."""
+        return f"PipelineState(mjx_model={type(self.mjx_model).__name__}, mjx_data={type(self.mjx_data).__name__}, component_ids={self.component_ids})"
+
 
 type ICLandStateChildren = tuple[
     PipelineState,
@@ -44,6 +48,16 @@ type ICLandStateChildren = tuple[
     jax.Array,
     dict[str, jax.Array],
     dict[str, jax.Array],
+]
+
+type ICLandBraxStateChildren = tuple[
+    mjx_state,
+    jax.Array,
+    jax.Array,
+    jax.Array,
+    dict[str, jax.Array],
+    System,
+    jax.Array,
 ]
 
 
@@ -91,10 +105,14 @@ class ICLandState:
         xd = offset.vmap().do(cvel)
         reformated_data = _reformat_contact(model, data)
 
+        reformated_data = {
+            k: v
+            for k, v in reformated_data.__dict__.items()
+            if k not in {"q", "qd", "x", "xd"}
+        }
+
         return ICLandBraxState(
-            pipeline_state=mjx_state(
-                q=q, qd=qd, x=x, xd=xd, **reformated_data.__dict__
-            ),
+            pipeline_state=mjx_state(q=q, qd=qd, x=x, xd=xd, **reformated_data),
             obs=self.observation,
             reward=self.reward,
             done=self.done,
@@ -118,6 +136,10 @@ class ICLandState:
         cls: Type["ICLandState"], _: None, children: ICLandStateChildren
     ) -> "ICLandState":
         return cls(*children)
+
+    def __repr__(self) -> str:
+        """Return a string representation of the ICLandState object."""
+        return f"ICLandState(pipeline_state={self.pipeline_state}, observation={self.observation}, reward={self.reward}, done={self.done}, metrics={self.metrics}, info={self.info})"
 
 
 jax.tree_util.register_pytree_node(
@@ -193,3 +215,25 @@ class ICLandBraxState(State):  # type: ignore[misc]
             metrics=self.metrics,
             info=self.info,
         )
+
+    def _tree_flatten(self) -> tuple[ICLandBraxStateChildren, None]:
+        return (
+            self.pipeline_state,
+            self.obs,
+            self.reward,
+            self.done,
+            self.metrics,
+            self.model,
+            self.component_ids,
+        ), None
+
+    @classmethod
+    def _tree_unflatten(
+        cls: Type["ICLandBraxState"], _: None, children: ICLandBraxStateChildren
+    ) -> "ICLandBraxState":
+        return cls(*children)
+
+
+jax.tree_util.register_pytree_node(
+    ICLandBraxState, ICLandBraxState._tree_flatten, ICLandBraxState._tree_unflatten
+)
