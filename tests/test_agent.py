@@ -37,7 +37,7 @@ def test_agent_translation(
     """Test agent movement in ICLand environment."""
     # Create the ICLand environment
     mj_model = mujoco.MjModel.from_xml_string(EMPTY_WORLD)
-    icland_params = ICLandParams(mj_model, None, 1, None)
+    icland_params = ICLandParams(mj_model, None, 1)
     icland_state = icland.init(key, icland_params)
     pipeline_state = icland_state.pipeline_state
     body_id = pipeline_state.component_ids[0, 0]
@@ -93,7 +93,7 @@ def test_agent_rotation(
     """Test agent movement in ICLand environment."""
     # Create the ICLand environment
     mj_model = mujoco.MjModel.from_xml_string(EMPTY_WORLD)
-    icland_params = ICLandParams(mj_model, None, 1, None)
+    icland_params = ICLandParams(mj_model, None, 1)
     icland_state = icland.init(key, icland_params)
     pipeline_state = icland_state.pipeline_state
 
@@ -127,7 +127,7 @@ def test_two_agents(key: jax.Array, name: str, policies: jnp.ndarray) -> None:
     """Test two agents movement in ICLand environment."""
     # Create the ICLand environment
     mj_model = mujoco.MjModel.from_xml_string(TWO_AGENT_EMPTY_WORLD)
-    icland_params = ICLandParams(mj_model, None, 2, None)
+    icland_params = ICLandParams(mj_model, None, 2)
     icland_state = icland.init(key, icland_params)
     pipeline_state = icland_state.pipeline_state
 
