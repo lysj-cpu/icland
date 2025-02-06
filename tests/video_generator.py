@@ -18,7 +18,6 @@ import os
 # N.B. These need to be before the mujoco imports
 # Fixes AttributeError: 'Renderer' object has no attribute '_mjr_context'
 os.environ["MUJOCO_GL"] = "wgl"
-os.environ["MUJOCO_GL"] = "wgl"
 
 # Tell XLA to use Triton GEMM, this improves steps/sec by ~30% on some GPUs
 xla_flags = os.environ.get("XLA_FLAGS", "")
@@ -82,6 +81,7 @@ key = jax.random.PRNGKey(42)
 
 def __generate_mjcf_string(  # pragma: no cover
     tile_map: jax.Array,
+    agent_position: tuple[float, float, float],
     mesh_dir: str = "meshes/",
 ) -> None:
     """Generates MJCF file from column meshes that form the world."""
@@ -95,8 +95,8 @@ def __generate_mjcf_string(  # pragma: no cover
     
     <worldbody>\n"""
 
-    mjcf += """            <body name="agent0" pos="1.5 1 4">
-                <joint type="slide" axis="1 0 0" />
+    mjcf += f'<body name="agent0" pos="{agent_position[0]} {agent_position[1]} {agent_position[2]}">\n'
+    mjcf += """            <joint type="slide" axis="1 0 0" />
                 <joint type="slide" axis="0 1 0" />
                 <joint type="slide" axis="0 0 1" />
                 <joint type="hinge" axis="0 0 1" stiffness="1"/>
@@ -149,7 +149,7 @@ def render_video_from_world(
     temp_dir = "temp"
     print(f"Exporting stls")
     export_stls(pieces, f"{temp_dir}/{temp_dir}")
-    xml_str = __generate_mjcf_string(tilemap, f"{temp_dir}/")
+    xml_str = __generate_mjcf_string(tilemap, (1.5, 1, 4), f"{temp_dir}/")
     print(f"Init mj model...")
     mj_model = mujoco.MjModel.from_xml_string(xml_str)
     icland_params = ICLandParams(model=mj_model, game=None, agent_count=1)
@@ -261,15 +261,86 @@ def render_video(
     imageio.mimsave(video_name, third_person_frames, fps=30, quality=8)
 
 
+def render_video_from_world_with_policies(
+    key: jax.random.PRNGKey,
+    policies: List[jax.Array],
+    switch_intervals: List[float],
+    duration: int,
+    video_name: str,
+) -> None:
+    """Renders a video where the agent follows multiple policies sequentially.
+
+    Args:
+        key: Random seed key.
+        policies: A list of policy arrays, applied sequentially.
+        switch_intervals: Time intervals at which to switch to the next policy.
+        duration: Total duration of the simulation.
+        video_name: Output video file name.
+    """
+    print(f"Sampling world with key {key}")
+    model = sample_world(10, 10, 1000, key, True, 1)
+    tilemap = export(model, TILECODES, 10, 10)
+    pieces = create_world(tilemap)
+    temp_dir = "temp"
+    export_stls(pieces, f"{temp_dir}/{temp_dir}")
+    
+    xml_str = __generate_mjcf_string(tilemap, (1.5, 1, 4), f"{temp_dir}/")
+    mj_model = mujoco.MjModel.from_xml_string(xml_str)
+    icland_params = ICLandParams(model=mj_model, game=None, agent_count=1)
+
+    icland_state = icland.init(key, icland_params)
+    mjx_data = icland_state.pipeline_state.mjx_data
+    frames: List[Any] = []
+    
+    current_policy_idx = 0
+    policy = policies[current_policy_idx]
+    
+    print(f"Starting simulation: {video_name}")
+    last_printed_time = -0.1
+
+    default_agent_1 = 0
+    world_width = tilemap.shape[1]
+    get_camera_info = jax.jit(get_agent_camera_from_mjx)
+
+    while mjx_data.time < duration:
+        # Switch policy at defined intervals
+        if current_policy_idx < len(switch_intervals) and mjx_data.time >= switch_intervals[current_policy_idx]:
+            current_policy_idx += 1
+            if current_policy_idx < len(policies):
+                policy = policies[current_policy_idx]
+                print(f"Switching policy at {mjx_data.time:.1f}s")
+
+        if int(mjx_data.time * 10) != int(last_printed_time * 10):
+            print(f"Time: {mjx_data.time:.1f}")
+            last_printed_time = mjx_data.time
+
+        icland_state = icland.step(key, icland_state, None, policy)
+        mjx_data = icland_state.pipeline_state.mjx_data
+
+        if len(frames) < mjx_data.time * 30:
+            print("Agent pos:", mjx_data.xpos[icland_state.pipeline_state.component_ids[0, 0]][:3])
+            camera_pos, camera_dir = get_camera_info(icland_state, world_width, default_agent_1)
+            f = render_frame(camera_pos, camera_dir, tilemap)
+            frames.append(f)
+
+    imageio.mimsave(video_name, frames, fps=30, quality=8)
+
 if __name__ == "__main__":
     # render_video_from_world(
-    #     key, FORWARD_POLICY, 3, "tests/video_output/world_convex_42_mjx.mp4"
+    #     key, FORWARD_POLICY, 1, "tests/video_output/world_convex_42_mjx.mp4"
     # )
-    for i, preset in enumerate(SIMULATION_PRESETS):
-        render_video(
-            preset["world"],
-            preset["policy"],
-            preset["duration"],
-            f"tests/video_output/{preset['name']}.mp4",
-            agent_count=preset.get("agent_count", 1),
-        )
+    # for i, preset in enumerate(SIMULATION_PRESETS):
+    #     render_video(
+    #         preset["world"],
+    #         preset["policy"],
+    #         preset["duration"],
+    #         f"tests/video_output/{preset['name']}.mp4",
+    #         agent_count=preset.get("agent_count", 1),
+    #     )
+    render_video_from_world_with_policies(
+        key, 
+        policies=[FORWARD_POLICY, LEFT_POLICY, RIGHT_POLICY],  # Sequential policies
+        switch_intervals=[1.0, 2.0],  # Switch at 1s and 2s
+        duration=3,  
+        video_name="tests/video_output/world_with_multiple_policies.mp4"
+    )
