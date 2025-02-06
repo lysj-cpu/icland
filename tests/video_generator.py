@@ -17,7 +17,7 @@ import os
 
 # N.B. These need to be before the mujoco imports
 # Fixes AttributeError: 'Renderer' object has no attribute '_mjr_context'
-os.environ["MUJOCO_GL"] = "egl"
+os.environ["MUJOCO_GL"] = "wgl"
 
 # Tell XLA to use Triton GEMM, this improves steps/sec by ~30% on some GPUs
 xla_flags = os.environ.get("XLA_FLAGS", "")
@@ -43,28 +43,34 @@ from icland.world_gen.tile_data import TILECODES
 
 SIMULATION_PRESETS: List[Dict[str, Any]] = [
     {
-        "name": "two_agent_move_collide",
-        "world": TWO_AGENT_EMPTY_WORLD_COLLIDE,
-        "policy": jnp.array([FORWARD_POLICY, BACKWARD_POLICY]),
-        "duration": 4,
-        "agent_count": 2,
-    },
-    {
-        "name": "two_agent_move_parallel",
-        "world": TWO_AGENT_EMPTY_WORLD,
-        "policy": jnp.array([FORWARD_POLICY, FORWARD_POLICY]),
-        "duration": 4,
-        "agent_count": 2,
-    },
-    {
-        "name": "empty_world",
-        "world": EMPTY_WORLD,
+        "name": "world_42_convex",
+        "world": WORLD_42_CONVEX,
         "policy": FORWARD_POLICY,
         "duration": 4,
     },
-    {"name": "ramp_30", "world": RAMP_30, "policy": FORWARD_POLICY, "duration": 4},
-    {"name": "ramp_45", "world": RAMP_45, "policy": FORWARD_POLICY, "duration": 4},
-    {"name": "ramp_60", "world": RAMP_60, "policy": FORWARD_POLICY, "duration": 4},
+    # {
+    #     "name": "two_agent_move_collide",
+    #     "world": TWO_AGENT_EMPTY_WORLD_COLLIDE,
+    #     "policy": jnp.array([FORWARD_POLICY, BACKWARD_POLICY]),
+    #     "duration": 4,
+    #     "agent_count": 2,
+    # },
+    # {
+    #     "name": "two_agent_move_parallel",
+    #     "world": TWO_AGENT_EMPTY_WORLD,
+    #     "policy": jnp.array([FORWARD_POLICY, FORWARD_POLICY]),
+    #     "duration": 4,
+    #     "agent_count": 2,
+    # },
+    # {
+    #     "name": "empty_world",
+    #     "world": EMPTY_WORLD,
+    #     "policy": FORWARD_POLICY,
+    #     "duration": 4,
+    # },
+    # {"name": "ramp_30", "world": RAMP_30, "policy": FORWARD_POLICY, "duration": 4},
+    # {"name": "ramp_45", "world": RAMP_45, "policy": FORWARD_POLICY, "duration": 4},
+    # {"name": "ramp_60", "world": RAMP_60, "policy": FORWARD_POLICY, "duration": 4},
 ]
 
 key = jax.random.PRNGKey(42)
@@ -131,30 +137,37 @@ def render_video_from_world(
     video_name: str,
 ) -> None:
     """Renders a video using SDF function."""
+    print(f"Sampling world with key {key}")
     model = sample_world(10, 10, 1000, key, True, 1)
+    print(f"Exporting tilemap")
     tilemap = export(model, TILECODES, 10, 10)
     pieces = create_world(tilemap)
     temp_dir = "temp"
-    export_stls(pieces, temp_dir)
+    print(f"Exporting stls")
+    export_stls(pieces, f"{temp_dir}/{temp_dir}")
     xml_str = __generate_mjcf_string(tilemap, f"{temp_dir}/")
+    print(f"Init mj model...")
     mj_model = mujoco.MjModel.from_xml_string(xml_str)
     icland_params = ICLandParams(model=mj_model, game=None, agent_count=1)
 
     icland_state = icland.init(key, icland_params)
     icland_state = icland.step(key, icland_state, None, policy)
+    print(f"Init mjX model and data...")
     mjx_model, mjx_data = icland_state.mjx_model, icland_state.mjx_data
     frames: List[Any] = []
-
+    print(f"Rendering...")
     while mjx_data.time < duration:
-        print(mjx_data.time)
+        # print(mjx_data.time)
         default_agent_1 = 0
-        default_agent_2 = 0
         icland_state = icland.step(key, icland_state, None, policy)
         mjx_data = icland_state.mjx_data
 
         if len(frames) < mjx_data.time * 30:
-            camera_pos, camera_dir = get_agent_camera_from_mjx(mjx_data, default_agent_1, default_agent_2)
-            f = render_frame(mjx_model, mjx_data, camera_pos, camera_dir, frames)
+            print("Agent pos:", mjx_data.xpos[icland_state.component_ids[0, 0]][:3])
+            camera_pos, camera_dir = get_agent_camera_from_mjx(
+                icland_state, tilemap, default_agent_1
+            )
+            f = render_frame(camera_pos, camera_dir, tilemap)
             frames.append(f)
 
     imageio.mimsave(video_name, frames, fps=30, quality=8)
@@ -204,11 +217,12 @@ def render_video(
 
     with mujoco.Renderer(mj_model) as renderer:
         while mjx_data.time < duration:
-            print(mjx_data.time)
+            # print(mjx_data.time)
             icland_state = icland.step(key, icland_state, None, policy)
             mjx_data = icland_state.mjx_data
             if len(third_person_frames) < mjx_data.time * 30:
                 mj_data = mjx.get_data(mj_model, mjx_data)
+                print("Agent pos:", mjx_data.xpos[icland_state.component_ids[0, 0]][:3])
                 mujoco.mjv_updateScene(
                     mj_model,
                     mj_data,
@@ -224,12 +238,12 @@ def render_video(
 
 
 if __name__ == "__main__":
-    render_video_from_world(key, FORWARD_POLICY, 3, "tests/video_output/world.mp4")
-    # for i, preset in enumerate(SIMULATION_PRESETS):
-    #     render_video(
-    #         preset["world"],
-    #         preset["policy"],
-    #         preset["duration"],
-    #         f"tests/video_output/{preset['name']}.mp4",
-    #         agent_count=preset.get("agent_count", 1),
-    #     )
+    # render_video_from_world(jax.random.PRNGKey(42), FORWARD_POLICY, 3, "tests/video_output/world.mp4")
+    for i, preset in enumerate(SIMULATION_PRESETS):
+        render_video(
+            preset["world"],
+            preset["policy"],
+            preset["duration"],
+            f"tests/video_output/{preset['name']}.mp4",
+            agent_count=preset.get("agent_count", 1),
+        )
