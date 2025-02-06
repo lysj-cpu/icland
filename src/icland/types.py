@@ -172,7 +172,7 @@ class ICLandParams(PyTreeNode):  # type: ignore[misc]
     """
 
     model: mujoco.MjModel
-    reward_function: Callable[[ICLandState], jax.Array]
+    reward_function: Callable[[ICLandInfo], jax.Array] | None
     agent_count: int
 
     # Without this, model is model=<mujoco._structs.MjModel object at 0x7b61fb18dc70>
@@ -194,14 +194,17 @@ class ICLandParams(PyTreeNode):  # type: ignore[misc]
             ICLandParams(model=MjModel, reward_function=lambda function(state), agent_count=1)
         """
         if (
-            hasattr(self.reward_function, "__name__")
+            self.reward_function
+            and hasattr(self.reward_function, "__name__")
             and self.reward_function.__name__ != "<lambda>"
         ):
             reward_function_name = self.reward_function.__name__
         else:
             reward_function_name = "lambda function"
 
-        reward_function_signature = str(inspect.signature(self.reward_function))
+        reward_function_signature = ""
+        if self.reward_function is not None:
+            reward_function_signature = str(inspect.signature(self.reward_function))
 
         return f"ICLandParams(model={type(self.model).__name__}, reward_function={reward_function_name}{reward_function_signature}, agent_count={self.agent_count})"
 

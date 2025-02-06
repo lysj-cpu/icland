@@ -98,7 +98,7 @@ def render_video(
     )
 
     icland_state = icland.init(key, icland_params)
-    icland_state = icland.step(key, icland_state, None, policy)
+    icland_state = icland.step(key, icland_state, icland_params, policy)
     mjx_data = icland_state.pipeline_state.mjx_data
 
     third_person_frames: List[Any] = []
@@ -124,7 +124,7 @@ def render_video(
             if int(mjx_data.time * 10) != int(last_printed_time * 10):
                 print(f"Time: {mjx_data.time:.1f}")
                 last_printed_time = mjx_data.time
-            icland_state = icland.step(key, icland_state, None, policy)
+            icland_state = icland.step(key, icland_state, icland_params, policy)
             mjx_data = icland_state.pipeline_state.mjx_data
             if len(third_person_frames) < mjx_data.time * 30:
                 mj_data = mjx.get_data(mj_model, mjx_data)

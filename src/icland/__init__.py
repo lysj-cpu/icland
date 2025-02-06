@@ -117,14 +117,11 @@ def init(key: jax.Array, params: ICLandParams) -> ICLandState:
         jnp.zeros((agent_count, AGENT_OBSERVATION_DIM)),
         jnp.zeros((agent_count, AGENT_OBSERVATION_DIM)),
         jnp.zeros((agent_count, AGENT_OBSERVATION_DIM)),
-        # jnp.zeros((agent_count, AGENT_OBSERVATION_DIM)),
-        # jnp.zeros((agent_count, AGENT_OBSERVATION_DIM)),
         {},
         collect_body_scene_info(agent_components, mjx_data),
     )
 
 
-# TODO: Original implementation had both mj_model and mjx_model - can we only use one?
 def collect_agent_components(mj_model: mujoco.MjModel, agent_count: int) -> jnp.ndarray:
     """Collect object IDs for all agents."""
     agent_components = jnp.empty(
@@ -174,13 +171,15 @@ def step(
         >>> params = sample(key)
         >>> state = init(key, params)
         >>> step(key, state, params, forward_policy)
-        ICLandState(pipeline_state=PipelineState(mjx_model=Model, mjx_data=Data, component_ids=[[1 1 0]]), observation=[[0.]], reward=[[0.]], done=[[0.]], metrics={}, info=ICLandInfo(agent_positions=Array([[0. , 0. , 0.5]], dtype=float32), agent_velocities=Array([[ 0.2    ,  0.     , -0.01962,  0.     ]], dtype=float32), agent_rotations=Array([0.], dtype=float32)))
+        ICLandState(pipeline_state=PipelineState(mjx_model=Model, mjx_data=Data, component_ids=[[1 1 0]]), observation=[[0.]], reward=[[0]], done=[[0.]], metrics={}, info=ICLandInfo(agent_positions=Array([[0. , 0. , 0.5]], dtype=float32), agent_velocities=Array([[ 0.2    ,  0.     , -0.01962,  0.     ]], dtype=float32), agent_rotations=Array([0.], dtype=float32)))
     """
     # Unpack state
     pipeline_state = state.pipeline_state
 
     mjx_model = pipeline_state.mjx_model
     mjx_data = pipeline_state.mjx_data
+    reward_function = params.reward_function
+
     agent_components = pipeline_state.component_ids
 
     # Ensure actions are in the correct shape
@@ -217,13 +216,11 @@ def step(
 
     # TO BE ADDED
     observations = jnp.zeros((agent_components.shape[0], AGENT_OBSERVATION_DIM))
-    rewards = jnp.zeros((agent_components.shape[0], AGENT_OBSERVATION_DIM))
     done = jnp.zeros((agent_components.shape[0], AGENT_OBSERVATION_DIM))
-    # metrics = jnp.zeros((agent_components.shape[0], AGENT_OBSERVATION_DIM))
-    # infos = jnp.zeros((agent_components.shape[0], AGENT_OBSERVATION_DIM))
     metrics: dict[str, jax.Array] = {}
-    infos: dict[str, jax.Array] = collect_body_scene_info(
-        agent_components, updated_data
-    )
-
+    infos = collect_body_scene_info(agent_components, updated_data)
+    if reward_function is None:
+        rewards = jnp.zeros((agent_components.shape[0], AGENT_OBSERVATION_DIM))
+    else:
+        rewards = reward_function(infos)
     return ICLandState(new_pipeline_state, observations, rewards, done, metrics, infos)

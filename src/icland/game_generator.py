@@ -59,7 +59,7 @@ def generate_game(
         # Calculate the distance between the agent and the target
         agent_rotation = info.agent_rotations
 
-        print(agent_rotation, target_rotation)
+        # print(agent_rotation, target_rotation)
 
         distance = jnp.abs(agent_rotation - target_rotation)
 

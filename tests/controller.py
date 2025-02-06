@@ -109,7 +109,9 @@ def interactive_simulation() -> None:
                 print(f"Time {mjx_data.time:.2f}: {current_policy}")
 
             # Step the simulation using the current_policy.
-            icland_state = icland.step(jax_key, icland_state, None, current_policy)
+            icland_state = icland.step(
+                jax_key, icland_state, icland_params, current_policy
+            )
             # (Optional) Update the JAX random key.
             jax_key, _ = jax.random.split(jax_key)
 

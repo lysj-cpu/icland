@@ -1,6 +1,6 @@
 """This module contains functions for simulating agent behavior in a physics environment."""
 
-from typing import Any, Dict
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -219,7 +219,7 @@ def step_agent(
 @jax.jit
 def collect_body_scene_info(
     component_ids: jnp.ndarray, mjx_data: MjxStateType
-) -> Dict[str, jnp.ndarray]:
+) -> ICLandInfo:
     """Collects information about the bodies in the scene including position and rotation.
 
     Args:
