@@ -41,15 +41,45 @@ class ICLand(Env):  # type: ignore[misc]
 
     @property
     def observation_size(self) -> ObservationSize:
-        """The size of the observation vector returned in step and reset."""
+        """The size of the observation vector returned in step and reset.
+
+        Examples:
+            >>> from icland.brax_env import ICLand
+            >>> import jax
+            >>> from brax.envs import get_environment, register_environment
+            >>> register_environment("icland", ICLand)
+            >>> env = get_environment("icland", rng=jax.random.key(42))
+            >>> env.observation_size
+            1
+        """
         return icland.AGENT_OBSERVATION_DIM
 
     @property
     def action_size(self) -> int:
-        """The size of the action vector expected by step."""
+        """The size of the action vector expected by step.
+
+        Examples:
+            >>> from icland.brax_env import ICLand
+            >>> import jax
+            >>> from brax.envs import get_environment, register_environment
+            >>> register_environment("icland", ICLand)
+            >>> env = get_environment("icland", rng=jax.random.key(42))
+            >>> env.action_size
+            3
+        """
         return icland.AGENT_ACTION_SPACE_DIM
 
     @property
     def backend(self) -> str:
-        """The physics backend that this env was instantiated with."""
+        """The physics backend that this env was instantiated with.
+
+        Examples:
+            >>> from icland.brax_env import ICLand
+            >>> import jax
+            >>> from brax.envs import get_environment, register_environment
+            >>> register_environment("icland", ICLand)
+            >>> env = get_environment("icland", rng=jax.random.key(42))
+            >>> env.backend
+            'jax'
+        """
         return "jax"
