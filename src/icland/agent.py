@@ -4,12 +4,15 @@ from typing import Any, Dict
 
 import jax
 import jax.numpy as jnp
+import mujoco
 
 from .constants import *
 from .types import *
 
 
-def create_agent(id: int, pos: jax.Array, specification: mujoco.MjSpec) -> jnp.ndarray:
+def create_agent(
+    id: int, pos: jax.Array, specification: mujoco.MjSpec
+) -> mujoco.MjSpec:
     """Create an agent in the physics environment.
 
     Args:
@@ -215,7 +218,7 @@ def step_agent(
 
 @jax.jit
 def collect_body_scene_info(
-    component_ids: jnp.ndarray, mjx_data
+    component_ids: jnp.ndarray, mjx_data: MjxStateType
 ) -> Dict[str, jnp.ndarray]:
     """Collects information about the bodies in the scene including position and rotation.
 

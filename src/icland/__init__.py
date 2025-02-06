@@ -51,8 +51,8 @@ def sample(key: jax.Array) -> ICLandParams:
         ICLandParams(model=MjModel, reward_function=<function sample.<locals>.<lambda> at 0x...>, agent_count=1)
     """
     # Sample the number of agents in the environment
-    agent_count: int = jax.random.randint(
-        key, (), WORL_MIN_AGENT_COUNT, WORLD_MAX_AGENT_COUNT
+    agent_count = int(
+        jax.random.randint(key, (), WORL_MIN_AGENT_COUNT, WORLD_MAX_AGENT_COUNT)
     )
 
     # Create the Mujoco model
@@ -68,7 +68,9 @@ def sample(key: jax.Array) -> ICLandParams:
 
     # Add the agents
     for agent_id in range(agent_count):
-        specification = create_agent(agent_id, [agent_id, 0, 0.5], specification)
+        specification = create_agent(
+            agent_id, jnp.array([agent_id, 0, 0.5]), specification
+        )
 
     # Compile the Mujoco model
     mj_model: mujoco.MjModel = specification.compile()
