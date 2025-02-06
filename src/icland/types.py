@@ -165,7 +165,18 @@ class ICLandParams(PyTreeNode):  # type: ignore[misc]
     # For some arbitrary memory address. __repr__ provides cleaner output
     # for users and for testing.
     def __repr__(self) -> str:
-        """Return a string representation of the ICLandParams object."""
+        """Return a string representation of the ICLandParams object.
+
+        Examples:
+            >>> from icland.types import ICLandParams, ICLandState
+            >>> import mujoco
+            >>> import jax
+            >>> mj_model = mujoco.MjModel.from_xml_string("<mujoco/>")
+            >>> def example_reward_function(state: ICLandState) -> jax.Array:
+            ...     return jax.numpy.array(0)
+            >>> ICLandParams(mj_model, None, 1, example_reward_function)
+            ICLandParams(model=MjModel, game=None, agent_count=1, reward_function=example_reward_function(state: icland.types.ICLandState) -> jax.Array)
+        """
         if (
             hasattr(self.reward_function, "__name__")
             and self.reward_function.__name__ != "<lambda>"
