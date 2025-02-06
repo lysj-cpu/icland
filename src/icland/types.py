@@ -5,6 +5,7 @@ It includes types for model parameters, state, and action sets used in the proje
 
 from typing import Optional, TypeAlias
 
+import jax
 import jax.numpy as jnp
 import mujoco
 from mujoco.mjx._src.dataclasses import PyTreeNode
@@ -38,7 +39,7 @@ class ICLandParams(PyTreeNode):  # type: ignore[misc]
         return f"ICLandParams(model={type(self.model).__name__}, game={self.game}, agent_count={self.agent_count})"
 
 
-class ICLandState(PyTreeNode):  # type: ignore[misc]
+class PipelineState(PyTreeNode):  # type: ignore[misc]
     r"""\State of the ICLand environment.
 
     Attributes:
@@ -50,3 +51,23 @@ class ICLandState(PyTreeNode):  # type: ignore[misc]
     mjx_model: MjxModelType
     mjx_data: MjxStateType
     component_ids: jnp.ndarray
+
+
+class ICLandState(PyTreeNode):  # type: ignore[misc]
+    r"""\Information regarding the current step.
+
+    Attributes:
+        pipeline_state: State of the ICLand environment.
+        observation: Observation of the environment.
+        reward: Reward of the environment.
+        done: Flag indicating if the episode is done.
+        metrics: Dictionary of metrics for the environment.
+        info: Dictionary of additional information.
+    """
+
+    pipeline_state: PipelineState
+    observation: jax.Array
+    reward: jax.Array
+    done: jax.Array
+    metrics: jax.Array  # These were Dict[str, jax.Array] = struct.field(default_factory=dict) but we need to install flax
+    info: jax.Array  # These were Dict[str, Any] = struct.field(default_factory=dict) but we need to install flax

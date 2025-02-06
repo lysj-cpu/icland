@@ -1,4 +1,4 @@
-from functools import partial
+from functools import partial  # noqa: D100
 from typing import Any, List, Tuple
 
 import imageio
@@ -6,7 +6,6 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from jax._src import pjit
-from mujoco.mjx._src.types import Data as MjxData
 
 from icland.renderer.sdfs import box_sdf, ramp_sdf
 from icland.types import ICLandState
@@ -281,27 +280,32 @@ def render_frame(
     return frame.reshape((view_height, view_width, NUM_CHANNELS))
 
 
-@partial(jax.jit, static_argnames=["camera_height", "camera_offset"])
+transform_axes = jnp.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]])
+
+
 def get_agent_camera_from_mjx(
     icland_state: ICLandState,
-    tilemap: jax.Array,
+    world_width: int,
     body_id_1: int,
     camera_height: float = 0.2,
     camera_offset: float = 0.06,
 ) -> Tuple[jax.Array, jax.Array]:
     """Get the camera position and direction from the MuJoCo data."""
-    data = icland_state.mjx_data
-    agent_id = icland_state.component_ids[body_id_1, 0]
-    transform_axes = jnp.array([
-        [-1, 0, 0],
-        [0, 0, 1],
-        [0, 1, 0]])
-    agent_pos = jnp.matmul(transform_axes, data.xpos[agent_id][:3]) + jnp.array(
-        [tilemap.shape[0], 0, 0]
-    )  # assuming the first three values are x, y, z coords
+    data = icland_state.pipeline_state.mjx_data
+    agent_id = icland_state.pipeline_state.component_ids[body_id_1, 0]
+
+    agent_pos = jnp.array(
+        [
+            -data.xpos[agent_id][0] + world_width,
+            data.xpos[agent_id][2],
+            data.xpos[agent_id][1],
+        ]
+    )
+
+    # Direct matrix multiplication using precomputed transform_axes
     yaw = data.qpos[3]
     forward_dir = jnp.array([-jnp.cos(yaw), 0.0, jnp.sin(yaw)])
-    height_offset = jnp.matmul(transform_axes, jnp.array([0, camera_height, 0]))
+    height_offset = jnp.array([0, camera_height, 0])
     camera_pos = agent_pos + height_offset + forward_dir * camera_offset
     camera_dir = forward_dir  # forward facing camera
 

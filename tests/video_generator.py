@@ -18,6 +18,7 @@ import os
 # N.B. These need to be before the mujoco imports
 # Fixes AttributeError: 'Renderer' object has no attribute '_mjr_context'
 os.environ["MUJOCO_GL"] = "wgl"
+os.environ["MUJOCO_GL"] = "wgl"
 
 # Tell XLA to use Triton GEMM, this improves steps/sec by ~30% on some GPUs
 xla_flags = os.environ.get("XLA_FLAGS", "")
@@ -42,12 +43,9 @@ from icland.world_gen.JITModel import export, sample_world
 from icland.world_gen.tile_data import TILECODES
 
 SIMULATION_PRESETS: List[Dict[str, Any]] = [
-    {
-        "name": "world_42_convex",
-        "world": WORLD_42_CONVEX,
-        "policy": FORWARD_POLICY,
-        "duration": 4,
-    },
+    # {"name": "ramp_60", "world": RAMP_60, "policy": FORWARD_POLICY, "duration": 4},
+    # {"name": "ramp_30", "world": RAMP_30, "policy": FORWARD_POLICY, "duration": 4},
+    # {"name": "ramp_45", "world": RAMP_45, "policy": FORWARD_POLICY, "duration": 4},
     # {
     #     "name": "two_agent_move_collide",
     #     "world": TWO_AGENT_EMPTY_WORLD_COLLIDE,
@@ -55,6 +53,12 @@ SIMULATION_PRESETS: List[Dict[str, Any]] = [
     #     "duration": 4,
     #     "agent_count": 2,
     # },
+    {
+        "name": "world_42_convex",
+        "world": WORLD_42_CONVEX,
+        "policy": FORWARD_POLICY,
+        "duration": 4,
+    },
     # {
     #     "name": "two_agent_move_parallel",
     #     "world": TWO_AGENT_EMPTY_WORLD,
@@ -86,7 +90,7 @@ def __generate_mjcf_string(  # pragma: no cover
     mjcf = f"""<mujoco model=\"generated_mesh_world\">
     <compiler meshdir=\"{mesh_dir}\"/>
     <default>
-        <geom type=\"mesh\" contype=\"0\" conaffinity=\"0\"/>
+        <geom type=\"mesh\" />
     </default>
     
     <worldbody>\n"""
@@ -153,21 +157,33 @@ def render_video_from_world(
     icland_state = icland.init(key, icland_params)
     icland_state = icland.step(key, icland_state, None, policy)
     print(f"Init mjX model and data...")
-    mjx_model, mjx_data = icland_state.mjx_model, icland_state.mjx_data
+    mjx_data = icland_state.pipeline_state.mjx_data
     frames: List[Any] = []
-    print(f"Rendering...")
-    while mjx_data.time < duration:
-        # print(mjx_data.time)
-        default_agent_1 = 0
-        icland_state = icland.step(key, icland_state, None, policy)
-        mjx_data = icland_state.mjx_data
 
+    print(f"Starting simulation: {video_name}")
+    last_printed_time = -0.1
+
+    default_agent_1 = 0
+    world_width = tilemap.shape[1]
+    print(f"Rendering...")
+    get_camera_info = jax.jit(get_agent_camera_from_mjx)
+    while mjx_data.time < duration:
+        if int(mjx_data.time * 10) != int(last_printed_time * 10):
+            print(f"Time: {mjx_data.time:.1f}")
+            last_printed_time = mjx_data.time
+        icland_state = icland.step(key, icland_state, None, policy)
+        mjx_data = icland_state.pipeline_state.mjx_data
         if len(frames) < mjx_data.time * 30:
-            print("Agent pos:", mjx_data.xpos[icland_state.component_ids[0, 0]][:3])
-            camera_pos, camera_dir = get_agent_camera_from_mjx(
-                icland_state, tilemap, default_agent_1
+            print(
+                "Agent pos:",
+                mjx_data.xpos[icland_state.pipeline_state.component_ids[0, 0]][:3],
             )
+            camera_pos, camera_dir = get_camera_info(
+                icland_state, world_width, default_agent_1
+            )
+            print("Got camera angle")
             f = render_frame(camera_pos, camera_dir, tilemap)
+            print("Rendered frame")
             frames.append(f)
 
     imageio.mimsave(video_name, frames, fps=30, quality=8)
@@ -198,7 +214,7 @@ def render_video(
 
     icland_state = icland.init(key, icland_params)
     icland_state = icland.step(key, icland_state, None, policy)
-    mjx_data = icland_state.mjx_data
+    mjx_data = icland_state.pipeline_state.mjx_data
 
     third_person_frames: List[Any] = []
 
@@ -206,7 +222,7 @@ def render_video(
     mujoco.mjv_defaultCamera(cam)
 
     cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
-    cam.trackbodyid = icland_state.component_ids[0, 0]
+    cam.trackbodyid = icland_state.pipeline_state.component_ids[0, 0]
     cam.distance = 1.5
     cam.azimuth = 90.0
     cam.elevation = -40.0
@@ -215,14 +231,22 @@ def render_video(
     opt.flags[mujoco.mjtVisFlag.mjVIS_JOINT] = True
     opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = True
 
+    print(f"Starting simulation: {video_name}")
+    last_printed_time = -0.1
+
     with mujoco.Renderer(mj_model) as renderer:
         while mjx_data.time < duration:
-            # print(mjx_data.time)
+            if int(mjx_data.time * 10) != int(last_printed_time * 10):
+                print(f"Time: {mjx_data.time:.1f}")
+                last_printed_time = mjx_data.time
             icland_state = icland.step(key, icland_state, None, policy)
-            mjx_data = icland_state.mjx_data
+            mjx_data = icland_state.pipeline_state.mjx_data
             if len(third_person_frames) < mjx_data.time * 30:
                 mj_data = mjx.get_data(mj_model, mjx_data)
-                print("Agent pos:", mjx_data.xpos[icland_state.component_ids[0, 0]][:3])
+                print(
+                    "Agent pos:",
+                    mjx_data.xpos[icland_state.pipeline_state.component_ids[0, 0]][:3],
+                )
                 mujoco.mjv_updateScene(
                     mj_model,
                     mj_data,
@@ -238,7 +262,9 @@ def render_video(
 
 
 if __name__ == "__main__":
-    # render_video_from_world(jax.random.PRNGKey(42), FORWARD_POLICY, 3, "tests/video_output/world.mp4")
+    # render_video_from_world(
+    #     key, FORWARD_POLICY, 3, "tests/video_output/world_convex_42_mjx.mp4"
+    # )
     for i, preset in enumerate(SIMULATION_PRESETS):
         render_video(
             preset["world"],
