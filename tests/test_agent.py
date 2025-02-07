@@ -46,7 +46,7 @@ def test_agent_translation(
     initial_pos = pipeline_state.mjx_data.xpos[body_id][:2]
 
     # Step the environment to update the agents velocty
-    icland_state = icland.step(key, icland_state, icland_params, policy)
+    icland_state = icland.step(key, icland_state, None, policy)
     pipeline_state = icland_state.pipeline_state
 
     # Check if the correct velocity was applied
@@ -59,7 +59,7 @@ def test_agent_translation(
     )
 
     # Step the environment to update the agents position via the velocity
-    icland_state = icland.step(key, icland_state, icland_params, NOOP_POLICY)
+    icland_state = icland.step(key, icland_state, None, NOOP_POLICY)
     pipeline_state = icland_state.pipeline_state
 
     # Get new position
@@ -101,7 +101,7 @@ def test_agent_rotation(
     initial_orientation = pipeline_state.mjx_data.qpos[3]
 
     # Step the environment to update the agents angular velocity
-    icland_state = icland.step(key, icland_state, icland_params, policy)
+    icland_state = icland.step(key, icland_state, None, policy)
     pipeline_state = icland_state.pipeline_state
 
     # Get new orientation
@@ -133,7 +133,7 @@ def test_two_agents(key: jax.Array, name: str, policies: jnp.ndarray) -> None:
 
     # Simulate 2 seconds
     while pipeline_state.mjx_data.time < 2:
-        icland_state = icland.step(key, icland_state, icland_params, policies)
+        icland_state = icland.step(key, icland_state, None, policies)
         pipeline_state = icland_state.pipeline_state
 
     # Get the positions of the two agents
@@ -142,7 +142,7 @@ def test_two_agents(key: jax.Array, name: str, policies: jnp.ndarray) -> None:
     agent_2_pos = pipeline_state.mjx_data.xpos[body_id_2][:2]
 
     # Simulate one more step.
-    icland_state = icland.step(key, icland_state, icland_params, NOOP_POLICY)
+    icland_state = icland.step(key, icland_state, None, NOOP_POLICY)
     pipeline_state = icland_state.pipeline_state
 
     agent_1_new_pos = pipeline_state.mjx_data.xpos[body_id_1][:2]

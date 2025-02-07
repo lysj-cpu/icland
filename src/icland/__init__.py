@@ -48,7 +48,7 @@ def sample(key: jax.Array) -> ICLandParams:
         >>> import jax
         >>> key = jax.random.key(42)
         >>> sample(key)
-        ICLandParams(model=MjModel, reward_function=rotation_reward_function(info: icland.types.ICLandInfo) -> jax.Array, agent_count=1)
+        ICLandParams(model=MjModel, reward_function=reward_function(info: icland.types.ICLandInfo) -> jax.Array, agent_count=1)
     """
     # Sample the number of agents in the environment
     agent_count = int(
@@ -97,7 +97,7 @@ def init(key: jax.Array, params: ICLandParams) -> ICLandState:
         >>> key = jax.random.key(42)
         >>> params = sample(key)
         >>> init(key, params)
-        ICLandState(pipeline_state=PipelineState(mjx_model=Model, mjx_data=Data, component_ids=[[1 1 0]]), observation=[[0.]], reward=[[0.]], done=[[0.]], metrics={}, info=ICLandInfo(agent_positions=Array([[0., 0., 0.]], dtype=float32), agent_velocities=Array([[0., 0., 0., 0.]], dtype=float32), agent_rotations=Array([0.], dtype=float32)))
+        ICLandState(pipeline_state=PipelineState(mjx_model=Model, mjx_data=Data, component_ids=[[1 1 0]]), observation=[0. 0. 0. 0.], data=ICLandInfo(...))
     """
     # Unpack params
     mj_model = params.model
@@ -109,15 +109,11 @@ def init(key: jax.Array, params: ICLandParams) -> ICLandState:
     mjx_data = mjx.put_data(mj_model, mj_data)
 
     agent_components = collect_agent_components(mj_model, agent_count)
-
     pipeline_state = PipelineState(mjx_model, mjx_data, agent_components)
 
     return ICLandState(
         pipeline_state,
-        jnp.zeros((agent_count, AGENT_OBSERVATION_DIM)),
-        jnp.zeros((agent_count, AGENT_OBSERVATION_DIM)),
-        jnp.zeros((agent_count, AGENT_OBSERVATION_DIM)),
-        {},
+        jnp.zeros(AGENT_OBSERVATION_DIM),
         collect_body_scene_info(agent_components, mjx_data),
     )
 
@@ -171,14 +167,13 @@ def step(
         >>> params = sample(key)
         >>> state = init(key, params)
         >>> step(key, state, params, forward_policy)
-        ICLandState(pipeline_state=PipelineState(mjx_model=Model, mjx_data=Data, component_ids=[[1 1 0]]), observation=[[0.]], reward=[[0]], done=[[0.]], metrics={}, info=ICLandInfo(agent_positions=Array([[0. , 0. , 0.5]], dtype=float32), agent_velocities=Array([[ 0.2    ,  0.     , -0.01962,  0.     ]], dtype=float32), agent_rotations=Array([0.], dtype=float32)))
+        ICLandState(pipeline_state=PipelineState(mjx_model=Model, mjx_data=Data, component_ids=[[1 1 0]]), observation=[ 4.0000002e-04  0.0000000e+00 -3.9240003e-05  0.0000000e+00], data=ICLandInfo(...))
     """
     # Unpack state
     pipeline_state = state.pipeline_state
 
     mjx_model = pipeline_state.mjx_model
     mjx_data = pipeline_state.mjx_data
-    reward_function = params.reward_function
 
     agent_components = pipeline_state.component_ids
 
@@ -213,14 +208,7 @@ def step(
     # Step the environment after applying all agent actions
     updated_data = mjx.step(mjx_model, updated_data)
     new_pipeline_state = PipelineState(mjx_model, updated_data, agent_components)
+    data: ICLandInfo = collect_body_scene_info(agent_components, mjx_data)
+    observation = updated_data.qpos
 
-    # TO BE ADDED
-    observations = jnp.zeros((agent_components.shape[0], AGENT_OBSERVATION_DIM))
-    done = jnp.zeros((agent_components.shape[0], AGENT_OBSERVATION_DIM))
-    metrics: dict[str, jax.Array] = {}
-    infos = collect_body_scene_info(agent_components, updated_data)
-    if reward_function is None:
-        rewards = jnp.zeros((agent_components.shape[0], AGENT_OBSERVATION_DIM))
-    else:
-        rewards = reward_function(infos)
-    return ICLandState(new_pipeline_state, observations, rewards, done, metrics, infos)
+    return ICLandState(new_pipeline_state, observation, data)
