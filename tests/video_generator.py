@@ -298,7 +298,7 @@ def render_video_from_world_with_policies(
     temp_dir = "temp"
     export_stls(pieces, f"{temp_dir}/{temp_dir}")
     
-    xml_str = __generate_mjcf_string(tilemap, (1.5, 1, 4), f"{temp_dir}/")
+    xml_str = __generate_mjcf_string(tilemap, jnp.array([[1.5, 1, 4]]), f"{temp_dir}/")
     mj_model = mujoco.MjModel.from_xml_string(xml_str)
     icland_params = ICLandParams(model=mj_model, game=None, agent_count=1)
 
