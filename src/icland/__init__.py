@@ -9,7 +9,7 @@ if shutil.which("nvidia-smi") is None:
 else:
     # N.B. These need to be before the mujoco imports
     # Fixes AttributeError: 'Renderer' object has no attribute '_mjr_context'
-    os.environ["MUJOCO_GL"] = "wgl"
+    os.environ["MUJOCO_GL"] = "egl"
 
     # Tell XLA to use Triton GEMM, this can improve steps/sec by ~30% on some GPUs
     xla_flags = os.environ.get("XLA_FLAGS", "")

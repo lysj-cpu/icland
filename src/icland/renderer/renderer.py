@@ -286,13 +286,13 @@ transform_axes = jnp.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]])
 def get_agent_camera_from_mjx(
     icland_state: ICLandState,
     world_width: int,
-    body_id_1: int,
+    body_id: int,
     camera_height: float = 0.2,
     camera_offset: float = 0.06,
 ) -> Tuple[jax.Array, jax.Array]:
     """Get the camera position and direction from the MuJoCo data."""
     data = icland_state.pipeline_state.mjx_data
-    agent_id = icland_state.pipeline_state.component_ids[body_id_1, 0]
+    agent_id = icland_state.pipeline_state.component_ids[body_id, 0]
 
     agent_pos = jnp.array(
         [
@@ -307,9 +307,8 @@ def get_agent_camera_from_mjx(
     forward_dir = jnp.array([-jnp.cos(yaw), 0.0, jnp.sin(yaw)])
     height_offset = jnp.array([0, camera_height, 0])
     camera_pos = agent_pos + height_offset + forward_dir * camera_offset
-    camera_dir = forward_dir  # forward facing camera
 
-    return camera_pos, camera_dir
+    return camera_pos, forward_dir
 
 
 if __name__ == "__main__":  # pragma: no cover
