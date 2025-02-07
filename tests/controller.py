@@ -25,7 +25,6 @@ xla_flags = os.environ.get("XLA_FLAGS", "")
 xla_flags += " --xla_gpu_triton_gemm_any=True"
 os.environ["XLA_FLAGS"] = xla_flags
 
-from typing import Any, Dict, List
 
 import cv2  # For displaying frames and capturing window events.
 import jax
@@ -35,37 +34,18 @@ import mujoco
 
 # Import your policies and worlds from your assets.
 from assets.policies import *
-from assets.worlds import RAMP_30  # You can choose any world you like.
 from mujoco import mjx
 
 import icland
 from icland.types import *
 
-# (Optional) A list of simulation presets; here we just pick one for interactivity.
-SIMULATION_PRESETS: List[Dict[str, Any]] = [
-    {
-        "name": "ramp_30",
-        "world": RAMP_30,
-        "policy": FORWARD_POLICY,  # This default will be overridden interactively.
-        "duration": 30,  # Duration in seconds (or you can let it run until quit)
-        "agent_count": 1,
-    },
-]
 
-
-def interactive_simulation(model_xml: str, duration: int, agent_count: int = 1) -> None:
-    """Runs an interactive simulation where you can change the agent's policy via keyboard input.
-
-    Args:
-        model_xml (str): XML string defining the MuJoCo model.
-        duration (int): Maximum duration (in seconds) to run the simulation.
-        agent_count (int): Number of agents in the simulation.
-    """
+def interactive_simulation() -> None:
+    """Runs an interactive simulation where you can change the agent's policy via keyboard input."""
     # Create the MuJoCo model from the XML string.
-    mj_model = mujoco.MjModel.from_xml_string(model_xml)
+    icland_params = icland.sample(jax.random.PRNGKey(42))
+    mj_model = icland_params.model
 
-    # Set up the simulation parameters.
-    icland_params = ICLandParams(model=mj_model, game=None, agent_count=agent_count)
     jax_key = jax.random.PRNGKey(42)
     icland_state = icland.init(jax_key, icland_params)
 
@@ -101,9 +81,6 @@ def interactive_simulation(model_xml: str, duration: int, agent_count: int = 1) 
 
             # Stop if simulation time exceeds the duration.
             mjx_data = icland_state.pipeline_state.mjx_data
-            if mjx_data.time >= duration:
-                print("Reached maximum duration.")
-                break
 
             # Quit if 'q' is pressed.
             if keyboard.is_pressed("q"):
@@ -132,7 +109,9 @@ def interactive_simulation(model_xml: str, duration: int, agent_count: int = 1) 
                 print(f"Time {mjx_data.time:.2f}: {current_policy}")
 
             # Step the simulation using the current_policy.
-            icland_state = icland.step(jax_key, icland_state, None, current_policy)
+            icland_state = icland.step(
+                jax_key, icland_state, icland_params, current_policy
+            )
             # (Optional) Update the JAX random key.
             jax_key, _ = jax.random.split(jax_key)
 
@@ -164,11 +143,4 @@ def interactive_simulation(model_xml: str, duration: int, agent_count: int = 1) 
 
 
 if __name__ == "__main__":
-    # For this example, we choose the first preset.
-    preset = SIMULATION_PRESETS[0]
-    print(f"Running preset: {preset['name']}")
-    interactive_simulation(
-        preset["world"],
-        preset["duration"],
-        agent_count=preset.get("agent_count", 1),
-    )
+    interactive_simulation()

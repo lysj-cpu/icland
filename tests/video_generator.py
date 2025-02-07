@@ -38,9 +38,6 @@ import icland
 from icland.types import *
 
 SIMULATION_PRESETS: List[Dict[str, Any]] = [
-    {"name": "ramp_60", "world": RAMP_60, "policy": FORWARD_POLICY, "duration": 4},
-    {"name": "ramp_30", "world": RAMP_30, "policy": FORWARD_POLICY, "duration": 4},
-    {"name": "ramp_45", "world": RAMP_45, "policy": FORWARD_POLICY, "duration": 4},
     {
         "name": "two_agent_move_collide",
         "world": TWO_AGENT_EMPTY_WORLD_COLLIDE,
@@ -48,6 +45,9 @@ SIMULATION_PRESETS: List[Dict[str, Any]] = [
         "duration": 4,
         "agent_count": 2,
     },
+    {"name": "ramp_30", "world": RAMP_30, "policy": FORWARD_POLICY, "duration": 4},
+    {"name": "ramp_60", "world": RAMP_60, "policy": FORWARD_POLICY, "duration": 4},
+    {"name": "ramp_45", "world": RAMP_45, "policy": FORWARD_POLICY, "duration": 4},
     {
         "name": "world_42_convex",
         "world": WORLD_42_CONVEX,
@@ -93,10 +93,12 @@ def render_video(
     """
     mj_model = mujoco.MjModel.from_xml_string(model_xml)
 
-    icland_params = ICLandParams(model=mj_model, game=None, agent_count=agent_count)
+    icland_params = ICLandParams(
+        model=mj_model, reward_function=None, agent_count=agent_count
+    )
 
     icland_state = icland.init(key, icland_params)
-    icland_state = icland.step(key, icland_state, None, policy)
+    icland_state = icland.step(key, icland_state, icland_params, policy)
     mjx_data = icland_state.pipeline_state.mjx_data
 
     third_person_frames: List[Any] = []
@@ -122,7 +124,7 @@ def render_video(
             if int(mjx_data.time * 10) != int(last_printed_time * 10):
                 print(f"Time: {mjx_data.time:.1f}")
                 last_printed_time = mjx_data.time
-            icland_state = icland.step(key, icland_state, None, policy)
+            icland_state = icland.step(key, icland_state, icland_params, policy)
             mjx_data = icland_state.pipeline_state.mjx_data
             if len(third_person_frames) < mjx_data.time * 30:
                 mj_data = mjx.get_data(mj_model, mjx_data)
