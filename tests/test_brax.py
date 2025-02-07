@@ -11,9 +11,9 @@ from assets.worlds import EMPTY_WORLD, TWO_AGENT_EMPTY_WORLD
 from brax.envs import get_environment, register_environment
 from brax.mjx.base import State as mjx_state
 
-from icland.brax_env import ICLand
+from icland.brax_env import ICLand, ICLandBraxState
 from icland.constants import SMALL_VALUE
-from icland.types import ICLandBraxState, ICLandParams
+from icland.types import ICLandParams
 
 
 @pytest.fixture(params=[EMPTY_WORLD, TWO_AGENT_EMPTY_WORLD])
@@ -25,16 +25,15 @@ def env(
     register_environment("icland", ICLand)
     mj_model = mujoco.MjModel.from_xml_string(world)
     agent_count = 1 if world == EMPTY_WORLD else 2
-    icland_params = ICLandParams(mj_model, None, agent_count)
+    icland_params = ICLandParams(mj_model, lambda x: [[0]], agent_count)
     env = get_environment("icland", rng=jax.random.key(42), params=icland_params)
 
     jit_reset = jax.jit(env.reset)
     jit_step = jax.jit(env.step)
 
     state: ICLandBraxState = jit_reset(jax.random.PRNGKey(0))
-    pipeline_state = state.pipeline_state
 
-    return jit_step, state, pipeline_state
+    return jit_step, state
 
 
 @pytest.mark.parametrize(
@@ -49,24 +48,25 @@ def env(
     indirect=["env"],
 )
 def test_agent_translation(
-    env: tuple[jax._src.pjit.JitWrapped, ICLandBraxState, mjx_state],
+    env: tuple[jax._src.pjit.JitWrapped, ICLandBraxState],
     name: str,
     policy: jnp.ndarray,
     expected_direction: jnp.ndarray,
 ) -> None:
     """Test agent movement in ICLand Brax environment."""
-    jit_step, state, pipeline_state = env
-    body_id = state.component_ids[0, 0]
+    jit_step, state = env
+    body_id = state.ic_state.pipeline_state.component_ids[0, 0]
+    pipeline_state = state.ic_state.pipeline_state
 
     # Get initial position, without height
-    initial_pos = pipeline_state.xpos[body_id][:2]
+    initial_pos = pipeline_state.mjx_data.xpos[body_id][:2]
 
     # Step the environment to update the agents velocty
     state = jit_step(state, policy)
-    pipeline_state = state.pipeline_state
+    pipeline_state = state.ic_state.pipeline_state
 
     # Check if the correct velocity was applied
-    velocity = pipeline_state.qvel[:2]
+    velocity = pipeline_state.mjx_data.qvel[:2]
     normalised_velocity = velocity / (jnp.linalg.norm(velocity) + SMALL_VALUE)
 
     assert jnp.allclose(normalised_velocity, expected_direction), (
@@ -76,10 +76,10 @@ def test_agent_translation(
 
     # Step the environment to update the agents position via the velocity
     state = jit_step(state, NOOP_POLICY)
-    pipeline_state = state.pipeline_state
+    pipeline_state = state.ic_state.pipeline_state
 
     # Get new position
-    new_position = pipeline_state.xpos[body_id][:2]
+    new_position = pipeline_state.mjx_data.xpos[body_id][:2]
 
     # Check if the agent moved in the expected direction
     displacement = new_position - initial_pos
@@ -108,12 +108,12 @@ def test_agent_rotation(
     name: str,
 ) -> None:
     """Test agent rotation in ICLand Brax environment."""
-    jit_step, state, pipeline_state = env
-    initial_orientation = pipeline_state.qpos[3]
+    jit_step, state = env
+    initial_orientation = state.ic_state.pipeline_state.mjx_data.qpos[3]
     state = jit_step(state, policy)
-    pipeline_state = state.pipeline_state
+    pipeline_state = state.ic_state.pipeline_state
 
-    new_orientation = pipeline_state.qpos[3]
+    new_orientation = pipeline_state.mjx_data.qpos[3]
     orientation_delta = new_orientation - initial_orientation
     normalised_orientation_delta = orientation_delta / (
         jnp.linalg.norm(orientation_delta) + SMALL_VALUE
@@ -146,24 +146,26 @@ def test_two_agents(
     policies: jnp.ndarray,
 ) -> None:
     """Test two agents movement in ICLand Brax environment."""
-    jit_step, state, pipeline_state = env
+    jit_step, state = env
+
+    pipeline_state = state.ic_state.pipeline_state
 
     # Simulate 2 seconds
-    while pipeline_state.time < 2:
+    while pipeline_state.mjx_data.time < 2:
         state = jit_step(state, policies)
-        pipeline_state = state.pipeline_state
+        pipeline_state = state.ic_state.pipeline_state
 
     # Get the positions of the two agents
-    body_id_1, body_id_2 = state.component_ids[:, 0]
-    agent_1_pos = pipeline_state.xpos[body_id_1][:2]
-    agent_2_pos = pipeline_state.xpos[body_id_2][:2]
+    body_id_1, body_id_2 = state.ic_state.pipeline_state.component_ids[:, 0]
+    agent_1_pos = pipeline_state.mjx_data.xpos[body_id_1][:2]
+    agent_2_pos = pipeline_state.mjx_data.xpos[body_id_2][:2]
 
     # Simulate one more step.
     state = jit_step(state, NOOP_POLICY)
-    pipeline_state = state.pipeline_state
+    pipeline_state = state.ic_state.pipeline_state
 
-    agent_1_new_pos = pipeline_state.xpos[body_id_1][:2]
-    agent_2_new_pos = pipeline_state.xpos[body_id_2][:2]
+    agent_1_new_pos = pipeline_state.mjx_data.xpos[body_id_1][:2]
+    agent_2_new_pos = pipeline_state.mjx_data.xpos[body_id_2][:2]
 
     # Get the displacements
     displacement_1 = agent_1_new_pos - agent_1_pos
