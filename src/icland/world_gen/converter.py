@@ -1,7 +1,8 @@
 """The code defines functions to generate block, ramp, and vertical ramp columns in a 3D world using JAX arrays and exports the generated mesh to an STL file."""
 
 import os
-from typing import Tuple
+from functools import partial
+from typing import Any, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -261,6 +262,348 @@ def export_stls(pieces: jax.Array, file_prefix: str) -> None:  # pragma: no cove
             (n_triangles * i) : (n_triangles * i + n_triangles)
         ]
         world_mesh.save(file_prefix + "_" + str(i) + ".stl")
+
+
+@partial(jax.jit, static_argnums=[2])
+def sample_spawn_points(
+    key: jax.Array, tilemap: jax.Array, num_objects: jnp.int32 = 1
+) -> jax.Array:  # pragma: no cover
+    """Sample num_objects spawn points from the tilemap."""
+    spawn_map = __get_spawn_map(tilemap)
+    flat_tilemap = spawn_map.flatten()
+    nonzero_indices = jnp.where(
+        flat_tilemap != 0, size=flat_tilemap.shape[0], fill_value=-1
+    )[0]
+
+    def run_once(key: jax.Array) -> jax.Array:
+        def pick(
+            item: Tuple[jnp.int32, jax.Array],
+        ) -> Tuple[jnp.int32, jax.Array]:
+            _, key = item
+            key, subkey = jax.random.split(key)
+            choice = jax.random.choice(subkey, nonzero_indices)
+            return choice, key
+
+        random_index, key = jax.lax.while_loop(lambda x: x[0] < 0, pick, (-1, key))
+
+        # Convert the flat index back to 2D coordinates
+        row = random_index // spawn_map.shape[0]
+        col = random_index % spawn_map.shape[0]
+
+        return jnp.array([row, col, tilemap[row, col, 3]])
+
+    keys = jax.random.split(key, num_objects)
+
+    return jax.vmap(run_once)(keys)
+
+
+def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
+    combined = combined.astype(jnp.int32)
+    w, h = combined.shape[0], combined.shape[1]
+
+    # Initialize arrays with JAX functions
+    visited = jax.lax.full((w, h), False, dtype=jnp.bool)
+    spawnable = jax.lax.full((w, h), 0, dtype=jnp.int32)
+
+    def __adj_jit(i: jnp.int32, j: jnp.int32, combined: jax.Array) -> jax.Array:
+        slots = jnp.full((4, 2), -1)
+        dx = jnp.array([-1, 0, 1, 0])
+        dy = jnp.array([0, 1, 0, -1])
+
+        def process_square(
+            combined: jax.Array,
+            i: jnp.int32,
+            j: jnp.int32,
+            slots: jax.Array,
+            dx: jax.Array,
+            dy: jax.Array,
+        ) -> jax.Array:
+            tile, r, f, level = combined[i, j]
+            for d in range(4):
+                x = i + dx[d]
+                y = j + dy[d]
+
+                def process_square_inner(slots: jax.Array) -> jax.Array:
+                    q, r2, f2, l = combined[x, y]
+                    slots = jax.lax.cond(
+                        jnp.any(
+                            jnp.array(
+                                [
+                                    jnp.all(
+                                        jnp.array(
+                                            [
+                                                q == TileType.RAMP.value,
+                                                r2 == (4 - d) % 4,
+                                                f2 == level - 1,
+                                                l == level,
+                                            ]
+                                        )
+                                    ),
+                                    jnp.all(
+                                        jnp.array(
+                                            [
+                                                q == TileType.RAMP.value,
+                                                r2 == (2 - d) % 4,
+                                                f2 == level,
+                                                l == level + 1,
+                                            ]
+                                        )
+                                    ),
+                                    jnp.all(
+                                        jnp.array(
+                                            [q == TileType.SQUARE.value, l == level]
+                                        )
+                                    ),
+                                ]
+                            )
+                        ),
+                        lambda z: z.at[d].set(jnp.array([x, y])),
+                        lambda z: z,
+                        slots,
+                    )
+                    return slots
+
+                slots = jax.lax.cond(
+                    jnp.all(
+                        jnp.array(
+                            [
+                                0 <= x,
+                                x < combined.shape[0],
+                                0 <= y,
+                                y < combined.shape[1],
+                            ]
+                        )
+                    ),
+                    process_square_inner,
+                    lambda x: x,
+                    slots,
+                )
+            return slots
+
+        def process_ramp(
+            combined: jax.Array,
+            i: jnp.int32,
+            j: jnp.int32,
+            slots: jax.Array,
+            dx: jax.Array,
+            dy: jax.Array,
+        ) -> jax.Array:
+            tile, r, f, level = combined[i, j]
+            mask = jnp.where((r + 1) % 2 == 0, 1, 0)
+            for d in range(4):
+                x = i + dx[d]
+                y = j + dy[d]
+
+                def process_ramp_inner(slots: jax.Array) -> jax.Array:
+                    q, r2, f2, l = combined[x, y]
+                    slots = jax.lax.cond(
+                        jnp.any(
+                            jnp.array(
+                                [
+                                    jnp.all(
+                                        jnp.array(
+                                            [
+                                                q == TileType.SQUARE.value,
+                                                d == (2 - r) % 4,
+                                                l == level,
+                                            ]
+                                        )
+                                    ),
+                                    jnp.all(
+                                        jnp.array(
+                                            [
+                                                q == TileType.SQUARE.value,
+                                                d == (4 - r) % 4,
+                                                l == f,
+                                            ]
+                                        )
+                                    ),
+                                    jnp.all(
+                                        jnp.array(
+                                            [
+                                                q == TileType.RAMP.value,
+                                                d == (2 - r) % 4,
+                                                r == r2,
+                                                f2 == level,
+                                            ]
+                                        )
+                                    ),
+                                    jnp.all(
+                                        jnp.array(
+                                            [
+                                                q == TileType.RAMP.value,
+                                                d == (4 - r) % 4,
+                                                r == r2,
+                                                l == f,
+                                            ]
+                                        )
+                                    ),
+                                ]
+                            )
+                        ),
+                        lambda z: z.at[d].set(jnp.array([x, y])),
+                        lambda z: z,
+                        slots,
+                    )
+                    return slots
+
+                slots = jax.lax.cond(
+                    jnp.all(
+                        jnp.array(
+                            [
+                                0 <= x,
+                                x < combined.shape[0],
+                                0 <= y,
+                                y < combined.shape[1],
+                                (d + mask) % 2 == 0,
+                            ]
+                        )
+                    ),
+                    process_ramp_inner,
+                    lambda x: x,
+                    slots,
+                )
+            return slots
+
+        slots = jax.lax.switch(
+            combined[i, j, 0],
+            [process_square, process_ramp, lambda a, b, c, s, d, e: s],
+            combined,
+            i,
+            j,
+            slots,
+            dx,
+            dy,
+        )
+        return slots
+
+    def __bfs(
+        i: jnp.int32,
+        j: jnp.int32,
+        ind: jnp.int32,
+        visited: jax.Array,
+        spawnable: jax.Array,
+        combined: jax.Array,
+    ) -> Tuple[jax.Array, jax.Array]:
+        capacity = combined.shape[0] * combined.shape[1]
+        queue = jnp.full((capacity, 2), -1)
+        front, rear, size = 0, 0, 0
+
+        def __enqueue(
+            i: jnp.int32,
+            j: jnp.int32,
+            rear: jnp.int32,
+            queue: jax.Array,
+            size: jnp.int32,
+        ) -> Tuple[jnp.int32, jax.Array, jnp.int32]:
+            queue = queue.at[rear].set(jnp.array([i, j]))
+            rear = (rear + 1) % capacity
+            size += 1
+            return rear, queue, size
+
+        def __dequeue(
+            front: jnp.int32, queue: jax.Array, size: jnp.int32
+        ) -> Tuple[jax.Array, jax.Array, jnp.int32]:
+            res = queue[front]
+            front = (front + 1) % capacity
+            size -= 1
+            return res, front, size
+
+        visited = visited.at[i, j].set(True)
+        rear, queue, size = __enqueue(i, j, rear, queue, size)
+
+        def body_fun(
+            args: Tuple[
+                jax.Array, jnp.int32, jnp.int32, jnp.int32, jax.Array, jax.Array
+            ],
+        ) -> Tuple[jax.Array, jnp.int32, jnp.int32, jnp.int32, jax.Array, jax.Array]:
+            queue, front, rear, size, visited, spawnable = args
+            item, front, size = __dequeue(front, queue, size)
+            x, y = item.astype(jnp.int32)
+
+            # PROCESS
+            spawnable = spawnable.at[x, y].set(ind)
+
+            # Find next nodes
+            def process_adj(
+                carry: Tuple[jax.Array, jnp.int32, jax.Array, jnp.int32, jax.Array],
+                node: jax.Array,
+            ) -> Tuple[
+                Tuple[jax.Array, jnp.int32, jax.Array, jnp.int32, jax.Array], None
+            ]:
+                p, q = node
+
+                visited, rear, queue, size, combined = carry
+
+                def process_node(
+                    visited: jax.Array,
+                    rear: jnp.int32,
+                    queue: jax.Array,
+                    size: jnp.int32,
+                ) -> Tuple[jax.Array, jnp.int32, jax.Array, jnp.int32]:
+                    visited = visited.at[p, q].set(True)
+                    rear, queue, size = __enqueue(p, q, rear, queue, size)
+                    return visited, rear, queue, size
+
+                def process_node_identity(
+                    visited: jax.Array,
+                    rear: jnp.int32,
+                    queue: jax.Array,
+                    size: jnp.int32,
+                ) -> Tuple[jax.Array, jnp.int32, jax.Array, jnp.int32]:
+                    return visited, rear, queue, size
+
+                visited, rear, queue, size = jax.lax.cond(
+                    jnp.all(
+                        jnp.array([p >= 0, q >= 0, jnp.logical_not(visited[p, q])])
+                    ),
+                    process_node,
+                    process_node_identity,
+                    visited,
+                    rear,
+                    queue,
+                    size,
+                )
+                return (visited, rear, queue, size, combined), None
+
+            (visited, rear, queue, size, _), _ = jax.lax.scan(
+                process_adj,
+                (visited, rear, queue, size, combined),
+                __adj_jit(x, y, combined),
+            )
+
+            return queue, front, rear, size, visited, spawnable
+
+        _, _, _, _, visited, spawnable = jax.lax.while_loop(
+            lambda args: args[3] > 0,
+            body_fun,
+            (queue, front, rear, size, visited, spawnable),
+        )
+
+        return visited, spawnable
+
+    def scan_body(
+        carry: Tuple[jax.Array, jax.Array], ind: jnp.int32
+    ) -> Tuple[Tuple[jax.Array, jax.Array], None]:
+        visited, spawnable = carry
+        i = ind // w
+        j = ind % w
+        visited, spawnable = jax.lax.cond(
+            jnp.logical_not(visited.at[i, j].get()),
+            lambda x: __bfs(i, j, i * w + j, x[0], x[1], combined),
+            lambda x: x,
+            (visited, spawnable),
+        )
+        return (visited, spawnable), None
+
+    (visited, spawnable), _ = jax.lax.scan(
+        scan_body, (visited, spawnable), jnp.arange(w * h)
+    )
+
+    spawnable = jnp.where(
+        spawnable == jnp.argmax(jnp.bincount(spawnable.flatten(), length=w * h)), 1, 0
+    )
+    return spawnable
 
 
 def generate_mjcf_from_meshes(  # pragma: no cover
