@@ -9,7 +9,6 @@ import pytest
 from assets.policies import *
 from assets.worlds import EMPTY_WORLD, TWO_AGENT_EMPTY_WORLD
 from brax.envs import get_environment, register_environment
-from brax.mjx.base import State as mjx_state
 
 from icland.brax_env import ICLand, ICLandBraxState
 from icland.constants import SMALL_VALUE
@@ -19,7 +18,7 @@ from icland.types import ICLandParams
 @pytest.fixture(params=[EMPTY_WORLD, TWO_AGENT_EMPTY_WORLD])
 def env(
     request: pytest.FixtureRequest,
-) -> tuple[jax._src.pjit.JitWrapped, ICLandBraxState, mjx_state]:
+) -> tuple[jax._src.pjit.JitWrapped, ICLandBraxState]:
     """Fixture to provide a consistent ICLand Brax environment for tests."""
     world = request.param
     register_environment("icland", ICLand)
@@ -102,7 +101,7 @@ def test_agent_translation(
     indirect=["env"],
 )
 def test_agent_rotation(
-    env: tuple[jax._src.pjit.JitWrapped, ICLandBraxState, mjx_state],
+    env: tuple[jax._src.pjit.JitWrapped, ICLandBraxState],
     policy: jnp.ndarray,
     expected_orientation: jnp.ndarray,
     name: str,
@@ -141,7 +140,7 @@ def test_agent_rotation(
     indirect=["env"],
 )
 def test_two_agents(
-    env: tuple[jax._src.pjit.JitWrapped, ICLandBraxState, mjx_state],
+    env: tuple[jax._src.pjit.JitWrapped, ICLandBraxState],
     name: str,
     policies: jnp.ndarray,
 ) -> None:

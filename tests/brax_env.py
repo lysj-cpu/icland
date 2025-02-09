@@ -2,6 +2,7 @@
 
 import functools
 from datetime import datetime
+from typing import Any, Dict
 
 import jax
 import matplotlib.pyplot as plt
@@ -55,7 +56,7 @@ def run_brax_test() -> None:
     )
 
     # Containers for tracking training progress.
-    progress_data = {
+    progress_data: Dict[str, Any] = {
         "steps": [],
         "rewards": [],
         "reward_std": [],
@@ -65,7 +66,7 @@ def run_brax_test() -> None:
     # Set y-axis bounds for plotting.
     min_reward, max_reward = -10, 10
 
-    def progress_callback(num_steps: int, metrics: dict) -> None:
+    def progress_callback(num_steps: int, metrics: Dict[str, Any]) -> None:
         """Callback function to track and plot training progress."""
         progress_data["timestamps"].append(datetime.now())
         progress_data["steps"].append(num_steps)

@@ -1,20 +1,25 @@
+# type: ignore
+"""Create a PDF report with system information and benchmark results."""
+
 import os
+
 from pylatex import Document, NoEscape
+from run_benchmarking import run_all_scenarios
 from sys_info import (
     get_cpu_info,
-    get_memory_info,
-    get_storage_info,
-    get_os_info,
     get_gpu_info,
+    get_memory_info,
+    get_os_info,
     get_python_info,
+    get_storage_info,
 )
-from run_benchmarking import run_all_scenarios, SCENARIOS
 
 
 # --------------------------------------------------------------------------------------
 # 1) Gather System Info
 # --------------------------------------------------------------------------------------
 def gather_system_info():
+    """Gather system information."""
     cpu_info = get_cpu_info()
     memory_info = get_memory_info()
     storage_info = get_storage_info()
@@ -33,8 +38,8 @@ def gather_system_info():
             "Python Version": python_info["Python Version"],
             "Interpreter": python_info["Interpreter"],
             "Virtual Env": python_info["Virtual Env"],
-            "Installed Packages": f"{len(python_info['Installed Packages'])} packages"
-        }
+            "Installed Packages": f"{len(python_info['Installed Packages'])} packages",
+        },
     }
     # Fill GPU info
     for gpu_id, gpu_data in gpu_info.items():
@@ -42,7 +47,7 @@ def gather_system_info():
             "Model": gpu_data.get("Model", "No dedicated GPU found"),
             "VRAM": gpu_data.get("VRAM", "N/A"),
             "Temperature": gpu_data.get("Temperature", "N/A"),
-            "Driver": gpu_data.get("Driver", "N/A")
+            "Driver": gpu_data.get("Driver", "N/A"),
         }
     return values
 
@@ -51,6 +56,7 @@ def gather_system_info():
 # 2) Helper: Sanitize for LaTeX
 # --------------------------------------------------------------------------------------
 def sanitize_for_latex(value: str) -> str:
+    """Sanitize a string for LaTeX."""
     special_chars = {
         "\\": "\\textbackslash{}",
         "_": "\\_",
@@ -72,6 +78,7 @@ def sanitize_for_latex(value: str) -> str:
 # 3) Helper: Generate LaTeX Table for System Info
 # --------------------------------------------------------------------------------------
 def generate_latex_table(title: str, data: dict) -> str:
+    """Generate a LaTeX table from a dictionary."""
     table = f"\\subsection*{{{sanitize_for_latex(title)}}}\n"
     table += "\\begin{tabular*}{\\textwidth}{@{\\extracolsep{\\fill}}p{0.25\\textwidth}p{0.75\\textwidth}@{}}\n"
     table += "    \\toprule\n"
@@ -89,7 +96,9 @@ def generate_latex_table(title: str, data: dict) -> str:
             for j, sub_key in enumerate(sub_keys):
                 sanitized_sub_key = sanitize_for_latex(str(sub_key))
                 sanitized_sub_val = sanitize_for_latex(str(val[sub_key]))
-                table += f"    {sanitized_sub_key} & \\texttt{{{sanitized_sub_val}}} \\\\\n"
+                table += (
+                    f"    {sanitized_sub_key} & \\texttt{{{sanitized_sub_val}}} \\\\\n"
+                )
             if i < len(keys_list) - 1:
                 table += "    \\midrule\n"
         else:
@@ -105,6 +114,7 @@ def generate_latex_table(title: str, data: dict) -> str:
 # 4) Main create_report function
 # --------------------------------------------------------------------------------------
 def create_report(output_pdf="benchmarking/output/benchmark_report"):
+    """Create a PDF report with system information and benchmark results."""
     # 4.1) Gather System Info
     sys_info = gather_system_info()
 
@@ -121,7 +131,9 @@ def create_report(output_pdf="benchmarking/output/benchmark_report"):
     doc.preamble.append(NoEscape(r"\usepackage{multirow}"))
     doc.preamble.append(NoEscape(r"\usepackage{makecell}"))
     doc.preamble.append(NoEscape(r"\usepackage{svg}"))
-    doc.preamble.append(NoEscape(r"\title{\vspace{-2cm}ICLand Benchmark Report\vspace{-1cm}}"))
+    doc.preamble.append(
+        NoEscape(r"\title{\vspace{-2cm}ICLand Benchmark Report\vspace{-1cm}}")
+    )
     doc.preamble.append(NoEscape(r"\date{}"))
 
     doc.append(NoEscape(r"\maketitle"))
@@ -139,7 +151,9 @@ def create_report(output_pdf="benchmarking/output/benchmark_report"):
         graphics = results_dict.get("graphics", {})
 
         doc.append(NoEscape(r"\clearpage"))
-        doc.append(NoEscape(f"\\section*{{Scenario: {sanitize_for_latex(scenario_name)}}}"))
+        doc.append(
+            NoEscape(f"\\section*{{Scenario: {sanitize_for_latex(scenario_name)}}}")
+        )
         doc.append(NoEscape(f"\\textit{{{sanitize_for_latex(desc)}}}\\\\"))
         doc.append(NoEscape(r"\\[6pt]"))
 
@@ -157,8 +171,10 @@ def create_report(output_pdf="benchmarking/output/benchmark_report"):
             abs_path = os.path.abspath(graph_path)
             doc.append(NoEscape(r"\begin{figure}[h!]"))
             doc.append(NoEscape(r"\centering"))
-            doc.append(NoEscape(r"\includegraphics[width=0.8\textwidth]{%s}" % abs_path))
-            caption = f"{graph_key.replace('_',' ').title()} for {scenario_name}"
+            doc.append(
+                NoEscape(r"\includegraphics[width=0.8\textwidth]{%s}" % abs_path)
+            )
+            caption = f"{graph_key.replace('_', ' ').title()} for {scenario_name}"
             doc.append(NoEscape(f"\\caption{{{sanitize_for_latex(caption)}}}"))
             doc.append(NoEscape(r"\end{figure}"))
             doc.append(NoEscape(r"\\[6pt]"))

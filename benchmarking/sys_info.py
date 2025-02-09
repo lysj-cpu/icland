@@ -1,14 +1,20 @@
-import platform
-import psutil
-import cpuinfo
-import shutil
-import os
-import sys
-import subprocess
-import GPUtil
-import time
+"""This module provides functions to get system information such as CPU, memory, storage, OS, Python, and GPU."""
 
-def get_cpu_info():
+import os
+import platform
+import shutil
+import subprocess
+import sys
+import time
+from typing import Dict, Union  # For type annotations
+
+import cpuinfo
+import GPUtil
+import psutil
+
+
+def get_cpu_info() -> Dict[str, str]:
+    """Get CPU information."""
     info = cpuinfo.get_cpu_info()
     return {
         "Model": info.get("brand_raw", "Unknown"),
@@ -19,23 +25,31 @@ def get_cpu_info():
         "L3 Cache": f"{info.get('l3_cache_size', 'Unknown')} bytes",
     }
 
-def get_memory_info():
+
+def get_memory_info() -> Dict[str, str]:
+    """Get memory information."""
     mem = psutil.virtual_memory()
     return {
-        "Total RAM": f"{mem.total / (1024 ** 3):.2f} GB",
-        "Available RAM": f"{mem.available / (1024 ** 3):.2f} GB",
+        "Total RAM": f"{mem.total / (1024**3):.2f} GB",
+        "Available RAM": f"{mem.available / (1024**3):.2f} GB",
     }
 
-def get_storage_info():
+
+def get_storage_info() -> Dict[str, str]:
+    """Get storage information."""
     disk = shutil.disk_usage("/")
     return {
-        "Total Storage": f"{disk.total / (1024 ** 3):.2f} GB",
-        "Used Storage": f"{disk.used / (1024 ** 3):.2f} GB",
-        "Free Storage": f"{disk.free / (1024 ** 3):.2f} GB",
-        "Filesystem Type": os.uname().sysname if hasattr(os, 'uname') else platform.system(),
+        "Total Storage": f"{disk.total / (1024**3):.2f} GB",
+        "Used Storage": f"{disk.used / (1024**3):.2f} GB",
+        "Free Storage": f"{disk.free / (1024**3):.2f} GB",
+        "Filesystem Type": os.uname().sysname
+        if hasattr(os, "uname")
+        else platform.system(),
     }
 
-def get_os_info():
+
+def get_os_info() -> Dict[str, str]:
+    """Get OS information."""
     return {
         "OS": platform.system(),
         "Version": platform.version(),
@@ -44,20 +58,25 @@ def get_os_info():
         "Uptime": f"{time.time() - psutil.boot_time():.0f} seconds",
     }
 
-def get_python_info():
+
+def get_python_info() -> Dict[str, str]:
+    """Get Python information."""
     return {
         "Python Version": sys.version,
         "Interpreter": platform.python_implementation(),
         "Virtual Env": sys.prefix,
-        "Installed Packages": subprocess.getoutput("pip freeze")[:500] + "...",  # Limiting output size
+        "Installed Packages": subprocess.getoutput("pip freeze")[:500]
+        + "...",  # Limiting output size
     }
 
-def get_gpu_info():
+
+def get_gpu_info() -> Dict[str, Union[str, Dict[str, str]]]:
+    """Get GPU information."""
     gpus = GPUtil.getGPUs()
     if not gpus:
         return {"GPU": "No dedicated GPU found"}
     return {
-        f"GPU {i+1}": {
+        f"GPU {i + 1}": {
             "Model": gpu.name,
             "VRAM": f"{gpu.memoryTotal} MB",
             "Temperature": f"{gpu.temperature} °C",
