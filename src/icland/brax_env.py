@@ -14,7 +14,7 @@ from flax import struct
 
 import icland
 from icland.constants import AGENT_OBSERVATION_DIM
-from icland.types import ICLandState
+from icland.types import ICLandState, MjxModelType, MjxStateType
 
 
 @struct.dataclass
@@ -26,8 +26,8 @@ class ICLandBraxState(base.Base):  # type: ignore
     obs: Observation
     reward: jax.Array
     done: jax.Array
-    metrics: Dict[str, jax.Array] = struct.field(default_factory=dict)  # type: ignore
-    info: Dict[str, Any] = struct.field(default_factory=dict)  # type: ignore
+    metrics: Dict[str, jax.Array] = struct.field(default_factory=dict)  # type: ignore[no-untyped-call]
+    info: Dict[str, Any] = struct.field(default_factory=dict)  # type: ignore[no-untyped-call]
 
 
 class ICLand(Env):  # type: ignore
@@ -109,7 +109,9 @@ class ICLand(Env):  # type: ignore
 
         return nstate
 
-    def _build_pipeline_state(self, model, data) -> base.State:  # type: ignore
+    def _build_pipeline_state(
+        self, model: MjxModelType, data: MjxStateType
+    ) -> base.State:
         """Helper method to create a pipeline state from the provided model and data.
 
         Args:
