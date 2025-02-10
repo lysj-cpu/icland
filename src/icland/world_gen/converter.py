@@ -2,7 +2,6 @@
 
 import os
 from functools import partial
-from typing import Tuple
 
 import jax
 import jax.numpy as jnp
@@ -188,7 +187,7 @@ def create_world(tile_map: jax.Array) -> jax.Array:  # pragma: no cover
 
     coords = jnp.concatenate([i_indices, j_indices, tile_map], axis=-1)
 
-    def process_tile(entry: jax.Array) -> Tuple[jax.Array, jax.Array]:
+    def process_tile(entry: jax.Array) -> tuple[jax.Array, jax.Array]:
         x, y, block, rotation, frm, to = entry
         if block == TileType.SQUARE.value:
             return __make_block_column(x, y, to)
@@ -277,8 +276,8 @@ def sample_spawn_points(
 
     def run_once(key: jax.Array) -> jax.Array:
         def pick(
-            item: Tuple[jnp.int32, jax.Array],
-        ) -> Tuple[jnp.int32, jax.Array]:
+            item: tuple[jnp.int32, jax.Array],
+        ) -> tuple[jnp.int32, jax.Array]:
             _, key = item
             key, subkey = jax.random.split(key)
             choice = jax.random.choice(subkey, nonzero_indices)
@@ -484,7 +483,7 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
         visited: jax.Array,
         spawnable: jax.Array,
         combined: jax.Array,
-    ) -> Tuple[jax.Array, jax.Array]:
+    ) -> tuple[jax.Array, jax.Array]:
         capacity = combined.shape[0] * combined.shape[1]
         queue = jnp.full((capacity, 2), -1)
         front, rear, size = 0, 0, 0
@@ -495,7 +494,7 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
             rear: jnp.int32,
             queue: jax.Array,
             size: jnp.int32,
-        ) -> Tuple[jnp.int32, jax.Array, jnp.int32]:
+        ) -> tuple[jnp.int32, jax.Array, jnp.int32]:
             queue = queue.at[rear].set(jnp.array([i, j]))
             rear = (rear + 1) % capacity
             size += 1
@@ -503,7 +502,7 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
 
         def __dequeue(
             front: jnp.int32, queue: jax.Array, size: jnp.int32
-        ) -> Tuple[jax.Array, jax.Array, jnp.int32]:
+        ) -> tuple[jax.Array, jax.Array, jnp.int32]:
             res = queue[front]
             front = (front + 1) % capacity
             size -= 1
@@ -513,10 +512,10 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
         rear, queue, size = __enqueue(i, j, rear, queue, size)
 
         def body_fun(
-            args: Tuple[
+            args: tuple[
                 jax.Array, jnp.int32, jnp.int32, jnp.int32, jax.Array, jax.Array
             ],
-        ) -> Tuple[jax.Array, jnp.int32, jnp.int32, jnp.int32, jax.Array, jax.Array]:
+        ) -> tuple[jax.Array, jnp.int32, jnp.int32, jnp.int32, jax.Array, jax.Array]:
             queue, front, rear, size, visited, spawnable = args
             item, front, size = __dequeue(front, queue, size)
             x, y = item.astype(jnp.int32)
@@ -526,10 +525,10 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
 
             # Find next nodes
             def process_adj(
-                carry: Tuple[jax.Array, jnp.int32, jax.Array, jnp.int32, jax.Array],
+                carry: tuple[jax.Array, jnp.int32, jax.Array, jnp.int32, jax.Array],
                 node: jax.Array,
-            ) -> Tuple[
-                Tuple[jax.Array, jnp.int32, jax.Array, jnp.int32, jax.Array], None
+            ) -> tuple[
+                tuple[jax.Array, jnp.int32, jax.Array, jnp.int32, jax.Array], None
             ]:
                 p, q = node
 
@@ -540,7 +539,7 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
                     rear: jnp.int32,
                     queue: jax.Array,
                     size: jnp.int32,
-                ) -> Tuple[jax.Array, jnp.int32, jax.Array, jnp.int32]:
+                ) -> tuple[jax.Array, jnp.int32, jax.Array, jnp.int32]:
                     visited = visited.at[p, q].set(True)
                     rear, queue, size = __enqueue(p, q, rear, queue, size)
                     return visited, rear, queue, size
@@ -550,7 +549,7 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
                     rear: jnp.int32,
                     queue: jax.Array,
                     size: jnp.int32,
-                ) -> Tuple[jax.Array, jnp.int32, jax.Array, jnp.int32]:
+                ) -> tuple[jax.Array, jnp.int32, jax.Array, jnp.int32]:
                     return visited, rear, queue, size
 
                 visited, rear, queue, size = jax.lax.cond(
@@ -583,8 +582,8 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
         return visited, spawnable
 
     def scan_body(
-        carry: Tuple[jax.Array, jax.Array], ind: jnp.int32
-    ) -> Tuple[Tuple[jax.Array, jax.Array], None]:
+        carry: tuple[jax.Array, jax.Array], ind: jnp.int32
+    ) -> tuple[tuple[jax.Array, jax.Array], None]:
         visited, spawnable = carry
         i = ind // w
         j = ind % w
