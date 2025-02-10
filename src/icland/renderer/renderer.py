@@ -1,16 +1,17 @@
 from functools import partial  # noqa: D100
-from typing import Any, Callable, List, Tuple
+from typing import Any, Callable, List
 
 import imageio
 import jax
 import jax.numpy as jnp
 import numpy as np
+from jax.scipy.spatial.transform import Rotation
 
-from icland.renderer.sdfs import box_sdf, ramp_sdf
+from icland.renderer.sdfs import box_sdf, capsule_sdf, cube_sdf, ramp_sdf, sphere_sdf
 from icland.types import ICLandState
 
 # Constants
-DEFAULT_VIEWSIZE: Tuple[jnp.int32, jnp.int32] = (92, 76)
+DEFAULT_VIEWSIZE: tuple[jnp.int32, jnp.int32] = (92, 76)
 DEFAULT_COLOR: jax.Array = jnp.array([0.2588, 0.5294, 0.9607])
 WORLD_UP: jax.Array = jnp.array([0.0, 1.0, 0.0], dtype=jnp.float32)
 NUM_CHANNELS: jnp.int32 = 3
@@ -221,16 +222,16 @@ def __scene_sdf_from_tilemap_color(
     terrain_color: jax.Array = DEFAULT_COLOR,
     with_color: bool = False,
     floor_height: jnp.float32 = 0.0,
-) -> Tuple[jnp.float32, jax.Array]:
+) -> tuple[jnp.float32, jax.Array]:
     """SDF for the world terrain."""
     tile_dist = __scene_sdf_from_tilemap(tilemap, p, floor_height - 1)
     floor_dist = p[1] - floor_height
     min_dist = jnp.minimum(tile_dist, floor_dist)
 
-    def process_without_color(_: Any) -> Tuple[jnp.float32, jax.Array]:
+    def process_without_color(_: Any) -> tuple[jnp.float32, jax.Array]:
         return min_dist, jnp.zeros((3,))
 
-    def process_with_color(_: Any) -> Tuple[jnp.float32, jax.Array]:
+    def process_with_color(_: Any) -> tuple[jnp.float32, jax.Array]:
         x, _, z = jnp.tanh(jnp.sin(p * jnp.pi) * 20.0)
         floor_color = (0.5 + (x * z) * 0.1) * jnp.ones(3)
         color = jnp.choose(
@@ -241,7 +242,117 @@ def __scene_sdf_from_tilemap_color(
     return jax.lax.cond(with_color, process_with_color, process_without_color, None)  # type: ignore
 
 
-@partial
+def __scene_sdf_with_objs(
+    # Scene
+    tilemap: jax.Array,
+    # Props (list of ints to represent which prop it is)
+    props: jax.Array,
+    # Players positions and rotation
+    # TODO: Change to adapt with ICLand Pipeline State
+    player_pos: jax.Array,
+    player_col: jax.Array,
+    # Prop positions and rotation
+    prop_pos: jax.Array,
+    prop_rot: jax.Array,
+    prop_col: jax.Array,
+    # Ray point
+    p: jax.Array,
+    # Extra kwargs
+    terrain_color: jax.Array = DEFAULT_COLOR,
+    # with_color: bool = False,
+    floor_height: jnp.float32 = 0.0,
+):
+    """SDF for the agents and props."""
+    # Pre: the lengths of player_pos and player_col are the same.
+    # Pre: the lengths of prop_pos, prop_rot and prop_col are the same.
+
+    # Add distances computed by SDFs here
+    tile_dist = __scene_sdf_from_tilemap(tilemap, p, floor_height - 1)
+    floor_dist = p[1] - floor_height
+
+    def process_player_sdf(i: jnp.int32) -> tuple[jnp.float32, jax.Array]:
+        curr_pos = player_pos[i]
+        curr_col = player_col[i]
+
+        transform = jnp.array(
+            [
+                [1, 0, 0, -curr_pos[0]],
+                [0, 1, 0, -curr_pos[1] + 0.2],
+                [0, 0, 1, -curr_pos[2]],
+                [0, 0, 0, 1],
+            ]
+        )
+
+        return capsule_sdf(
+            jnp.matmul(transform, jnp.append(p, 1))[:3], 2, 1
+        ), curr_col
+
+    def process_prop_sdf(i: jnp.int32):
+        curr_pos = prop_pos[i]
+        curr_rot = prop_rot[i]
+        curr_col = prop_col[i]
+
+        curr_type = props[i]
+
+        def get_transformation_matrix(qpos, curr_pos):
+            # Extract rotation matrix from quaternion
+            R = Rotation.from_quat(qpos[:4]).as_matrix()  # 3x3 rotation matrix
+
+            # Create the 4x4 transformation matrix
+            transform = jnp.eye(4)  # Start with an identity matrix
+            transform = transform.at[:3, :3].set(R)  # Set the rotation part
+            transform = transform.at[:3, 3].set(
+                jnp.array(curr_pos)
+            )  # Set the translation part
+
+            return transform
+
+        # We currently support 2 prop types: the cube and the sphere
+        # 0: ignore (in which case we set dist to infinity), 1: cube, 2: sphere
+        # Apply the sdf based on prop type
+        return jax.lax.switch(
+            curr_type,
+            [
+                lambda _: jnp.inf,
+                partial(cube_sdf, size=1),
+                partial(sphere_sdf, r=5),
+            ],
+            jnp.matmul(
+                jnp.linalg.inv(get_transformation_matrix(curr_rot, curr_pos)),
+                jnp.append(p, 1),
+            ),
+        ), curr_col
+
+    # Prop distances: Tuple[Array of floats, Array of colors]
+    prop_dists = jax.vmap(process_prop_sdf)(jnp.arange(prop_pos.shape[0]))
+
+    # Player distances
+    player_dists = jax.vmap(process_player_sdf)(jnp.arange(player_pos.shape[0]))
+
+    # Get minimum distance and color
+    min_prop_dist, min_prop_col = (
+        jnp.min(prop_dists[0]),
+        prop_col[jnp.argmin(prop_dists[0])],
+    )
+    min_player_dist, min_player_col = (
+        jnp.min(player_dists[0]),
+        player_col[jnp.argmin(player_dists[0])],
+    )
+
+    # Get the absolute minimum distance and color
+    candidates = jnp.array([tile_dist, floor_dist, min_prop_dist, min_player_dist])
+    min_dist = jnp.min(candidates)
+
+    x, _, z = jnp.tanh(jnp.sin(p * jnp.pi) * 20.0)
+    floor_color = (0.5 + (x * z) * 0.1) * jnp.ones(3)
+    min_dist_col = jnp.array(
+        [terrain_color, floor_color, min_prop_col, min_player_col]
+    )[jnp.argmin(candidates)]
+
+    return min_dist, min_dist_col
+
+
+@jax.jit
 def __shade_f(
     surf_color: jax.Array,
     shadow: jax.Array,
@@ -257,6 +368,54 @@ def __shade_f(
     light = 0.7 * diffuse + 0.2 * ambient
     return surf_color * light + spec
 
+# tilemap: jax.Array,
+# props: jax.Array,
+# player_pos: jax.Array,
+# player_col: jax.Array,
+# prop_pos: jax.Array,
+# prop_rot: jax.Array,
+# prop_col: jax.Array,
+# p: jax.Array,
+# terrain_color: jax.Array = DEFAULT_COLOR,
+# floor_height: jnp.float32 = 0.0,
+
+@partial(jax.jit, static_argnames=["view_width", "view_height"])
+def render_frame_with_objects(
+    cam_pos: jax.Array,
+    cam_dir: jax.Array,
+    tilemap: jax.Array,
+    props: jax.Array = jnp.array([1]),
+    terrain_color: jax.Array = DEFAULT_COLOR,
+    light_dir: jax.Array = __normalize(jnp.array([5.0, 10.0, 5.0])),
+    view_width: jnp.int32 = DEFAULT_VIEWSIZE[0],
+    view_height: jnp.int32 = DEFAULT_VIEWSIZE[1],
+    # view_size: tuple[jnp.int32, jnp.int32] = DEFAULT_VIEWSIZE,
+) -> jax.Array:
+    """Renders one frame given camera position, direction, and world terrain."""
+    player_pos = jnp.array([[8.5, 4, 1]])
+    player_col = jnp.array([[1.0, 0.0, 0.0]])
+    prop_pos = jnp.array([[4, 3.5, 1]])
+    prop_rot = jnp.array([[1, 0, 0, 0]])
+    prop_col = jnp.array([[1.0, 1.0, 0.0]])
+    
+    # Ray casting
+    ray_dir = __camera_rays(cam_pos, cam_dir, view_width, view_height, fx=0.6)
+    sdf = partial(__scene_sdf_with_objs, tilemap, props, player_pos, player_col, prop_pos, prop_rot, prop_col, terrain_color=terrain_color)
+    sdf_dists_only = lambda p: sdf(p)[0]
+    hit_pos = jax.vmap(partial(__raycast, sdf_dists_only, cam_pos))(ray_dir)
+
+    # Shading
+    raw_normal = jax.vmap(jax.grad(sdf_dists_only))(hit_pos)
+    shadow = jax.vmap(partial(__cast_shadow, sdf_dists_only, light_dir))(hit_pos)
+    _, surf_color = jax.vmap(sdf)(hit_pos)
+
+    # Frame export
+    f = partial(__shade_f, light_dir=light_dir)
+    frame = jax.vmap(f)(surf_color, shadow, raw_normal, ray_dir)
+    frame = frame ** (1.0 / 2.2)  # gamma correction
+
+    return frame.reshape((view_height, view_width, NUM_CHANNELS))
+
 
 @partial(jax.jit, static_argnames=["view_width", "view_height"])
 def render_frame(
@@ -267,7 +426,7 @@ def render_frame(
     light_dir: jax.Array = __normalize(jnp.array([5.0, 10.0, 5.0])),
     view_width: jnp.int32 = DEFAULT_VIEWSIZE[0],
     view_height: jnp.int32 = DEFAULT_VIEWSIZE[1],
-    # view_size: Tuple[jnp.int32, jnp.int32] = DEFAULT_VIEWSIZE,
+    # view_size: tuple[jnp.int32, jnp.int32] = DEFAULT_VIEWSIZE,
 ) -> jax.Array:
     """Renders one frame given camera position, direction, and world terrain."""
     # Ray casting
@@ -303,7 +462,7 @@ def get_agent_camera_from_mjx(
     body_id: jnp.int32,
     camera_height: jnp.float32 = 0.2,
     camera_offset: jnp.float32 = 0.06,
-) -> Tuple[jax.Array, jax.Array]:
+) -> tuple[jax.Array, jax.Array]:
     """Get the camera position and direction from the MuJoCo data."""
     data = icland_state.pipeline_state.mjx_data
     agent_id = icland_state.pipeline_state.component_ids[body_id, 0]
@@ -452,13 +611,21 @@ if __name__ == "__main__":  # pragma: no cover
     )
     frames: List[Any] = []
     for i in range(72):
-        f = render_frame(
+        # f = render_frame(
+            # cam_pos=jnp.array([5.0, 10.0, -10.0 + (i * 10 / 72)]),
+            # cam_dir=jnp.array([0.0, -0.5, 1.0]),
+            # tilemap=tilemap,
+            # terrain_color=jnp.array([1.0, 0.0, 0.0]),
+            # view_width=256,
+            # view_height=144,
+        # )
+        f = render_frame_with_objects(
             cam_pos=jnp.array([5.0, 10.0, -10.0 + (i * 10 / 72)]),
             cam_dir=jnp.array([0.0, -0.5, 1.0]),
             tilemap=tilemap,
-            terrain_color=jnp.array([1.0, 0.0, 0.0]),
-            view_width=256,
-            view_height=144,
+            terrain_color=DEFAULT_COLOR,
+            view_width=96,
+            view_height=72,
         )
         frames.append(np.array(f))
         print(f"Rendered frame {i}")

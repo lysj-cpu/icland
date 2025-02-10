@@ -3,7 +3,7 @@
 
 import os
 import time
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import jax
 import jax.numpy as jnp
@@ -47,7 +47,7 @@ SCENARIOS: Dict[str, Dict[str, Any]] = {
 # Helper: Set up environment & JAX step function (for example scenario).
 # For other scenarios, you might customize or override this part.
 # --------------------------------------------------------------------------------------
-def setup_environment(seed: int) -> Tuple[jnp.ndarray, Any, Any, Callable[..., Any]]:
+def setup_environment(seed: int) -> tuple[jnp.ndarray, Any, Any, Callable[..., Any]]:
     """Set up the environment for the benchmarking scenario.
 
     Args:

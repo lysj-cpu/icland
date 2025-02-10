@@ -3,7 +3,7 @@
 import os
 import xml.etree.ElementTree as ET
 from enum import Enum
-from typing import Any, Callable, Tuple
+from typing import Any, Callable
 
 import jax
 import jax.numpy as jnp
@@ -28,7 +28,7 @@ class TileType(Enum):
     VRAMP = 2
 
 
-def load_bitmap(filepath: str) -> Tuple[list[int], int, int]:
+def load_bitmap(filepath: str) -> tuple[list[int], int, int]:
     """Loads an image file (e.g., PNG) into a list of ARGB-encoded 32-bit integers.
 
     Returns:
@@ -124,7 +124,7 @@ class XMLReader:
         j_tilecodes (jax.numpy.array): JAX-compatible array of tile properties.
     """
 
-    def __tilename_to_code(self, tile: str, rotation: int) -> Tuple[int, int, int, int]:
+    def __tilename_to_code(self, tile: str, rotation: int) -> tuple[int, int, int, int]:
         name_split = tile.split("_")
         tile_type = name_split[0]
         tile_type_num = 0
@@ -480,11 +480,11 @@ class XMLReader:
             filename,
         )
 
-    def get_tilemap_data(self) -> Tuple[int, jax.Array, jax.Array, jax.Array]:
+    def get_tilemap_data(self) -> tuple[int, jax.Array, jax.Array, jax.Array]:
         """Returns relevant tilemap data.
 
         Returns:
-            Tuple: (T, j_weights, j_propagator, j_tilecodes)
+            tuple: (T, j_weights, j_propagator, j_tilecodes)
                 T (int): Number of unique tile variants.
                 j_weights (jax.numpy.array): Array of tile weights.
                 j_propagator (jax.numpy.array): Propagator data.
