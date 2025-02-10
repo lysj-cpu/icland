@@ -2,7 +2,7 @@
 
 import os
 from functools import partial
-from typing import Any, Tuple
+from typing import Tuple
 
 import jax
 import jax.numpy as jnp

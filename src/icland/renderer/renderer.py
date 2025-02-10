@@ -1,11 +1,10 @@
 from functools import partial  # noqa: D100
-from typing import Any, List, Tuple
+from typing import Any, Callable, List, Tuple
 
 import imageio
 import jax
 import jax.numpy as jnp
 import numpy as np
-from jax._src import pjit
 
 from icland.renderer.sdfs import box_sdf, ramp_sdf
 from icland.types import ICLandState
@@ -18,12 +17,17 @@ NUM_CHANNELS: jnp.int32 = 3
 
 
 def __norm(
-    v: jax.Array, axis: Any = -1, keepdims: jnp.bool = False, eps: jnp.float32 = 0.0
-):
+    v: jax.Array,
+    axis: jnp.int32 = -1,
+    keepdims: jnp.bool = False,
+    eps: jnp.float32 = 0.0,
+) -> jax.Array:
     return jnp.sqrt((v * v).sum(axis, keepdims=keepdims).clip(eps))
 
 
-def __normalize(v: jax.Array, axis: Any = -1, eps: jnp.float32 = 1e-20):
+def __normalize(
+    v: jax.Array, axis: jnp.int32 = -1, eps: jnp.float32 = 1e-20
+) -> jax.Array:
     return v / __norm(v, axis, keepdims=True, eps=eps)
 
 
@@ -34,7 +38,7 @@ def __process_column(
     rot: jnp.int32,
     w: jnp.float32,
     h: jnp.float32,
-) -> pjit.JitWrapped:
+) -> jnp.float32:
     angle = -jnp.pi * rot / 2
     cos_t = jnp.cos(angle)
     sin_t = jnp.sin(angle)
@@ -59,9 +63,9 @@ def __process_ramp(
     x: jnp.float32,
     y: jnp.float32,
     rot: jnp.int32,
-    w: jnp.float32,
     h: jnp.float32,
-) -> pjit.JitWrapped:
+    w: jnp.float32,
+) -> jnp.float32:
     angle = -jnp.pi * rot / 2
     cos_t = jnp.cos(angle)
     sin_t = jnp.sin(angle)
@@ -94,24 +98,31 @@ def __process_ramp(
     return ramp_sdf(transformed[:3], w, h)
 
 
-def __scene_sdf_from_tilemap(tilemap: jax.Array, p: jax.Array, floor_height=0.0):
+def __scene_sdf_from_tilemap(
+    tilemap: jax.Array, p: jax.Array, floor_height: jnp.float32 = 0.0
+) -> jnp.float32:
     w, h = tilemap.shape[0], tilemap.shape[1]
     dists = jnp.arange(w * h, dtype=jnp.int32)
     tile_width = 1
-    process_tile = lambda p, x, y, tile: jax.lax.switch(
-        tile[0],
-        [
-            lambda p, x, y, rot, w, h: __process_column(p, x, y, rot, w, h),
-            lambda p, x, y, rot, w, h: __process_ramp(p, x, y, rot, h, w),
-            lambda p, x, y, rot, w, h: __process_column(p, x, y, rot, w, h),
-        ],
-        p,
-        x,
-        y,
-        tile[1],
-        tile_width,
-        tile[3],
-    )
+
+    def process_tile(
+        p: jax.Array, x: jnp.int32, y: jnp.int32, tile: jax.Array
+    ) -> jnp.float32:
+        return jax.lax.switch(
+            tile[0],
+            [
+                __process_column,
+                __process_ramp,
+                __process_column,
+            ],
+            p,
+            x,
+            y,
+            tile[1],
+            tile_width,
+            tile[3],
+        )
+
     tile_dists = jax.vmap(
         lambda i: process_tile(p, i // w, i % w, tilemap[i // w, i % w])
     )(dists)
@@ -122,9 +133,14 @@ def __scene_sdf_from_tilemap(tilemap: jax.Array, p: jax.Array, floor_height=0.0)
 
 
 def __raycast(
-    sdf: pjit.JitWrapped, p0: jax.Array, dir: jax.Array, step_n: jnp.int32 = 50
-):
-    def f(_, p):
+    sdf: Callable[[jax.Array], jnp.float32],
+    p0: jax.Array,
+    dir: jax.Array,
+    step_n: jnp.int32 = 50,
+) -> Any:
+    reveal_type(sdf)
+
+    def f(_: Any, p: jax.Array) -> Any:
         return p + sdf(p) * dir
 
     return jax.lax.fori_loop(0, step_n, f, p0)
@@ -137,13 +153,13 @@ def __camera_rays(
     # view_size: tuple[jnp.int32, jnp.int32],
     w: jnp.int32,
     h: jnp.int32,
-    fx: float = 0.6,  # Changed type hint to float
+    fx: jnp.float32 = 0.6,  # Changed type hint to float
 ) -> jax.Array:
     """Finds camera rays."""
 
     # Define a helper normalization function.
-    def normalize(v):
-        return v / jnp.linalg.norm(v, axis=-1, keepdims=True)
+    def normalize(v: jax.Array) -> jax.Array:
+        return v / jnp.linalg.norm(v, axis=-1, keepdims=True)  # type: ignore
 
     # Ensure the forward direction is normalized.
     forward = normalize(forward)
@@ -187,13 +203,13 @@ def __camera_rays(
 
 
 def __cast_shadow(
-    sdf: pjit.JitWrapped,
+    sdf: partial[Any],
     light_dir: jax.Array,
     p0: jax.Array,
     step_n: jnp.int32 = 50,
     hardness: jnp.float32 = 8.0,
-) -> jax.Array:
-    def f(_: Any, carry: jnp.float32):
+) -> Any:
+    def f(_: Any, carry: jnp.float32) -> Any:
         t, shadow = carry
         h = sdf(p0 + light_dir * t)
         return t + h, jnp.clip(hardness * h / t, 0.0, shadow)
@@ -202,21 +218,21 @@ def __cast_shadow(
 
 
 def __scene_sdf_from_tilemap_color(
-    tilemap,
-    p,
+    tilemap: jax.Array,
+    p: jax.Array,
     terrain_color: jax.Array = DEFAULT_COLOR,
-    with_color=False,
-    floor_height=0.0,
-):
+    with_color: bool = False,
+    floor_height: jnp.float32 = 0.0,
+) -> Tuple[jnp.float32, jax.Array]:
     """SDF for the world terrain."""
     tile_dist = __scene_sdf_from_tilemap(tilemap, p, floor_height - 1)
     floor_dist = p[1] - floor_height
     min_dist = jnp.minimum(tile_dist, floor_dist)
 
-    def process_without_color(_):
+    def process_without_color(_: Any) -> Tuple[jnp.float32, jax.Array]:
         return min_dist, jnp.zeros((3,))
 
-    def process_with_color(_):
+    def process_with_color(_: Any) -> Tuple[jnp.float32, jax.Array]:
         x, _, z = jnp.tanh(jnp.sin(p * jnp.pi) * 20.0)
         floor_color = (0.5 + (x * z) * 0.1) * jnp.ones(3)
         color = jnp.choose(
@@ -224,7 +240,7 @@ def __scene_sdf_from_tilemap_color(
         )
         return min_dist, color
 
-    return jax.lax.cond(with_color, process_with_color, process_without_color, None)
+    return jax.lax.cond(with_color, process_with_color, process_without_color, None)  # type: ignore
 
 
 @partial
@@ -285,10 +301,10 @@ transform_axes = jnp.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]])
 
 def get_agent_camera_from_mjx(
     icland_state: ICLandState,
-    world_width: int,
-    body_id: int,
-    camera_height: float = 0.2,
-    camera_offset: float = 0.06,
+    world_width: jnp.int32,
+    body_id: jnp.int32,
+    camera_height: jnp.float32 = 0.2,
+    camera_offset: jnp.float32 = 0.06,
 ) -> Tuple[jax.Array, jax.Array]:
     """Get the camera position and direction from the MuJoCo data."""
     data = icland_state.pipeline_state.mjx_data

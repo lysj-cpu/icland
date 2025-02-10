@@ -29,6 +29,7 @@ from typing import Any, Dict, List
 
 import imageio
 import jax
+import jax.numpy as jnp
 import mujoco
 from assets.policies import *
 from assets.worlds import *
@@ -276,7 +277,7 @@ def render_video(
 
 
 def render_video_from_world_with_policies(
-    key: jax.random.PRNGKey,
+    key: jax.Array,
     policies: List[jax.Array],
     switch_intervals: List[float],
     duration: int,
@@ -297,7 +298,7 @@ def render_video_from_world_with_policies(
     pieces = create_world(tilemap)
     temp_dir = "temp"
     export_stls(pieces, f"{temp_dir}/{temp_dir}")
-    
+
     xml_str = __generate_mjcf_string(tilemap, jnp.array([[1.5, 1, 4]]), f"{temp_dir}/")
     mj_model = mujoco.MjModel.from_xml_string(xml_str)
     icland_params = ICLandParams(model=mj_model, game=None, agent_count=1)
@@ -305,10 +306,10 @@ def render_video_from_world_with_policies(
     icland_state = icland.init(key, icland_params)
     mjx_data = icland_state.pipeline_state.mjx_data
     frames: List[Any] = []
-    
+
     current_policy_idx = 0
     policy = policies[current_policy_idx]
-    
+
     print(f"Starting simulation: {video_name}")
     last_printed_time = -0.1
 
@@ -318,7 +319,10 @@ def render_video_from_world_with_policies(
 
     while mjx_data.time < duration:
         # Switch policy at defined intervals
-        if current_policy_idx < len(switch_intervals) and mjx_data.time >= switch_intervals[current_policy_idx]:
+        if (
+            current_policy_idx < len(switch_intervals)
+            and mjx_data.time >= switch_intervals[current_policy_idx]
+        ):
             current_policy_idx += 1
             if current_policy_idx < len(policies):
                 policy = policies[current_policy_idx]
@@ -332,12 +336,18 @@ def render_video_from_world_with_policies(
         mjx_data = icland_state.pipeline_state.mjx_data
 
         if len(frames) < mjx_data.time * 30:
-            print("Agent pos:", mjx_data.xpos[icland_state.pipeline_state.component_ids[0, 0]][:3])
-            camera_pos, camera_dir = get_camera_info(icland_state, world_width, default_agent_1)
+            print(
+                "Agent pos:",
+                mjx_data.xpos[icland_state.pipeline_state.component_ids[0, 0]][:3],
+            )
+            camera_pos, camera_dir = get_camera_info(
+                icland_state, world_width, default_agent_1
+            )
             f = render_frame(camera_pos, camera_dir, tilemap)
             frames.append(f)
 
     imageio.mimsave(video_name, frames, fps=30, quality=8)
+
 
 if __name__ == "__main__":
     keys = [
