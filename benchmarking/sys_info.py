@@ -6,14 +6,13 @@ import shutil
 import subprocess
 import sys
 import time
-from typing import Dict, Union  # For type annotations
 
 import cpuinfo
 import GPUtil
 import psutil
 
 
-def get_cpu_info() -> Dict[str, str]:
+def get_cpu_info() -> dict[str, str]:
     """Get CPU information."""
     info = cpuinfo.get_cpu_info()
     return {
@@ -26,7 +25,7 @@ def get_cpu_info() -> Dict[str, str]:
     }
 
 
-def get_memory_info() -> Dict[str, str]:
+def get_memory_info() -> dict[str, str]:
     """Get memory information."""
     mem = psutil.virtual_memory()
     return {
@@ -35,7 +34,7 @@ def get_memory_info() -> Dict[str, str]:
     }
 
 
-def get_storage_info() -> Dict[str, str]:
+def get_storage_info() -> dict[str, str]:
     """Get storage information."""
     disk = shutil.disk_usage("/")
     return {
@@ -48,7 +47,7 @@ def get_storage_info() -> Dict[str, str]:
     }
 
 
-def get_os_info() -> Dict[str, str]:
+def get_os_info() -> dict[str, str]:
     """Get OS information."""
     return {
         "OS": platform.system(),
@@ -59,7 +58,7 @@ def get_os_info() -> Dict[str, str]:
     }
 
 
-def get_python_info() -> Dict[str, str]:
+def get_python_info() -> dict[str, str]:
     """Get Python information."""
     return {
         "Python Version": sys.version,
@@ -70,11 +69,11 @@ def get_python_info() -> Dict[str, str]:
     }
 
 
-def get_gpu_info() -> Dict[str, Union[str, Dict[str, str]]]:
+def get_gpu_info() -> dict[str, dict[str, str]]:
     """Get GPU information."""
     gpus = GPUtil.getGPUs()
     if not gpus:
-        return {"GPU": "No dedicated GPU found"}
+        return {"GPU": {"Model": "No dedicated GPU found"}}
     return {
         f"GPU {i + 1}": {
             "Model": gpu.name,
