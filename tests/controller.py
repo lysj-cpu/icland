@@ -25,7 +25,6 @@ xla_flags = os.environ.get("XLA_FLAGS", "")
 xla_flags += " --xla_gpu_triton_gemm_any=True"
 os.environ["XLA_FLAGS"] = xla_flags
 
-
 import cv2  # For displaying frames and capturing window events.
 import jax
 import jax.numpy as jnp

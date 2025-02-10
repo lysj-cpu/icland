@@ -20,8 +20,6 @@ else:
     os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 
 
-from typing import Tuple
-
 import jax
 import jax.numpy as jnp
 import mujoco
@@ -182,9 +180,9 @@ def step(
 
     # Define a function to step a single agent
     def step_single_agent(
-        carry: Tuple[MjxStateType, jax.Array],
-        agent_components: Tuple[jnp.ndarray, jnp.ndarray],
-    ) -> Tuple[Tuple[MjxStateType, jax.Array], None]:
+        carry: tuple[MjxStateType, jax.Array],
+        agent_components: tuple[jnp.ndarray, jnp.ndarray],
+    ) -> tuple[tuple[MjxStateType, jax.Array], None]:
         mjx_data, action = carry
 
         agent_component, agent_index = agent_components
