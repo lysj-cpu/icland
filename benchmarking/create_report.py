@@ -1,7 +1,7 @@
-# type: ignore
 """Create a PDF report with system information and benchmark results."""
 
 import os
+from dataclasses import dataclass
 
 from pylatex import Document, NoEscape
 from run_benchmarking import run_all_scenarios
@@ -15,10 +15,22 @@ from sys_info import (
 )
 
 
+@dataclass
+class SystemInfo:
+    """Dataclass to store system information."""
+
+    cpu_information: dict[str, str]
+    memory_information: dict[str, str]
+    storage_information: dict[str, str]
+    os_information: dict[str, str]
+    gpu_information: dict[str, dict[str, str]]
+    python_environment: dict[str, str]
+
+
 # --------------------------------------------------------------------------------------
 # 1) Gather System Info
 # --------------------------------------------------------------------------------------
-def gather_system_info():
+def gather_system_info() -> SystemInfo:
     """Gather system information."""
     cpu_info = get_cpu_info()
     memory_info = get_memory_info()
@@ -27,29 +39,29 @@ def gather_system_info():
     gpu_info = get_gpu_info()
     python_info = get_python_info()
 
-    # Pack into nested dict for table generation
-    values = {
-        "CPU Information": cpu_info,
-        "Memory Information": memory_info,
-        "Storage Information": storage_info,
-        "OS Information": os_info,
-        "GPU Information": {},
-        "Python Environment": {
+    system_info = SystemInfo(
+        cpu_information=cpu_info,
+        memory_information=memory_info,
+        storage_information=storage_info,
+        os_information=os_info,
+        gpu_information={},
+        python_environment={
             "Python Version": python_info["Python Version"],
             "Interpreter": python_info["Interpreter"],
             "Virtual Env": python_info["Virtual Env"],
             "Installed Packages": f"{len(python_info['Installed Packages'])} packages",
         },
-    }
-    # Fill GPU info
+    )
+
     for gpu_id, gpu_data in gpu_info.items():
-        values["GPU Information"][f"GPU {gpu_id}"] = {
+        system_info.gpu_information[f"GPU {gpu_id}"] = {
             "Model": gpu_data.get("Model", "No dedicated GPU found"),
             "VRAM": gpu_data.get("VRAM", "N/A"),
             "Temperature": gpu_data.get("Temperature", "N/A"),
             "Driver": gpu_data.get("Driver", "N/A"),
         }
-    return values
+
+    return system_info
 
 
 # --------------------------------------------------------------------------------------
@@ -77,7 +89,7 @@ def sanitize_for_latex(value: str) -> str:
 # --------------------------------------------------------------------------------------
 # 3) Helper: Generate LaTeX Table for System Info
 # --------------------------------------------------------------------------------------
-def generate_latex_table(title: str, data: dict) -> str:
+def generate_latex_table(title: str, data: dict[str, str | dict[str, str]]) -> str:
     """Generate a LaTeX table from a dictionary."""
     table = f"\\subsection*{{{sanitize_for_latex(title)}}}\n"
     table += "\\begin{tabular*}{\\textwidth}{@{\\extracolsep{\\fill}}p{0.25\\textwidth}p{0.75\\textwidth}@{}}\n"
@@ -113,7 +125,7 @@ def generate_latex_table(title: str, data: dict) -> str:
 # --------------------------------------------------------------------------------------
 # 4) Main create_report function
 # --------------------------------------------------------------------------------------
-def create_report(output_pdf="benchmarking/output/benchmark_report"):
+def create_report(output_pdf: str = "benchmarking/output/benchmark_report") -> None:
     """Create a PDF report with system information and benchmark results."""
     # 4.1) Gather System Info
     sys_info = gather_system_info()
@@ -140,7 +152,7 @@ def create_report(output_pdf="benchmarking/output/benchmark_report"):
 
     # 4.4) Device Information Section
     doc.append(NoEscape(r"\section*{Device Information}"))
-    for section_title, section_data in sys_info.items():
+    for section_title, section_data in sys_info.__dict__.items():
         table_tex = generate_latex_table(section_title, section_data)
         doc.append(NoEscape(table_tex))
 
