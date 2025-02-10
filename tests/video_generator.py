@@ -43,38 +43,35 @@ from icland.world_gen.JITModel import export, sample_world
 from icland.world_gen.tile_data import TILECODES
 
 SIMULATION_PRESETS: List[Dict[str, Any]] = [
-    # {"name": "ramp_60", "world": RAMP_60, "policy": FORWARD_POLICY, "duration": 4},
-    # {"name": "ramp_30", "world": RAMP_30, "policy": FORWARD_POLICY, "duration": 4},
-    # {"name": "ramp_45", "world": RAMP_45, "policy": FORWARD_POLICY, "duration": 4},
-    # {
-    #     "name": "two_agent_move_collide",
-    #     "world": TWO_AGENT_EMPTY_WORLD_COLLIDE,
-    #     "policy": jnp.array([FORWARD_POLICY, BACKWARD_POLICY]),
-    #     "duration": 4,
-    #     "agent_count": 2,
-    # },
+    {
+        "name": "two_agent_move_collide",
+        "world": TWO_AGENT_EMPTY_WORLD_COLLIDE,
+        "policy": jnp.array([FORWARD_POLICY, BACKWARD_POLICY]),
+        "duration": 4,
+        "agent_count": 2,
+    },
+    {"name": "ramp_30", "world": RAMP_30, "policy": FORWARD_POLICY, "duration": 4},
+    {"name": "ramp_60", "world": RAMP_60, "policy": FORWARD_POLICY, "duration": 4},
+    {"name": "ramp_45", "world": RAMP_45, "policy": FORWARD_POLICY, "duration": 4},
     {
         "name": "world_42_convex",
         "world": WORLD_42_CONVEX,
         "policy": FORWARD_POLICY,
         "duration": 4,
     },
-    # {
-    #     "name": "two_agent_move_parallel",
-    #     "world": TWO_AGENT_EMPTY_WORLD,
-    #     "policy": jnp.array([FORWARD_POLICY, FORWARD_POLICY]),
-    #     "duration": 4,
-    #     "agent_count": 2,
-    # },
-    # {
-    #     "name": "empty_world",
-    #     "world": EMPTY_WORLD,
-    #     "policy": FORWARD_POLICY,
-    #     "duration": 4,
-    # },
-    # {"name": "ramp_30", "world": RAMP_30, "policy": FORWARD_POLICY, "duration": 4},
-    # {"name": "ramp_45", "world": RAMP_45, "policy": FORWARD_POLICY, "duration": 4},
-    # {"name": "ramp_60", "world": RAMP_60, "policy": FORWARD_POLICY, "duration": 4},
+    {
+        "name": "two_agent_move_parallel",
+        "world": TWO_AGENT_EMPTY_WORLD,
+        "policy": jnp.array([FORWARD_POLICY, FORWARD_POLICY]),
+        "duration": 4,
+        "agent_count": 2,
+    },
+    {
+        "name": "world_42_convex",
+        "world": WORLD_42_CONVEX,
+        "policy": FORWARD_POLICY,
+        "duration": 4,
+    },
 ]
 
 
@@ -225,10 +222,12 @@ def render_video(
     """
     mj_model = mujoco.MjModel.from_xml_string(model_xml)
 
-    icland_params = ICLandParams(model=mj_model, game=None, agent_count=agent_count)
+    icland_params = ICLandParams(
+        model=mj_model, reward_function=None, agent_count=agent_count
+    )
 
     icland_state = icland.init(key, icland_params)
-    icland_state = icland.step(key, icland_state, None, policy)
+    icland_state = icland.step(key, icland_state, icland_params, policy)
     mjx_data = icland_state.pipeline_state.mjx_data
 
     third_person_frames: List[Any] = []
@@ -254,7 +253,7 @@ def render_video(
             if int(mjx_data.time * 10) != int(last_printed_time * 10):
                 print(f"Time: {mjx_data.time:.1f}")
                 last_printed_time = mjx_data.time
-            icland_state = icland.step(key, icland_state, None, policy)
+            icland_state = icland.step(key, icland_state, icland_params, policy)
             mjx_data = icland_state.pipeline_state.mjx_data
             if len(third_person_frames) < mjx_data.time * 30:
                 mj_data = mjx.get_data(mj_model, mjx_data)
@@ -350,20 +349,22 @@ def render_video_from_world_with_policies(
 
 
 if __name__ == "__main__":
-    keys = [
-        jax.random.PRNGKey(42),
-        jax.random.PRNGKey(420),
-        jax.random.PRNGKey(2004),
-    ]
-    for k in keys:
-        render_video_from_world(
-            k, FORWARD_POLICY, 4, f"tests/video_output/world_convex_{k[1]}_mjx.mp4"
-        )
-    # for i, preset in enumerate(SIMULATION_PRESETS):
-    #     render_video(
-    #         preset["world"],
-    #         preset["policy"],
-    #         preset["duration"],
-    #         f"tests/video_output/{preset['name']}.mp4",
-    #         agent_count=preset.get("agent_count", 1),
+    # keys = [
+    #     jax.random.PRNGKey(42),
+    #     jax.random.PRNGKey(420),
+    #     jax.random.PRNGKey(2004),
+    # ]
+    # for k in keys:
+    #     render_video_from_world(
+    #         k, FORWARD_POLICY, 4, f"tests/video_output/world_convex_{k[1]}_mjx.mp4"
     #     )
+    for i, preset in enumerate(SIMULATION_PRESETS):
+        print(f"Running preset {i + 1}/{len(SIMULATION_PRESETS)}: {preset['name']}")
+        render_video(
+            jax.random.PRNGKey(42),
+            preset["world"],
+            preset["policy"],
+            preset["duration"],
+            f"tests/video_output/{preset['name']}.mp4",
+            agent_count=preset.get("agent_count", 1),
+        )

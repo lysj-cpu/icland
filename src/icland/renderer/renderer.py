@@ -138,8 +138,6 @@ def __raycast(
     dir: jax.Array,
     step_n: jnp.int32 = 50,
 ) -> Any:
-    reveal_type(sdf)
-
     def f(_: Any, p: jax.Array) -> Any:
         return p + sdf(p) * dir
 
