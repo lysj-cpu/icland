@@ -19,21 +19,24 @@ WORLD_UP: jax.Array = jnp.array([0.0, 1.0, 0.0], dtype=jnp.float32)
 NUM_CHANNELS: jnp.int32 = 3
 
 
+@partial(jax.jit, static_argnames=["axis", "keepdims"])
 def __norm(
     v: jax.Array,
     axis: jnp.int32 = -1,
     keepdims: jnp.bool = False,
     eps: jnp.float32 = 0.0,
 ) -> jax.Array:
-    return jnp.sqrt((v * v).sum(axis, keepdims=keepdims).clip(eps))
+    return jnp.sqrt((v * v).sum(axis, keepdims=keepdims).clip(min=eps))
 
 
+@jax.jit
 def __normalize(
     v: jax.Array, axis: jnp.int32 = -1, eps: jnp.float32 = 1e-20
 ) -> jax.Array:
-    return v / __norm(v, axis, keepdims=True, eps=eps)
+    return v / __norm(v, axis, keepdims=True, eps=eps)  # type: ignore
 
 
+@jax.jit
 def __process_column(
     p: jax.Array,
     x: jnp.float32,
@@ -61,6 +64,7 @@ def __process_column(
     return box_sdf(transformed[:3], w, (h * w) / 2)
 
 
+@jax.jit
 def __process_ramp(
     p: jax.Array,
     x: jnp.float32,
@@ -101,9 +105,10 @@ def __process_ramp(
     return ramp_sdf(transformed[:3], w, h)
 
 
+@jax.jit
 def __scene_sdf_from_tilemap(
     tilemap: jax.Array, p: jax.Array, floor_height: jnp.float32 = 0.0
-) -> jnp.float32:
+) -> jax.Array:
     w, h = tilemap.shape[0], tilemap.shape[1]
     dists = jnp.arange(w * h, dtype=jnp.int32)
     tile_width = 1
@@ -135,8 +140,9 @@ def __scene_sdf_from_tilemap(
     return jnp.minimum(floor_dist, tile_dists.min())
 
 
+@partial(jax.jit, static_argnames=["sdf"])
 def __raycast(
-    sdf: Callable[[jax.Array], jnp.float32],
+    sdf: Callable[[jax.Array], jax.Array],
     p0: jax.Array,
     dir: jax.Array,
     step_n: jnp.int32 = 50,
@@ -203,8 +209,9 @@ def __camera_rays(
     return ray_dir
 
 
+@partial(jax.jit, static_argnames=["sdf"])
 def __cast_shadow(
-    sdf: partial[Any],
+    sdf: Callable[[jax.Array], jax.Array],
     light_dir: jax.Array,
     p0: jax.Array,
     step_n: jnp.int32 = 50,
@@ -218,6 +225,7 @@ def __cast_shadow(
     return jax.lax.fori_loop(0, step_n, f, (1e-2, 1.0))[1]
 
 
+@jax.jit
 def __scene_sdf_from_tilemap_color(
     tilemap: jax.Array,
     p: jax.Array,
@@ -244,7 +252,7 @@ def __scene_sdf_from_tilemap_color(
     return jax.lax.cond(with_color, process_with_color, process_without_color, None)  # type: ignore
 
 
-@partial
+@jax.jit
 def __shade_f(
     surf_color: jax.Array,
     shadow: jax.Array,
@@ -258,7 +266,7 @@ def __shade_f(
     half = __normalize(light_dir - ray_dir)
     spec = 0.3 * shadow * half.dot(normal).clip(0.0) ** 200.0
     light = 0.7 * diffuse + 0.2 * ambient
-    return surf_color * light + spec
+    return surf_color * light + spec  # type: ignore
 
 
 @partial(jax.jit, static_argnames=["view_width", "view_height"])
@@ -294,12 +302,13 @@ def render_frame(
     frame = jax.vmap(f)(surf_color, shadow, raw_normal, ray_dir)
     frame = frame ** (1.0 / 2.2)  # gamma correction
 
-    return frame.reshape((view_height, view_width, NUM_CHANNELS))
+    return frame.reshape((view_height, view_width, NUM_CHANNELS))  # type: ignore
 
 
 transform_axes = jnp.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]])
 
 
+@jax.jit
 def get_agent_camera_from_mjx(
     icland_state: ICLandState,
     world_width: jnp.int32,
