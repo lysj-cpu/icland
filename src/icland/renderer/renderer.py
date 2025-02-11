@@ -30,7 +30,7 @@ def __norm(
 def __normalize(
     v: jax.Array, axis: jnp.int32 = -1, eps: jnp.float32 = 1e-20
 ) -> jax.Array:
-    return v / __norm(v, axis, keepdims=True, eps=eps)
+    return v / __norm(v, axis, keepdims=True, eps=eps)  # type: ignore
 
 
 @jax.jit
@@ -263,7 +263,7 @@ def __shade_f(
     half = __normalize(light_dir - ray_dir)
     spec = 0.3 * shadow * half.dot(normal).clip(0.0) ** 200.0
     light = 0.7 * diffuse + 0.2 * ambient
-    return surf_color * light + spec
+    return surf_color * light + spec    # type: ignore
 
 
 @partial(jax.jit, static_argnames=["view_width", "view_height"])
@@ -299,7 +299,7 @@ def render_frame(
     frame = jax.vmap(f)(surf_color, shadow, raw_normal, ray_dir)
     frame = frame ** (1.0 / 2.2)  # gamma correction
 
-    return frame.reshape((view_height, view_width, NUM_CHANNELS))
+    return frame.reshape((view_height, view_width, NUM_CHANNELS))   # type: ignore
 
 
 transform_axes = jnp.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]])
