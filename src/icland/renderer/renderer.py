@@ -103,7 +103,7 @@ def __process_ramp(
 
 def __scene_sdf_from_tilemap(
     tilemap: jax.Array, p: jax.Array, floor_height: jnp.float32 = 0.0
-) -> jnp.float32:
+) -> tuple[jnp.float32, jnp.int32, jnp.int32]:
     w, h = tilemap.shape[0], tilemap.shape[1]
     dists = jnp.arange(w * h, dtype=jnp.int32)
     tile_width = 1
@@ -129,10 +129,15 @@ def __scene_sdf_from_tilemap(
     tile_dists = jax.vmap(
         lambda i: process_tile(p, i // w, i % w, tilemap[i // w, i % w])
     )(dists)
+    min_dist_index = jnp.argmin(tile_dists)
 
     floor_dist = p[1] - floor_height
 
-    return jnp.minimum(floor_dist, tile_dists.min())
+    return (
+        jnp.minimum(floor_dist, tile_dists.min()),
+        min_dist_index // w,
+        min_dist_index % w,
+    )
 
 
 def __raycast(
@@ -227,7 +232,7 @@ def __scene_sdf_from_tilemap_color(
     floor_height: jnp.float32 = 0.0,
 ) -> tuple[jnp.float32, jax.Array]:
     """SDF for the world terrain."""
-    tile_dist = __scene_sdf_from_tilemap(tilemap, p, floor_height - 1)
+    tile_dist, _, _ = __scene_sdf_from_tilemap(tilemap, p, floor_height - 1)
     floor_dist = p[1] - floor_height
     min_dist = jnp.minimum(tile_dist, floor_dist)
 
@@ -258,11 +263,10 @@ def __scene_sdf_with_objs(
     prop_pos: jax.Array,
     prop_rot: jax.Array,
     prop_col: jax.Array,
+    terrain_cmap: jax.Array,
     # Ray point
     p: jax.Array,
     # Extra kwargs
-    terrain_color: jax.Array = DEFAULT_COLOR,
-    # with_color: bool = False,
     floor_height: jnp.float32 = 0.0,
 ) -> tuple[jnp.float32, jax.Array]:
     """SDF for the agents and props."""
@@ -270,7 +274,7 @@ def __scene_sdf_with_objs(
     # Pre: the lengths of prop_pos, prop_rot and prop_col are the same.
 
     # Add distances computed by SDFs here
-    tile_dist = __scene_sdf_from_tilemap(tilemap, p, floor_height - 1)
+    tile_dist, cx, cy = __scene_sdf_from_tilemap(tilemap, p, floor_height - 1)
     floor_dist = p[1] - floor_height
 
     def process_player_sdf(i: jnp.int32) -> tuple[jnp.float32, jax.Array]:
@@ -350,6 +354,8 @@ def __scene_sdf_with_objs(
 
     x, _, z = jnp.tanh(jnp.sin(p * jnp.pi) * 20.0)
     floor_color = (0.5 + (x * z) * 0.1) * jnp.ones(3)
+    terrain_color = terrain_cmap[cx, cy]
+
     min_dist_col = jnp.array(
         [terrain_color, floor_color, min_prop_col, min_player_col]
     )[jnp.argmin(candidates)]
@@ -374,16 +380,30 @@ def __shade_f(
     return surf_color * light + spec
 
 
-# tilemap: jax.Array,
-# props: jax.Array,
-# player_pos: jax.Array,
-# player_col: jax.Array,
-# prop_pos: jax.Array,
-# prop_rot: jax.Array,
-# prop_col: jax.Array,
-# p: jax.Array,
-# terrain_color: jax.Array = DEFAULT_COLOR,
-# floor_height: jnp.float32 = 0.0,
+def generate_colormap(key: jax.Array, width: jnp.int32, height: jnp.int32) -> jax.Array:
+    """Generates a colormap array with random colors from a set."""
+    colors = jnp.array(
+        [
+            [1.0, 0.5, 0.0],  # Orange
+            [0.5, 1.0, 0.5],  # Light Green
+            [0.0, 0.0, 0.5],  # Light Blue
+            [0.75, 0.5, 0.75],  # Light Purple
+        ]
+    )  # Shape (4, 3) - 4 colors, 3 channels (RGB)
+
+    num_colors = colors.shape[0]
+    total_elements = width * height  # For 2D part of the array
+
+    # Generate random indices (0, 1, 2, 3) for the colors
+    color_indices = jax.random.randint(key, (total_elements,), 0, num_colors)
+
+    # Use advanced indexing to select the colors
+    selected_colors = colors[color_indices]  # Shape (total_elements, 3)
+
+    # Reshape to the desired colormap shape
+    colormap = selected_colors.reshape((width, height, 3))
+
+    return colormap
 
 
 @partial(jax.jit, static_argnames=["view_width", "view_height"])
@@ -391,8 +411,8 @@ def render_frame_with_objects(
     cam_pos: jax.Array,
     cam_dir: jax.Array,
     tilemap: jax.Array,
+    terrain_cmap: jax.Array,
     props: jax.Array = jnp.array([1]),
-    terrain_color: jax.Array = DEFAULT_COLOR,
     light_dir: jax.Array = __normalize(jnp.array([5.0, 10.0, 5.0])),
     view_width: jnp.int32 = DEFAULT_VIEWSIZE[0],
     view_height: jnp.int32 = DEFAULT_VIEWSIZE[1],
@@ -416,7 +436,7 @@ def render_frame_with_objects(
         prop_pos,
         prop_rot,
         prop_col,
-        terrain_color=terrain_color,
+        terrain_cmap,
     )
     sdf_dists_only = lambda p: sdf(p)[0]
     hit_pos = jax.vmap(partial(__raycast, sdf_dists_only, cam_pos))(ray_dir)
@@ -449,11 +469,12 @@ def render_frame(
     # Ray casting
     ray_dir = __camera_rays(cam_pos, cam_dir, view_width, view_height, fx=0.6)
     sdf = partial(__scene_sdf_from_tilemap, tilemap)
-    hit_pos = jax.vmap(partial(__raycast, sdf, cam_pos))(ray_dir)
+    sdf_dist_only = lambda p: sdf(p)[0]
+    hit_pos = jax.vmap(partial(__raycast, sdf_dist_only, cam_pos))(ray_dir)
 
     # Shading
-    raw_normal = jax.vmap(jax.grad(sdf))(hit_pos)
-    shadow = jax.vmap(partial(__cast_shadow, sdf, light_dir))(hit_pos)
+    raw_normal = jax.vmap(jax.grad(sdf_dist_only))(hit_pos)
+    shadow = jax.vmap(partial(__cast_shadow, sdf_dist_only, light_dir))(hit_pos)
     color_sdf = partial(
         __scene_sdf_from_tilemap_color,
         tilemap,
@@ -751,6 +772,8 @@ if __name__ == "__main__":  # pragma: no cover
         ]
     )
     frames: List[Any] = []
+    cmap = generate_colormap(jax.random.PRNGKey(0), 10, 10)
+    print(cmap.shape)
     for i in range(72):
         # f = render_frame(
         # cam_pos=jnp.array([5.0, 10.0, -10.0 + (i * 10 / 72)]),
@@ -764,7 +787,7 @@ if __name__ == "__main__":  # pragma: no cover
             cam_pos=jnp.array([5.0, 10.0, -10.0 + (i * 10 / 72)]),
             cam_dir=jnp.array([0.0, -0.5, 1.0]),
             tilemap=tilemap,
-            terrain_color=DEFAULT_COLOR,
+            terrain_cmap=cmap,
             view_width=96,
             view_height=72,
         )
@@ -772,7 +795,7 @@ if __name__ == "__main__":  # pragma: no cover
         print(f"Rendered frame {i}")
 
     imageio.mimsave(
-        f"tests/video_output/sdf_world_scene_gpu.mp4",
+        f"tests/video_output/sdf_world_scene.mp4",
         frames,
         fps=30,
         quality=8,
