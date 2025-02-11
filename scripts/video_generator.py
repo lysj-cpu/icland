@@ -31,11 +31,10 @@ import imageio
 import jax
 import jax.numpy as jnp
 import mujoco
-from assets.policies import *
-from assets.worlds import *
 from mujoco import mjx
 
 import icland
+from icland.presets import *
 from icland.renderer.renderer import get_agent_camera_from_mjx, render_frame
 from icland.types import *
 from icland.world_gen.converter import create_world, export_stls, sample_spawn_points
@@ -54,23 +53,11 @@ SIMULATION_PRESETS: list[dict[str, Any]] = [
     {"name": "ramp_60", "world": RAMP_60, "policy": FORWARD_POLICY, "duration": 4},
     {"name": "ramp_45", "world": RAMP_45, "policy": FORWARD_POLICY, "duration": 4},
     {
-        "name": "world_42_convex",
-        "world": WORLD_42_CONVEX,
-        "policy": FORWARD_POLICY,
-        "duration": 4,
-    },
-    {
         "name": "two_agent_move_parallel",
         "world": TWO_AGENT_EMPTY_WORLD,
         "policy": jnp.array([FORWARD_POLICY, FORWARD_POLICY]),
         "duration": 4,
         "agent_count": 2,
-    },
-    {
-        "name": "world_42_convex",
-        "world": WORLD_42_CONVEX,
-        "policy": FORWARD_POLICY,
-        "duration": 4,
     },
 ]
 
@@ -178,12 +165,6 @@ def render_video_from_world(
         icland_state = icland.step(key, icland_state, None, policy)
         mjx_data = icland_state.pipeline_state.mjx_data
         if len(frames) < mjx_data.time * 30:
-            print(
-                "Agent pos:",
-                mjx_data.xpos[
-                    icland_state.pipeline_state.component_ids[default_agent_1, 0]
-                ][:3],
-            )
             camera_pos, camera_dir = get_camera_info(
                 icland_state, world_width, default_agent_1
             )
@@ -257,10 +238,6 @@ def render_video(
             mjx_data = icland_state.pipeline_state.mjx_data
             if len(third_person_frames) < mjx_data.time * 30:
                 mj_data = mjx.get_data(mj_model, mjx_data)
-                print(
-                    "Agent pos:",
-                    mjx_data.xpos[icland_state.pipeline_state.component_ids[0, 0]][:3],
-                )
                 mujoco.mjv_updateScene(
                     mj_model,
                     mj_data,
@@ -335,10 +312,6 @@ def render_video_from_world_with_policies(
         mjx_data = icland_state.pipeline_state.mjx_data
 
         if len(frames) < mjx_data.time * 30:
-            print(
-                "Agent pos:",
-                mjx_data.xpos[icland_state.pipeline_state.component_ids[0, 0]][:3],
-            )
             camera_pos, camera_dir = get_camera_info(
                 icland_state, world_width, default_agent_1
             )
@@ -365,6 +338,6 @@ if __name__ == "__main__":
             preset["world"],
             preset["policy"],
             preset["duration"],
-            f"tests/video_output/{preset['name']}.mp4",
+            f"scripts/video_output/{preset['name']}.mp4",
             agent_count=preset.get("agent_count", 1),
         )

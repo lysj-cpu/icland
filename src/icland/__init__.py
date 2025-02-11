@@ -1,25 +1,5 @@
 """Recreating Google DeepMind's XLand RL environment in JAX."""
 
-import os
-import shutil
-import warnings
-
-if shutil.which("nvidia-smi") is None:
-    warnings.warn("Cannot communicate with GPU")
-else:
-    # N.B. These need to be before the mujoco imports
-    # Fixes AttributeError: 'Renderer' object has no attribute '_mjr_context'
-    os.environ["MUJOCO_GL"] = "egl"
-
-    # Tell XLA to use Triton GEMM, this can improve steps/sec by ~30% on some GPUs
-    xla_flags = os.environ.get("XLA_FLAGS", "")
-    xla_flags += " --xla_gpu_triton_gemm_any=True"
-    os.environ["XLA_FLAGS"] = xla_flags
-
-    # See: https://github.com/jax-ml/jax/issues/8916#issuecomment-1101113497
-    os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-
-
 import jax
 import jax.numpy as jnp
 import mujoco
@@ -27,7 +7,7 @@ from mujoco import mjx
 
 from .agent import collect_body_scene_info, create_agent, step_agent
 from .constants import *
-from .game_generator import generate_game
+from .game import generate_game
 from .types import *
 
 
