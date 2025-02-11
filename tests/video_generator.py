@@ -53,12 +53,12 @@ SIMULATION_PRESETS: List[Dict[str, Any]] = [
     # {"name": "ramp_30", "world": RAMP_30, "policy": FORWARD_POLICY, "duration": 4},
     # {"name": "ramp_60", "world": RAMP_60, "policy": FORWARD_POLICY, "duration": 4},
     # {"name": "ramp_45", "world": RAMP_45, "policy": FORWARD_POLICY, "duration": 4},
-    # {
-    #     "name": "world_42_convex",
-    #     "world": WORLD_42_CONVEX,
-    #     "policy": FORWARD_POLICY,
-    #     "duration": 4,
-    # },
+    {
+        "name": "world_42_convex",
+        "world": WORLD_42_CONVEX,
+        "policy": FORWARD_POLICY,
+        "duration": 4,
+    },
     # {
     #     "name": "two_agent_move_parallel",
     #     "world": TWO_AGENT_EMPTY_WORLD,
@@ -66,19 +66,19 @@ SIMULATION_PRESETS: List[Dict[str, Any]] = [
     #     "duration": 4,
     #     "agent_count": 2,
     # },
-    {
-        "name": "world_42_convex",
-        "world": WORLD_42_CONVEX,
-        "policy": RIGHT_POLICY,
-        "duration": 2.5,
-    },
+    # {
+    #     "name": "world_42_convex",
+    #     "world": WORLD_42_CONVEX,
+    #     "policy": RIGHT_POLICY,
+    #     "duration": 2.5,
+    # },
 ]
 
 
 def _generate_mjcf_string(  # pragma: no cover
     tile_map: jax.Array,
     agent_spawns: jax.Array,
-    mesh_dir: str = "meshes/",
+    mesh_dir: str = "tests/assets/meshes/",
 ) -> str:
     """Generates MJCF file from column meshes that form the world."""
     mesh_files = [f for f in os.listdir(mesh_dir) if f.endswith(".stl")]
@@ -117,7 +117,7 @@ def _generate_mjcf_string(  # pragma: no cover
                 pos="0 0 0.2"
                 mass="0"
             />
-        </body>"""
+            </body>\n"""
 
     for i, mesh_file in enumerate(mesh_files):
         mesh_name = os.path.splitext(mesh_file)[0]
@@ -125,27 +125,27 @@ def _generate_mjcf_string(  # pragma: no cover
             f'        <geom name="{mesh_name}" mesh="{mesh_name}" pos="0 0 0"/>' + "\n"
         )
 
-    mjcf += f'    <geom name="east_wall" type="plane"'
-    mjcf += f"""        pos="{w} {h / 2} 10"
+    mjcf += f'        <geom name="east_wall" type="plane"\n'
+    mjcf += f"""            pos="{w} {h / 2} 10"
             quat="0.5 -0.5 -0.5 0.5"
             size="{h / 2} 10 0.01"
-            rgba="1 0.819607843 0.859375 0.5" />"""
+            rgba="1 0.819607843 0.859375 0.5" />\n"""
 
-    mjcf += f'    <geom name="west_wall" type="plane"'
-    mjcf += f"""        pos="0 {h / 2} 10"
-            quat="0.5 -0.5 -0.5 0.5"
+    mjcf += f'        <geom name="west_wall" type="plane"\n'
+    mjcf += f"""            pos="0 {h / 2} 10"
+            quat="0.5 0.5 0.5 0.5"
             size="{h / 2} 10 0.01"
-            rgba="1 0.819607843 0.859375 0.5" />"""
-    mjcf += f'    <geom name="north_wall" type="plane"'
-    mjcf += f"""        pos="{w / 2} 0 10"
-            quat="0.5 -0.5 -0.5 0.5"
+            rgba="1 0.819607843 0.859375 0.5" />\n"""
+    mjcf += f'        <geom name="north_wall" type="plane"\n'
+    mjcf += f"""            pos="{w / 2} 0 10"
+            quat="0.5 -0.5 0.5 0.5"
             size="10 {w / 2} 0.01"
-            rgba="1 0.819607843 0.859375 0.5" />"""
-    mjcf += f'    <geom name="south_wall" type="plane"'
-    mjcf += f"""        pos="{w / 2} {h} 10"
-            quat="0.5 -0.5 -0.5 0.5"
+            rgba="1 0.819607843 0.859375 0.5" />\n"""
+    mjcf += f'        <geom name="south_wall" type="plane"\n'
+    mjcf += f"""            pos="{w / 2} {h} 10"
+            quat="0.5 0.5 -0.5 0.5"
             size="10 {w / 2} 0.01"
-            rgba="1 0.819607843 0.859375 0.5" />"""
+            rgba="1 0.819607843 0.859375 0.5" />\n"""
 
     mjcf += "    </worldbody>\n\n    <asset>\n"
 

@@ -88,7 +88,7 @@ def plot_trajectories_multi_policies(
             print(f"Time: {mjx_data.time:.1f}")
             last_printed_time = mjx_data.time
 
-        icland_state = icland.step(key, icland_state, None, policy)
+        icland_state = icland.step(key, icland_state, icland_params, policy)
         mjx_data = icland_state.pipeline_state.mjx_data
 
         if len(trajectory) < mjx_data.time * 30:
@@ -148,7 +148,7 @@ if __name__ == "__main__":
         # jax.random.PRNGKey(216),
         jax.random.PRNGKey(42),
         jax.random.PRNGKey(420),
-        jax.random.PRNGKey(2004),
+        # jax.random.PRNGKey(2004),
         # jax.random.PRNGKey(141),
         # jax.random.PRNGKey(8),
         # jax.random.PRNGKey(5120),
