@@ -2,8 +2,9 @@
 
 import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Optional, cast
+from typing import Any, cast
 
 import jax
 import jax.numpy as jnp
@@ -221,7 +222,7 @@ def plot_metric(
     xlabel: str,
     title: str,
     filename: str,
-    labels: Optional[list[str]] = None,
+    labels: list[str] | None = None,
 ) -> str:
     """General plotting utility for one or more lines on the same figure.
 
@@ -314,7 +315,7 @@ def run_scenario_benchmark(
 
     # 3) Generate scenario-specific plots (optional)
     #    For "vary_batch_size", we can plot e.g. Steps/sec vs. batch_size
-    graphics: dict[str, Optional[str]] = {}
+    graphics: dict[str, str | None] = {}
     if "batch_sizes" in params and len(benchmark_runs) > 0:
         output_dir = f"benchmarking/output/graphics/{scenario_name}"
         # X-axis is batch_sizes
@@ -400,7 +401,7 @@ def run_scenario_benchmark(
 #   - returns a dictionary keyed by scenario name
 # --------------------------------------------------------------------------------------
 def run_all_scenarios(
-    scenarios_dict: Optional[dict[str, dict[str, Any]]] = None,
+    scenarios_dict: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Runs all scenarios in the SCENARIOS dictionary.
 

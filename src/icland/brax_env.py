@@ -1,6 +1,6 @@
 """ICLand Brax environment."""
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -22,19 +22,19 @@ class ICLandBraxState(base.Base):  # type: ignore
     """Environment state for training and inference."""
 
     ic_state: ICLandState
-    pipeline_state: Optional[base.State]
+    pipeline_state: base.State | None
     obs: Observation
     reward: jax.Array
     done: jax.Array
-    metrics: Dict[str, jax.Array] = struct.field(default_factory=dict)  # type: ignore[no-untyped-call]
-    info: Dict[str, Any] = struct.field(default_factory=dict)  # type: ignore[no-untyped-call]
+    metrics: dict[str, jax.Array] = struct.field(default_factory=dict)  # type: ignore[no-untyped-call]
+    info: dict[str, Any] = struct.field(default_factory=dict)  # type: ignore[no-untyped-call]
 
 
 class ICLand(Env):  # type: ignore
     """ICLand Brax environment."""
 
     def __init__(
-        self, rng: jax.Array, params: Optional[icland.ICLandParams] = None
+        self, rng: jax.Array, params: icland.ICLandParams | None = None
     ) -> None:
         """Initializes the environment with a random seed.
 
