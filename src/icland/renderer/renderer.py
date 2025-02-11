@@ -9,11 +9,6 @@ import numpy as np
 from icland.renderer.sdfs import box_sdf, ramp_sdf
 from icland.types import ICLandState
 
-# Enable JAX debug flags
-# jax.config.update("jax_debug_nans", True)  # Check for NaNs
-jax.config.update("jax_log_compiles", True)  # Log compilations
-# jax.config.update("jax_debug_infs", True)  # Check for infinities
-
 # Constants
 DEFAULT_VIEWSIZE: Tuple[jnp.int32, jnp.int32] = (92, 76)
 DEFAULT_COLOR: jax.Array = jnp.array([0.2588, 0.5294, 0.9607])
