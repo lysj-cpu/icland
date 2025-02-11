@@ -1,6 +1,6 @@
 """Generates a game for the ICLand environment."""
 
-from typing import Callable
+from collections.abc import Callable
 
 import jax
 import jax.numpy as jnp

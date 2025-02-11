@@ -25,7 +25,7 @@ xla_flags = os.environ.get("XLA_FLAGS", "")
 xla_flags += " --xla_gpu_triton_gemm_any=True"
 os.environ["XLA_FLAGS"] = xla_flags
 
-from typing import Any, Dict, List
+from typing import Any
 
 import imageio
 import jax
@@ -42,7 +42,7 @@ from icland.world_gen.converter import create_world, export_stls, sample_spawn_p
 from icland.world_gen.JITModel import export, sample_world
 from icland.world_gen.tile_data import TILECODES
 
-SIMULATION_PRESETS: List[Dict[str, Any]] = [
+SIMULATION_PRESETS: list[dict[str, Any]] = [
     {
         "name": "two_agent_move_collide",
         "world": TWO_AGENT_EMPTY_WORLD_COLLIDE,
@@ -88,7 +88,7 @@ def __generate_mjcf_string(  # pragma: no cover
     <default>
         <geom type=\"mesh\" />
     </default>
-    
+
     <worldbody>\n"""
 
     for i, s in enumerate(agent_spawns):
@@ -162,7 +162,7 @@ def render_video_from_world(
     icland_state = icland.step(key, icland_state, None, policy)
     print(f"Init mjX model and data...")
     mjx_data = icland_state.pipeline_state.mjx_data
-    frames: List[Any] = []
+    frames: list[Any] = []
 
     print(f"Starting simulation: {video_name}")
     last_printed_time = -0.1
@@ -230,7 +230,7 @@ def render_video(
     icland_state = icland.step(key, icland_state, icland_params, policy)
     mjx_data = icland_state.pipeline_state.mjx_data
 
-    third_person_frames: List[Any] = []
+    third_person_frames: list[Any] = []
 
     cam = mujoco.MjvCamera()
     mujoco.mjv_defaultCamera(cam)
@@ -277,8 +277,8 @@ def render_video(
 
 def render_video_from_world_with_policies(
     key: jax.Array,
-    policies: List[jax.Array],
-    switch_intervals: List[float],
+    policies: list[jax.Array],
+    switch_intervals: list[float],
     duration: int,
     video_name: str,
 ) -> None:
@@ -304,7 +304,7 @@ def render_video_from_world_with_policies(
 
     icland_state = icland.init(key, icland_params)
     mjx_data = icland_state.pipeline_state.mjx_data
-    frames: List[Any] = []
+    frames: list[Any] = []
 
     current_policy_idx = 0
     policy = policies[current_policy_idx]

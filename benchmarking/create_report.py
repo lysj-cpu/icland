@@ -183,9 +183,7 @@ def create_report(output_pdf: str = "benchmarking/output/benchmark_report") -> N
             abs_path = os.path.abspath(graph_path)
             doc.append(NoEscape(r"\begin{figure}[h!]"))
             doc.append(NoEscape(r"\centering"))
-            doc.append(
-                NoEscape(r"\includegraphics[width=0.8\textwidth]{%s}" % abs_path)
-            )
+            doc.append(NoEscape(rf"\includegraphics[width=0.8\textwidth]{abs_path}"))
             caption = f"{graph_key.replace('_', ' ').title()} for {scenario_name}"
             doc.append(NoEscape(f"\\caption{{{sanitize_for_latex(caption)}}}"))
             doc.append(NoEscape(r"\end{figure}"))
