@@ -20,6 +20,7 @@ DEFAULT_COLOR: jax.Array = jnp.array([0.2588, 0.5294, 0.9607])
 WORLD_UP: jax.Array = jnp.array([0.0, 1.0, 0.0], dtype=jnp.float32)
 NUM_CHANNELS: jnp.int32 = 3
 
+
 @partial(jax.jit, static_argnames=["axis", "keepdims"])
 def __norm(
     v: jax.Array,
@@ -29,11 +30,13 @@ def __norm(
 ) -> jax.Array:
     return jnp.sqrt((v * v).sum(axis, keepdims=keepdims).clip(min=eps))
 
+
 @jax.jit
 def __normalize(
     v: jax.Array, axis: jnp.int32 = -1, eps: jnp.float32 = 1e-20
 ) -> jax.Array:
     return v / __norm(v, axis, keepdims=True, eps=eps)
+
 
 @jax.jit
 def __process_column(
@@ -61,6 +64,7 @@ def __process_column(
         jnp.append(p, 1),
     )
     return box_sdf(transformed[:3], w, (h * w) / 2)
+
 
 @jax.jit
 def __process_ramp(
@@ -102,6 +106,7 @@ def __process_ramp(
     )
     return ramp_sdf(transformed[:3], w, h)
 
+
 @jax.jit
 def __scene_sdf_from_tilemap(
     tilemap: jax.Array, p: jax.Array, floor_height: jnp.float32 = 0.0
@@ -135,6 +140,7 @@ def __scene_sdf_from_tilemap(
     floor_dist = p[1] - floor_height
 
     return jnp.minimum(floor_dist, tile_dists.min())
+
 
 @partial(jax.jit, static_argnames=["sdf"])
 def __raycast(
@@ -204,6 +210,7 @@ def __camera_rays(
     #  a copy of cam_pos for every pixel.)
     return ray_dir
 
+
 @partial(jax.jit, static_argnames=["sdf"])
 def __cast_shadow(
     sdf: Callable[[jax.Array], jax.Array],
@@ -218,6 +225,7 @@ def __cast_shadow(
         return t + h, jnp.clip(hardness * h / t, 0.0, shadow)
 
     return jax.lax.fori_loop(0, step_n, f, (1e-2, 1.0))[1]
+
 
 @jax.jit
 def __scene_sdf_from_tilemap_color(
@@ -300,6 +308,7 @@ def render_frame(
 
 
 transform_axes = jnp.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]])
+
 
 @jax.jit
 def get_agent_camera_from_mjx(
