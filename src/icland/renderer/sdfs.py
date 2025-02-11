@@ -70,8 +70,8 @@ def box_sdf(p: jax.Array, w: jnp.float32, h: jnp.float32) -> jnp.float32:
 @jax.jit
 def capsule_sdf(p: jax.Array, h: jnp.float32, r: jnp.float32) -> jnp.float32:
     """Signed distance function for capsule (agent)."""
-    py = p[1] - __safe_min(__safe_max(p[1], 0.0), h)
-    return jnp.linalg.norm(p[:3]) - r
+    pn = p.at[1].subtract(__safe_min(__safe_max(p[1], 0.0), h))
+    return jnp.linalg.norm(pn[:3]) - r
 
 
 @jax.jit

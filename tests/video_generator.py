@@ -43,45 +43,47 @@ from icland.world_gen.JITModel import export, sample_world
 from icland.world_gen.tile_data import TILECODES
 
 SIMULATION_PRESETS: List[Dict[str, Any]] = [
-    {
-        "name": "two_agent_move_collide",
-        "world": TWO_AGENT_EMPTY_WORLD_COLLIDE,
-        "policy": jnp.array([FORWARD_POLICY, BACKWARD_POLICY]),
-        "duration": 4,
-        "agent_count": 2,
-    },
-    {"name": "ramp_30", "world": RAMP_30, "policy": FORWARD_POLICY, "duration": 4},
-    {"name": "ramp_60", "world": RAMP_60, "policy": FORWARD_POLICY, "duration": 4},
-    {"name": "ramp_45", "world": RAMP_45, "policy": FORWARD_POLICY, "duration": 4},
+    # {
+    #     "name": "two_agent_move_collide",
+    #     "world": TWO_AGENT_EMPTY_WORLD_COLLIDE,
+    #     "policy": jnp.array([FORWARD_POLICY, BACKWARD_POLICY]),
+    #     "duration": 4,
+    #     "agent_count": 2,
+    # },
+    # {"name": "ramp_30", "world": RAMP_30, "policy": FORWARD_POLICY, "duration": 4},
+    # {"name": "ramp_60", "world": RAMP_60, "policy": FORWARD_POLICY, "duration": 4},
+    # {"name": "ramp_45", "world": RAMP_45, "policy": FORWARD_POLICY, "duration": 4},
+    # {
+    #     "name": "world_42_convex",
+    #     "world": WORLD_42_CONVEX,
+    #     "policy": FORWARD_POLICY,
+    #     "duration": 4,
+    # },
+    # {
+    #     "name": "two_agent_move_parallel",
+    #     "world": TWO_AGENT_EMPTY_WORLD,
+    #     "policy": jnp.array([FORWARD_POLICY, FORWARD_POLICY]),
+    #     "duration": 4,
+    #     "agent_count": 2,
+    # },
     {
         "name": "world_42_convex",
         "world": WORLD_42_CONVEX,
-        "policy": FORWARD_POLICY,
-        "duration": 4,
-    },
-    {
-        "name": "two_agent_move_parallel",
-        "world": TWO_AGENT_EMPTY_WORLD,
-        "policy": jnp.array([FORWARD_POLICY, FORWARD_POLICY]),
-        "duration": 4,
-        "agent_count": 2,
-    },
-    {
-        "name": "world_42_convex",
-        "world": WORLD_42_CONVEX,
-        "policy": FORWARD_POLICY,
-        "duration": 4,
+        "policy": RIGHT_POLICY,
+        "duration": 2.5,
     },
 ]
 
 
-def __generate_mjcf_string(  # pragma: no cover
+def _generate_mjcf_string(  # pragma: no cover
     tile_map: jax.Array,
     agent_spawns: jax.Array,
     mesh_dir: str = "meshes/",
 ) -> str:
     """Generates MJCF file from column meshes that form the world."""
     mesh_files = [f for f in os.listdir(mesh_dir) if f.endswith(".stl")]
+
+    w, h = tile_map.shape[0], tile_map.shape[1]
 
     mjcf = f"""<mujoco model=\"generated_mesh_world\">
     <compiler meshdir=\"{mesh_dir}\"/>
@@ -123,6 +125,28 @@ def __generate_mjcf_string(  # pragma: no cover
             f'        <geom name="{mesh_name}" mesh="{mesh_name}" pos="0 0 0"/>' + "\n"
         )
 
+    mjcf += f'    <geom name="east_wall" type="plane"'
+    mjcf += f"""        pos="{w} {h / 2} 10"
+            quat="0.5 -0.5 -0.5 0.5"
+            size="{h / 2} 10 0.01"
+            rgba="1 0.819607843 0.859375 0.5" />"""
+
+    mjcf += f'    <geom name="west_wall" type="plane"'
+    mjcf += f"""        pos="0 {h / 2} 10"
+            quat="0.5 -0.5 -0.5 0.5"
+            size="{h / 2} 10 0.01"
+            rgba="1 0.819607843 0.859375 0.5" />"""
+    mjcf += f'    <geom name="north_wall" type="plane"'
+    mjcf += f"""        pos="{w / 2} 0 10"
+            quat="0.5 -0.5 -0.5 0.5"
+            size="10 {w / 2} 0.01"
+            rgba="1 0.819607843 0.859375 0.5" />"""
+    mjcf += f'    <geom name="south_wall" type="plane"'
+    mjcf += f"""        pos="{w / 2} {h} 10"
+            quat="0.5 -0.5 -0.5 0.5"
+            size="10 {w / 2} 0.01"
+            rgba="1 0.819607843 0.859375 0.5" />"""
+
     mjcf += "    </worldbody>\n\n    <asset>\n"
 
     for mesh_file in mesh_files:
@@ -153,13 +177,13 @@ def render_video_from_world(
     os.makedirs(f"{temp_dir}", exist_ok=True)
     print(f"Exporting stls")
     export_stls(pieces, f"{temp_dir}/{temp_dir}")
-    xml_str = __generate_mjcf_string(tilemap, spawnpoints, f"{temp_dir}/")
+    xml_str = _generate_mjcf_string(tilemap, spawnpoints, f"{temp_dir}/")
     print(f"Init mj model...")
     mj_model = mujoco.MjModel.from_xml_string(xml_str)
-    icland_params = ICLandParams(model=mj_model, game=None, agent_count=1)
+    icland_params = ICLandParams(model=mj_model, reward_function=None, agent_count=1)
 
     icland_state = icland.init(key, icland_params)
-    icland_state = icland.step(key, icland_state, None, policy)
+    icland_state = icland.step(key, icland_state, icland_params, policy)
     print(f"Init mjX model and data...")
     mjx_data = icland_state.pipeline_state.mjx_data
     frames: List[Any] = []
@@ -175,7 +199,7 @@ def render_video_from_world(
         if int(mjx_data.time * 10) != int(last_printed_time * 10):
             print(f"Time: {mjx_data.time:.1f}")
             last_printed_time = mjx_data.time
-        icland_state = icland.step(key, icland_state, None, policy)
+        icland_state = icland.step(key, icland_state, icland_params, policy)
         mjx_data = icland_state.pipeline_state.mjx_data
         if len(frames) < mjx_data.time * 30:
             print(
@@ -296,11 +320,12 @@ def render_video_from_world_with_policies(
     tilemap = export(model, TILECODES, 10, 10)
     pieces = create_world(tilemap)
     temp_dir = "temp"
+    os.makedirs(f"{temp_dir}", exist_ok=True)
     export_stls(pieces, f"{temp_dir}/{temp_dir}")
 
-    xml_str = __generate_mjcf_string(tilemap, jnp.array([[1.5, 1, 4]]), f"{temp_dir}/")
+    xml_str = _generate_mjcf_string(tilemap, jnp.array([[1.5, 1, 4]]), f"{temp_dir}/")
     mj_model = mujoco.MjModel.from_xml_string(xml_str)
-    icland_params = ICLandParams(model=mj_model, game=None, agent_count=1)
+    icland_params = ICLandParams(model=mj_model, reward_function=None, agent_count=1)
 
     icland_state = icland.init(key, icland_params)
     mjx_data = icland_state.pipeline_state.mjx_data
@@ -331,7 +356,7 @@ def render_video_from_world_with_policies(
             print(f"Time: {mjx_data.time:.1f}")
             last_printed_time = mjx_data.time
 
-        icland_state = icland.step(key, icland_state, None, policy)
+        icland_state = icland.step(key, icland_state, icland_params, policy)
         mjx_data = icland_state.pipeline_state.mjx_data
 
         if len(frames) < mjx_data.time * 30:
@@ -345,26 +370,28 @@ def render_video_from_world_with_policies(
             f = render_frame(camera_pos, camera_dir, tilemap)
             frames.append(f)
 
+    shutil.rmtree(f"{temp_dir}")
+
     imageio.mimsave(video_name, frames, fps=30, quality=8)
 
 
 if __name__ == "__main__":
-    # keys = [
-    #     jax.random.PRNGKey(42),
-    #     jax.random.PRNGKey(420),
-    #     jax.random.PRNGKey(2004),
-    # ]
-    # for k in keys:
-    #     render_video_from_world(
-    #         k, FORWARD_POLICY, 4, f"tests/video_output/world_convex_{k[1]}_mjx.mp4"
-    #     )
-    for i, preset in enumerate(SIMULATION_PRESETS):
-        print(f"Running preset {i + 1}/{len(SIMULATION_PRESETS)}: {preset['name']}")
-        render_video(
-            jax.random.PRNGKey(42),
-            preset["world"],
-            preset["policy"],
-            preset["duration"],
-            f"tests/video_output/{preset['name']}.mp4",
-            agent_count=preset.get("agent_count", 1),
+    keys = [
+        jax.random.PRNGKey(42),
+        # jax.random.PRNGKey(420),
+        # jax.random.PRNGKey(2004),
+    ]
+    for k in keys:
+        render_video_from_world(
+            k, FORWARD_POLICY, 4, f"tests/video_output/world_convex_{k[1]}_mjx.mp4"
         )
+    # for i, preset in enumerate(SIMULATION_PRESETS):
+    #     print(f"Running preset {i + 1}/{len(SIMULATION_PRESETS)}: {preset['name']}")
+    #     render_video(
+    #         jax.random.PRNGKey(42),
+    #         preset["world"],
+    #         preset["policy"],
+    #         preset["duration"],
+    #         f"tests/video_output/{preset['name']}.mp4",
+    #         agent_count=preset.get("agent_count", 1),
+    #     )

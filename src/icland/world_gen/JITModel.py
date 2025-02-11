@@ -8,7 +8,9 @@ import jax
 import jax.numpy as jnp
 from flax import struct
 
+from icland.world_gen.converter import sample_spawn_points
 from icland.world_gen.tile_data import NUM_ACTIONS, PROPAGATOR, TILECODES, WEIGHTS
+from icland.world_gen.XMLReader import XMLReader
 
 
 @jax.jit
@@ -626,6 +628,14 @@ def sample_world(
 
 
 if __name__ == "__main__":  # Drive code used for testing.
-    model = sample_world(10, 10, 1000, jax.random.key(42), True, 1)
-    one_hot = export(model, TILECODES, 10, 10)
+    xml_reader = XMLReader("src/icland/world_gen/tilemap/data.xml")
+    key_no = 216
+    key = jax.random.key(key_no)
+    w = 10
+    h = 10
+    model = sample_world(w, h, 1000, key, True, 1)
+    one_hot = export(model, TILECODES, w, h)
+    xml_reader.save(model.observed, w, h, f"tilemap_{key_no}.png")
     print(one_hot.tolist())
+    spawnable = sample_spawn_points(key, one_hot, num_objects=3)
+    print(spawnable.tolist())

@@ -123,7 +123,7 @@ WORLD_42_CONVEX = """
     </default>
     
     <worldbody>
-            <body name="agent0" pos="1.5 1 4">
+            <body name="agent0" pos="3 1 4">
             <joint type="slide" axis="1 0 0" />
             <joint type="slide" axis="0 1 0" />
             <joint type="slide" axis="0 0 1" />
@@ -144,215 +144,238 @@ WORLD_42_CONVEX = """
                 mass="0"
             />
             </body>
-        <geom name="world_0" mesh="world_0" pos="0 0 0"/>
-        <geom name="world_1" mesh="world_1" pos="0 0 0"/>
-        <geom name="world_10" mesh="world_10" pos="0 0 0"/>
-        <geom name="world_11" mesh="world_11" pos="0 0 0"/>
-        <geom name="world_12" mesh="world_12" pos="0 0 0"/>
-        <geom name="world_13" mesh="world_13" pos="0 0 0"/>
-        <geom name="world_14" mesh="world_14" pos="0 0 0"/>
-        <geom name="world_15" mesh="world_15" pos="0 0 0"/>
-        <geom name="world_16" mesh="world_16" pos="0 0 0"/>
-        <geom name="world_17" mesh="world_17" pos="0 0 0"/>
-        <geom name="world_18" mesh="world_18" pos="0 0 0"/>
-        <geom name="world_19" mesh="world_19" pos="0 0 0"/>
-        <geom name="world_2" mesh="world_2" pos="0 0 0"/>
-        <geom name="world_20" mesh="world_20" pos="0 0 0"/>
-        <geom name="world_21" mesh="world_21" pos="0 0 0"/>
-        <geom name="world_22" mesh="world_22" pos="0 0 0"/>
-        <geom name="world_23" mesh="world_23" pos="0 0 0"/>
-        <geom name="world_24" mesh="world_24" pos="0 0 0"/>
-        <geom name="world_25" mesh="world_25" pos="0 0 0"/>
-        <geom name="world_26" mesh="world_26" pos="0 0 0"/>
-        <geom name="world_27" mesh="world_27" pos="0 0 0"/>
-        <geom name="world_28" mesh="world_28" pos="0 0 0"/>
-        <geom name="world_29" mesh="world_29" pos="0 0 0"/>
-        <geom name="world_3" mesh="world_3" pos="0 0 0"/>
-        <geom name="world_30" mesh="world_30" pos="0 0 0"/>
-        <geom name="world_31" mesh="world_31" pos="0 0 0"/>
-        <geom name="world_32" mesh="world_32" pos="0 0 0"/>
-        <geom name="world_33" mesh="world_33" pos="0 0 0"/>
-        <geom name="world_34" mesh="world_34" pos="0 0 0"/>
-        <geom name="world_35" mesh="world_35" pos="0 0 0"/>
-        <geom name="world_36" mesh="world_36" pos="0 0 0"/>
-        <geom name="world_37" mesh="world_37" pos="0 0 0"/>
-        <geom name="world_38" mesh="world_38" pos="0 0 0"/>
-        <geom name="world_39" mesh="world_39" pos="0 0 0"/>
-        <geom name="world_4" mesh="world_4" pos="0 0 0"/>
-        <geom name="world_40" mesh="world_40" pos="0 0 0"/>
-        <geom name="world_41" mesh="world_41" pos="0 0 0"/>
-        <geom name="world_42" mesh="world_42" pos="0 0 0"/>
-        <geom name="world_43" mesh="world_43" pos="0 0 0"/>
-        <geom name="world_44" mesh="world_44" pos="0 0 0"/>
-        <geom name="world_45" mesh="world_45" pos="0 0 0"/>
-        <geom name="world_46" mesh="world_46" pos="0 0 0"/>
-        <geom name="world_47" mesh="world_47" pos="0 0 0"/>
-        <geom name="world_48" mesh="world_48" pos="0 0 0"/>
-        <geom name="world_49" mesh="world_49" pos="0 0 0"/>
-        <geom name="world_5" mesh="world_5" pos="0 0 0"/>
-        <geom name="world_50" mesh="world_50" pos="0 0 0"/>
-        <geom name="world_51" mesh="world_51" pos="0 0 0"/>
-        <geom name="world_52" mesh="world_52" pos="0 0 0"/>
-        <geom name="world_53" mesh="world_53" pos="0 0 0"/>
-        <geom name="world_54" mesh="world_54" pos="0 0 0"/>
-        <geom name="world_55" mesh="world_55" pos="0 0 0"/>
-        <geom name="world_56" mesh="world_56" pos="0 0 0"/>
-        <geom name="world_57" mesh="world_57" pos="0 0 0"/>
-        <geom name="world_58" mesh="world_58" pos="0 0 0"/>
-        <geom name="world_59" mesh="world_59" pos="0 0 0"/>
-        <geom name="world_6" mesh="world_6" pos="0 0 0"/>
-        <geom name="world_60" mesh="world_60" pos="0 0 0"/>
-        <geom name="world_61" mesh="world_61" pos="0 0 0"/>
-        <geom name="world_62" mesh="world_62" pos="0 0 0"/>
-        <geom name="world_63" mesh="world_63" pos="0 0 0"/>
-        <geom name="world_64" mesh="world_64" pos="0 0 0"/>
-        <geom name="world_65" mesh="world_65" pos="0 0 0"/>
-        <geom name="world_66" mesh="world_66" pos="0 0 0"/>
-        <geom name="world_67" mesh="world_67" pos="0 0 0"/>
-        <geom name="world_68" mesh="world_68" pos="0 0 0"/>
-        <geom name="world_69" mesh="world_69" pos="0 0 0"/>
-        <geom name="world_7" mesh="world_7" pos="0 0 0"/>
-        <geom name="world_70" mesh="world_70" pos="0 0 0"/>
-        <geom name="world_71" mesh="world_71" pos="0 0 0"/>
-        <geom name="world_72" mesh="world_72" pos="0 0 0"/>
-        <geom name="world_73" mesh="world_73" pos="0 0 0"/>
-        <geom name="world_74" mesh="world_74" pos="0 0 0"/>
-        <geom name="world_75" mesh="world_75" pos="0 0 0"/>
-        <geom name="world_76" mesh="world_76" pos="0 0 0"/>
-        <geom name="world_77" mesh="world_77" pos="0 0 0"/>
-        <geom name="world_78" mesh="world_78" pos="0 0 0"/>
-        <geom name="world_79" mesh="world_79" pos="0 0 0"/>
-        <geom name="world_8" mesh="world_8" pos="0 0 0"/>
-        <geom name="world_80" mesh="world_80" pos="0 0 0"/>
-        <geom name="world_81" mesh="world_81" pos="0 0 0"/>
-        <geom name="world_82" mesh="world_82" pos="0 0 0"/>
-        <geom name="world_83" mesh="world_83" pos="0 0 0"/>
-        <geom name="world_84" mesh="world_84" pos="0 0 0"/>
-        <geom name="world_85" mesh="world_85" pos="0 0 0"/>
-        <geom name="world_86" mesh="world_86" pos="0 0 0"/>
-        <geom name="world_87" mesh="world_87" pos="0 0 0"/>
-        <geom name="world_88" mesh="world_88" pos="0 0 0"/>
-        <geom name="world_89" mesh="world_89" pos="0 0 0"/>
-        <geom name="world_9" mesh="world_9" pos="0 0 0"/>
-        <geom name="world_90" mesh="world_90" pos="0 0 0"/>
-        <geom name="world_91" mesh="world_91" pos="0 0 0"/>
-        <geom name="world_92" mesh="world_92" pos="0 0 0"/>
-        <geom name="world_93" mesh="world_93" pos="0 0 0"/>
-        <geom name="world_94" mesh="world_94" pos="0 0 0"/>
-        <geom name="world_95" mesh="world_95" pos="0 0 0"/>
-        <geom name="world_96" mesh="world_96" pos="0 0 0"/>
-        <geom name="world_97" mesh="world_97" pos="0 0 0"/>
-        <geom name="world_98" mesh="world_98" pos="0 0 0"/>
-        <geom name="world_99" mesh="world_99" pos="0 0 0"/>
+        <geom name="temp_0" mesh="temp_0" pos="0 0 0"/>
+        <geom name="temp_1" mesh="temp_1" pos="0 0 0"/>
+        <geom name="temp_10" mesh="temp_10" pos="0 0 0"/>
+        <geom name="temp_11" mesh="temp_11" pos="0 0 0"/>
+        <geom name="temp_12" mesh="temp_12" pos="0 0 0"/>
+        <geom name="temp_13" mesh="temp_13" pos="0 0 0"/>
+        <geom name="temp_14" mesh="temp_14" pos="0 0 0"/>
+        <geom name="temp_15" mesh="temp_15" pos="0 0 0"/>
+        <geom name="temp_16" mesh="temp_16" pos="0 0 0"/>
+        <geom name="temp_17" mesh="temp_17" pos="0 0 0"/>
+        <geom name="temp_18" mesh="temp_18" pos="0 0 0"/>
+        <geom name="temp_19" mesh="temp_19" pos="0 0 0"/>
+        <geom name="temp_2" mesh="temp_2" pos="0 0 0"/>
+        <geom name="temp_20" mesh="temp_20" pos="0 0 0"/>
+        <geom name="temp_21" mesh="temp_21" pos="0 0 0"/>
+        <geom name="temp_22" mesh="temp_22" pos="0 0 0"/>
+        <geom name="temp_23" mesh="temp_23" pos="0 0 0"/>
+        <geom name="temp_24" mesh="temp_24" pos="0 0 0"/>
+        <geom name="temp_25" mesh="temp_25" pos="0 0 0"/>
+        <geom name="temp_26" mesh="temp_26" pos="0 0 0"/>
+        <geom name="temp_27" mesh="temp_27" pos="0 0 0"/>
+        <geom name="temp_28" mesh="temp_28" pos="0 0 0"/>
+        <geom name="temp_29" mesh="temp_29" pos="0 0 0"/>
+        <geom name="temp_3" mesh="temp_3" pos="0 0 0"/>
+        <geom name="temp_30" mesh="temp_30" pos="0 0 0"/>
+        <geom name="temp_31" mesh="temp_31" pos="0 0 0"/>
+        <geom name="temp_32" mesh="temp_32" pos="0 0 0"/>
+        <geom name="temp_33" mesh="temp_33" pos="0 0 0"/>
+        <geom name="temp_34" mesh="temp_34" pos="0 0 0"/>
+        <geom name="temp_35" mesh="temp_35" pos="0 0 0"/>
+        <geom name="temp_36" mesh="temp_36" pos="0 0 0"/>
+        <geom name="temp_37" mesh="temp_37" pos="0 0 0"/>
+        <geom name="temp_38" mesh="temp_38" pos="0 0 0"/>
+        <geom name="temp_39" mesh="temp_39" pos="0 0 0"/>
+        <geom name="temp_4" mesh="temp_4" pos="0 0 0"/>
+        <geom name="temp_40" mesh="temp_40" pos="0 0 0"/>
+        <geom name="temp_41" mesh="temp_41" pos="0 0 0"/>
+        <geom name="temp_42" mesh="temp_42" pos="0 0 0"/>
+        <geom name="temp_43" mesh="temp_43" pos="0 0 0"/>
+        <geom name="temp_44" mesh="temp_44" pos="0 0 0"/>
+        <geom name="temp_45" mesh="temp_45" pos="0 0 0"/>
+        <geom name="temp_46" mesh="temp_46" pos="0 0 0"/>
+        <geom name="temp_47" mesh="temp_47" pos="0 0 0"/>
+        <geom name="temp_48" mesh="temp_48" pos="0 0 0"/>
+        <geom name="temp_49" mesh="temp_49" pos="0 0 0"/>
+        <geom name="temp_5" mesh="temp_5" pos="0 0 0"/>
+        <geom name="temp_50" mesh="temp_50" pos="0 0 0"/>
+        <geom name="temp_51" mesh="temp_51" pos="0 0 0"/>
+        <geom name="temp_52" mesh="temp_52" pos="0 0 0"/>
+        <geom name="temp_53" mesh="temp_53" pos="0 0 0"/>
+        <geom name="temp_54" mesh="temp_54" pos="0 0 0"/>
+        <geom name="temp_55" mesh="temp_55" pos="0 0 0"/>
+        <geom name="temp_56" mesh="temp_56" pos="0 0 0"/>
+        <geom name="temp_57" mesh="temp_57" pos="0 0 0"/>
+        <geom name="temp_58" mesh="temp_58" pos="0 0 0"/>
+        <geom name="temp_59" mesh="temp_59" pos="0 0 0"/>
+        <geom name="temp_6" mesh="temp_6" pos="0 0 0"/>
+        <geom name="temp_60" mesh="temp_60" pos="0 0 0"/>
+        <geom name="temp_61" mesh="temp_61" pos="0 0 0"/>
+        <geom name="temp_62" mesh="temp_62" pos="0 0 0"/>
+        <geom name="temp_63" mesh="temp_63" pos="0 0 0"/>
+        <geom name="temp_64" mesh="temp_64" pos="0 0 0"/>
+        <geom name="temp_65" mesh="temp_65" pos="0 0 0"/>
+        <geom name="temp_66" mesh="temp_66" pos="0 0 0"/>
+        <geom name="temp_67" mesh="temp_67" pos="0 0 0"/>
+        <geom name="temp_68" mesh="temp_68" pos="0 0 0"/>
+        <geom name="temp_69" mesh="temp_69" pos="0 0 0"/>
+        <geom name="temp_7" mesh="temp_7" pos="0 0 0"/>
+        <geom name="temp_70" mesh="temp_70" pos="0 0 0"/>
+        <geom name="temp_71" mesh="temp_71" pos="0 0 0"/>
+        <geom name="temp_72" mesh="temp_72" pos="0 0 0"/>
+        <geom name="temp_73" mesh="temp_73" pos="0 0 0"/>
+        <geom name="temp_74" mesh="temp_74" pos="0 0 0"/>
+        <geom name="temp_75" mesh="temp_75" pos="0 0 0"/>
+        <geom name="temp_76" mesh="temp_76" pos="0 0 0"/>
+        <geom name="temp_77" mesh="temp_77" pos="0 0 0"/>
+        <geom name="temp_78" mesh="temp_78" pos="0 0 0"/>
+        <geom name="temp_79" mesh="temp_79" pos="0 0 0"/>
+        <geom name="temp_8" mesh="temp_8" pos="0 0 0"/>
+        <geom name="temp_80" mesh="temp_80" pos="0 0 0"/>
+        <geom name="temp_81" mesh="temp_81" pos="0 0 0"/>
+        <geom name="temp_82" mesh="temp_82" pos="0 0 0"/>
+        <geom name="temp_83" mesh="temp_83" pos="0 0 0"/>
+        <geom name="temp_84" mesh="temp_84" pos="0 0 0"/>
+        <geom name="temp_85" mesh="temp_85" pos="0 0 0"/>
+        <geom name="temp_86" mesh="temp_86" pos="0 0 0"/>
+        <geom name="temp_87" mesh="temp_87" pos="0 0 0"/>
+        <geom name="temp_88" mesh="temp_88" pos="0 0 0"/>
+        <geom name="temp_89" mesh="temp_89" pos="0 0 0"/>
+        <geom name="temp_9" mesh="temp_9" pos="0 0 0"/>
+        <geom name="temp_90" mesh="temp_90" pos="0 0 0"/>
+        <geom name="temp_91" mesh="temp_91" pos="0 0 0"/>
+        <geom name="temp_92" mesh="temp_92" pos="0 0 0"/>
+        <geom name="temp_93" mesh="temp_93" pos="0 0 0"/>
+        <geom name="temp_94" mesh="temp_94" pos="0 0 0"/>
+        <geom name="temp_95" mesh="temp_95" pos="0 0 0"/>
+        <geom name="temp_96" mesh="temp_96" pos="0 0 0"/>
+        <geom name="temp_97" mesh="temp_97" pos="0 0 0"/>
+        <geom name="temp_98" mesh="temp_98" pos="0 0 0"/>
+        <geom name="temp_99" mesh="temp_99" pos="0 0 0"/>
+        <geom name="east_wall" type="plane"
+          pos="10 5 10"
+          quat="0.5 -0.5 -0.5 0.5"
+          size="5 10 0.01"
+          rgba="1 0.819607843 0.859375 0.5" />
+
+        <geom name="west_wall" type="plane"
+          pos="0 5 10"
+          quat="0.5 0.5 0.5 0.5"
+          size="5 10 0.01"
+          rgba="1 0.819607843 0.859375 0.5" />
+
+        <geom name="north_wall" type="plane"
+          pos="5 0 10"
+          quat="0.5 -0.5 0.5 0.5"
+          size="10 5 0.01"
+          rgba="1 0.819607843 0.859375 0.5" />
+
+        <geom name="south_wall" type="plane"
+          pos="5 10 10"
+          quat="0.5 0.5 -0.5 0.5"
+          size="10 5 0.01"
+          rgba="1 0.819607843 0.859375 0.5" />
     </worldbody>
 
     <asset>
-        <mesh name="world_0" file="world_0.stl"/>
-        <mesh name="world_1" file="world_1.stl"/>
-        <mesh name="world_10" file="world_10.stl"/>
-        <mesh name="world_11" file="world_11.stl"/>
-        <mesh name="world_12" file="world_12.stl"/>
-        <mesh name="world_13" file="world_13.stl"/>
-        <mesh name="world_14" file="world_14.stl"/>
-        <mesh name="world_15" file="world_15.stl"/>
-        <mesh name="world_16" file="world_16.stl"/>
-        <mesh name="world_17" file="world_17.stl"/>
-        <mesh name="world_18" file="world_18.stl"/>
-        <mesh name="world_19" file="world_19.stl"/>
-        <mesh name="world_2" file="world_2.stl"/>
-        <mesh name="world_20" file="world_20.stl"/>
-        <mesh name="world_21" file="world_21.stl"/>
-        <mesh name="world_22" file="world_22.stl"/>
-        <mesh name="world_23" file="world_23.stl"/>
-        <mesh name="world_24" file="world_24.stl"/>
-        <mesh name="world_25" file="world_25.stl"/>
-        <mesh name="world_26" file="world_26.stl"/>
-        <mesh name="world_27" file="world_27.stl"/>
-        <mesh name="world_28" file="world_28.stl"/>
-        <mesh name="world_29" file="world_29.stl"/>
-        <mesh name="world_3" file="world_3.stl"/>
-        <mesh name="world_30" file="world_30.stl"/>
-        <mesh name="world_31" file="world_31.stl"/>
-        <mesh name="world_32" file="world_32.stl"/>
-        <mesh name="world_33" file="world_33.stl"/>
-        <mesh name="world_34" file="world_34.stl"/>
-        <mesh name="world_35" file="world_35.stl"/>
-        <mesh name="world_36" file="world_36.stl"/>
-        <mesh name="world_37" file="world_37.stl"/>
-        <mesh name="world_38" file="world_38.stl"/>
-        <mesh name="world_39" file="world_39.stl"/>
-        <mesh name="world_4" file="world_4.stl"/>
-        <mesh name="world_40" file="world_40.stl"/>
-        <mesh name="world_41" file="world_41.stl"/>
-        <mesh name="world_42" file="world_42.stl"/>
-        <mesh name="world_43" file="world_43.stl"/>
-        <mesh name="world_44" file="world_44.stl"/>
-        <mesh name="world_45" file="world_45.stl"/>
-        <mesh name="world_46" file="world_46.stl"/>
-        <mesh name="world_47" file="world_47.stl"/>
-        <mesh name="world_48" file="world_48.stl"/>
-        <mesh name="world_49" file="world_49.stl"/>
-        <mesh name="world_5" file="world_5.stl"/>
-        <mesh name="world_50" file="world_50.stl"/>
-        <mesh name="world_51" file="world_51.stl"/>
-        <mesh name="world_52" file="world_52.stl"/>
-        <mesh name="world_53" file="world_53.stl"/>
-        <mesh name="world_54" file="world_54.stl"/>
-        <mesh name="world_55" file="world_55.stl"/>
-        <mesh name="world_56" file="world_56.stl"/>
-        <mesh name="world_57" file="world_57.stl"/>
-        <mesh name="world_58" file="world_58.stl"/>
-        <mesh name="world_59" file="world_59.stl"/>
-        <mesh name="world_6" file="world_6.stl"/>
-        <mesh name="world_60" file="world_60.stl"/>
-        <mesh name="world_61" file="world_61.stl"/>
-        <mesh name="world_62" file="world_62.stl"/>
-        <mesh name="world_63" file="world_63.stl"/>
-        <mesh name="world_64" file="world_64.stl"/>
-        <mesh name="world_65" file="world_65.stl"/>
-        <mesh name="world_66" file="world_66.stl"/>
-        <mesh name="world_67" file="world_67.stl"/>
-        <mesh name="world_68" file="world_68.stl"/>
-        <mesh name="world_69" file="world_69.stl"/>
-        <mesh name="world_7" file="world_7.stl"/>
-        <mesh name="world_70" file="world_70.stl"/>
-        <mesh name="world_71" file="world_71.stl"/>
-        <mesh name="world_72" file="world_72.stl"/>
-        <mesh name="world_73" file="world_73.stl"/>
-        <mesh name="world_74" file="world_74.stl"/>
-        <mesh name="world_75" file="world_75.stl"/>
-        <mesh name="world_76" file="world_76.stl"/>
-        <mesh name="world_77" file="world_77.stl"/>
-        <mesh name="world_78" file="world_78.stl"/>
-        <mesh name="world_79" file="world_79.stl"/>
-        <mesh name="world_8" file="world_8.stl"/>
-        <mesh name="world_80" file="world_80.stl"/>
-        <mesh name="world_81" file="world_81.stl"/>
-        <mesh name="world_82" file="world_82.stl"/>
-        <mesh name="world_83" file="world_83.stl"/>
-        <mesh name="world_84" file="world_84.stl"/>
-        <mesh name="world_85" file="world_85.stl"/>
-        <mesh name="world_86" file="world_86.stl"/>
-        <mesh name="world_87" file="world_87.stl"/>
-        <mesh name="world_88" file="world_88.stl"/>
-        <mesh name="world_89" file="world_89.stl"/>
-        <mesh name="world_9" file="world_9.stl"/>
-        <mesh name="world_90" file="world_90.stl"/>
-        <mesh name="world_91" file="world_91.stl"/>
-        <mesh name="world_92" file="world_92.stl"/>
-        <mesh name="world_93" file="world_93.stl"/>
-        <mesh name="world_94" file="world_94.stl"/>
-        <mesh name="world_95" file="world_95.stl"/>
-        <mesh name="world_96" file="world_96.stl"/>
-        <mesh name="world_97" file="world_97.stl"/>
-        <mesh name="world_98" file="world_98.stl"/>
-        <mesh name="world_99" file="world_99.stl"/>
+        <mesh name="temp_0" file="temp_0.stl"/>
+        <mesh name="temp_1" file="temp_1.stl"/>
+        <mesh name="temp_10" file="temp_10.stl"/>
+        <mesh name="temp_11" file="temp_11.stl"/>
+        <mesh name="temp_12" file="temp_12.stl"/>
+        <mesh name="temp_13" file="temp_13.stl"/>
+        <mesh name="temp_14" file="temp_14.stl"/>
+        <mesh name="temp_15" file="temp_15.stl"/>
+        <mesh name="temp_16" file="temp_16.stl"/>
+        <mesh name="temp_17" file="temp_17.stl"/>
+        <mesh name="temp_18" file="temp_18.stl"/>
+        <mesh name="temp_19" file="temp_19.stl"/>
+        <mesh name="temp_2" file="temp_2.stl"/>
+        <mesh name="temp_20" file="temp_20.stl"/>
+        <mesh name="temp_21" file="temp_21.stl"/>
+        <mesh name="temp_22" file="temp_22.stl"/>
+        <mesh name="temp_23" file="temp_23.stl"/>
+        <mesh name="temp_24" file="temp_24.stl"/>
+        <mesh name="temp_25" file="temp_25.stl"/>
+        <mesh name="temp_26" file="temp_26.stl"/>
+        <mesh name="temp_27" file="temp_27.stl"/>
+        <mesh name="temp_28" file="temp_28.stl"/>
+        <mesh name="temp_29" file="temp_29.stl"/>
+        <mesh name="temp_3" file="temp_3.stl"/>
+        <mesh name="temp_30" file="temp_30.stl"/>
+        <mesh name="temp_31" file="temp_31.stl"/>
+        <mesh name="temp_32" file="temp_32.stl"/>
+        <mesh name="temp_33" file="temp_33.stl"/>
+        <mesh name="temp_34" file="temp_34.stl"/>
+        <mesh name="temp_35" file="temp_35.stl"/>
+        <mesh name="temp_36" file="temp_36.stl"/>
+        <mesh name="temp_37" file="temp_37.stl"/>
+        <mesh name="temp_38" file="temp_38.stl"/>
+        <mesh name="temp_39" file="temp_39.stl"/>
+        <mesh name="temp_4" file="temp_4.stl"/>
+        <mesh name="temp_40" file="temp_40.stl"/>
+        <mesh name="temp_41" file="temp_41.stl"/>
+        <mesh name="temp_42" file="temp_42.stl"/>
+        <mesh name="temp_43" file="temp_43.stl"/>
+        <mesh name="temp_44" file="temp_44.stl"/>
+        <mesh name="temp_45" file="temp_45.stl"/>
+        <mesh name="temp_46" file="temp_46.stl"/>
+        <mesh name="temp_47" file="temp_47.stl"/>
+        <mesh name="temp_48" file="temp_48.stl"/>
+        <mesh name="temp_49" file="temp_49.stl"/>
+        <mesh name="temp_5" file="temp_5.stl"/>
+        <mesh name="temp_50" file="temp_50.stl"/>
+        <mesh name="temp_51" file="temp_51.stl"/>
+        <mesh name="temp_52" file="temp_52.stl"/>
+        <mesh name="temp_53" file="temp_53.stl"/>
+        <mesh name="temp_54" file="temp_54.stl"/>
+        <mesh name="temp_55" file="temp_55.stl"/>
+        <mesh name="temp_56" file="temp_56.stl"/>
+        <mesh name="temp_57" file="temp_57.stl"/>
+        <mesh name="temp_58" file="temp_58.stl"/>
+        <mesh name="temp_59" file="temp_59.stl"/>
+        <mesh name="temp_6" file="temp_6.stl"/>
+        <mesh name="temp_60" file="temp_60.stl"/>
+        <mesh name="temp_61" file="temp_61.stl"/>
+        <mesh name="temp_62" file="temp_62.stl"/>
+        <mesh name="temp_63" file="temp_63.stl"/>
+        <mesh name="temp_64" file="temp_64.stl"/>
+        <mesh name="temp_65" file="temp_65.stl"/>
+        <mesh name="temp_66" file="temp_66.stl"/>
+        <mesh name="temp_67" file="temp_67.stl"/>
+        <mesh name="temp_68" file="temp_68.stl"/>
+        <mesh name="temp_69" file="temp_69.stl"/>
+        <mesh name="temp_7" file="temp_7.stl"/>
+        <mesh name="temp_70" file="temp_70.stl"/>
+        <mesh name="temp_71" file="temp_71.stl"/>
+        <mesh name="temp_72" file="temp_72.stl"/>
+        <mesh name="temp_73" file="temp_73.stl"/>
+        <mesh name="temp_74" file="temp_74.stl"/>
+        <mesh name="temp_75" file="temp_75.stl"/>
+        <mesh name="temp_76" file="temp_76.stl"/>
+        <mesh name="temp_77" file="temp_77.stl"/>
+        <mesh name="temp_78" file="temp_78.stl"/>
+        <mesh name="temp_79" file="temp_79.stl"/>
+        <mesh name="temp_8" file="temp_8.stl"/>
+        <mesh name="temp_80" file="temp_80.stl"/>
+        <mesh name="temp_81" file="temp_81.stl"/>
+        <mesh name="temp_82" file="temp_82.stl"/>
+        <mesh name="temp_83" file="temp_83.stl"/>
+        <mesh name="temp_84" file="temp_84.stl"/>
+        <mesh name="temp_85" file="temp_85.stl"/>
+        <mesh name="temp_86" file="temp_86.stl"/>
+        <mesh name="temp_87" file="temp_87.stl"/>
+        <mesh name="temp_88" file="temp_88.stl"/>
+        <mesh name="temp_89" file="temp_89.stl"/>
+        <mesh name="temp_9" file="temp_9.stl"/>
+        <mesh name="temp_90" file="temp_90.stl"/>
+        <mesh name="temp_91" file="temp_91.stl"/>
+        <mesh name="temp_92" file="temp_92.stl"/>
+        <mesh name="temp_93" file="temp_93.stl"/>
+        <mesh name="temp_94" file="temp_94.stl"/>
+        <mesh name="temp_95" file="temp_95.stl"/>
+        <mesh name="temp_96" file="temp_96.stl"/>
+        <mesh name="temp_97" file="temp_97.stl"/>
+        <mesh name="temp_98" file="temp_98.stl"/>
+        <mesh name="temp_99" file="temp_99.stl"/>
     </asset>
 </mujoco>
 
 """
 
-TWO_AGENT_EMPTY_WORLD_COLLIDE = """
+TWO_AGENT_EMPTY_temp_COLLIDE = """
 <mujoco>
   <worldbody>
     <light name="main_light" pos="0 0 1" dir="0 0 -1"
@@ -536,7 +559,7 @@ RAMP_60 = """
 </mujoco>
 """
 
-WORLD_42_CONVEX = """
+temp_42_CONVEX = """
 <mujoco model="generated_mesh_world">
     <compiler meshdir="tests/assets/meshes/"/>
     <default>
@@ -565,209 +588,209 @@ WORLD_42_CONVEX = """
                 mass="0"
             />
             </body>
-        <geom name="world_0" mesh="world_0" pos="0 0 0"/>
-        <geom name="world_1" mesh="world_1" pos="0 0 0"/>
-        <geom name="world_10" mesh="world_10" pos="0 0 0"/>
-        <geom name="world_11" mesh="world_11" pos="0 0 0"/>
-        <geom name="world_12" mesh="world_12" pos="0 0 0"/>
-        <geom name="world_13" mesh="world_13" pos="0 0 0"/>
-        <geom name="world_14" mesh="world_14" pos="0 0 0"/>
-        <geom name="world_15" mesh="world_15" pos="0 0 0"/>
-        <geom name="world_16" mesh="world_16" pos="0 0 0"/>
-        <geom name="world_17" mesh="world_17" pos="0 0 0"/>
-        <geom name="world_18" mesh="world_18" pos="0 0 0"/>
-        <geom name="world_19" mesh="world_19" pos="0 0 0"/>
-        <geom name="world_2" mesh="world_2" pos="0 0 0"/>
-        <geom name="world_20" mesh="world_20" pos="0 0 0"/>
-        <geom name="world_21" mesh="world_21" pos="0 0 0"/>
-        <geom name="world_22" mesh="world_22" pos="0 0 0"/>
-        <geom name="world_23" mesh="world_23" pos="0 0 0"/>
-        <geom name="world_24" mesh="world_24" pos="0 0 0"/>
-        <geom name="world_25" mesh="world_25" pos="0 0 0"/>
-        <geom name="world_26" mesh="world_26" pos="0 0 0"/>
-        <geom name="world_27" mesh="world_27" pos="0 0 0"/>
-        <geom name="world_28" mesh="world_28" pos="0 0 0"/>
-        <geom name="world_29" mesh="world_29" pos="0 0 0"/>
-        <geom name="world_3" mesh="world_3" pos="0 0 0"/>
-        <geom name="world_30" mesh="world_30" pos="0 0 0"/>
-        <geom name="world_31" mesh="world_31" pos="0 0 0"/>
-        <geom name="world_32" mesh="world_32" pos="0 0 0"/>
-        <geom name="world_33" mesh="world_33" pos="0 0 0"/>
-        <geom name="world_34" mesh="world_34" pos="0 0 0"/>
-        <geom name="world_35" mesh="world_35" pos="0 0 0"/>
-        <geom name="world_36" mesh="world_36" pos="0 0 0"/>
-        <geom name="world_37" mesh="world_37" pos="0 0 0"/>
-        <geom name="world_38" mesh="world_38" pos="0 0 0"/>
-        <geom name="world_39" mesh="world_39" pos="0 0 0"/>
-        <geom name="world_4" mesh="world_4" pos="0 0 0"/>
-        <geom name="world_40" mesh="world_40" pos="0 0 0"/>
-        <geom name="world_41" mesh="world_41" pos="0 0 0"/>
-        <geom name="world_42" mesh="world_42" pos="0 0 0"/>
-        <geom name="world_43" mesh="world_43" pos="0 0 0"/>
-        <geom name="world_44" mesh="world_44" pos="0 0 0"/>
-        <geom name="world_45" mesh="world_45" pos="0 0 0"/>
-        <geom name="world_46" mesh="world_46" pos="0 0 0"/>
-        <geom name="world_47" mesh="world_47" pos="0 0 0"/>
-        <geom name="world_48" mesh="world_48" pos="0 0 0"/>
-        <geom name="world_49" mesh="world_49" pos="0 0 0"/>
-        <geom name="world_5" mesh="world_5" pos="0 0 0"/>
-        <geom name="world_50" mesh="world_50" pos="0 0 0"/>
-        <geom name="world_51" mesh="world_51" pos="0 0 0"/>
-        <geom name="world_52" mesh="world_52" pos="0 0 0"/>
-        <geom name="world_53" mesh="world_53" pos="0 0 0"/>
-        <geom name="world_54" mesh="world_54" pos="0 0 0"/>
-        <geom name="world_55" mesh="world_55" pos="0 0 0"/>
-        <geom name="world_56" mesh="world_56" pos="0 0 0"/>
-        <geom name="world_57" mesh="world_57" pos="0 0 0"/>
-        <geom name="world_58" mesh="world_58" pos="0 0 0"/>
-        <geom name="world_59" mesh="world_59" pos="0 0 0"/>
-        <geom name="world_6" mesh="world_6" pos="0 0 0"/>
-        <geom name="world_60" mesh="world_60" pos="0 0 0"/>
-        <geom name="world_61" mesh="world_61" pos="0 0 0"/>
-        <geom name="world_62" mesh="world_62" pos="0 0 0"/>
-        <geom name="world_63" mesh="world_63" pos="0 0 0"/>
-        <geom name="world_64" mesh="world_64" pos="0 0 0"/>
-        <geom name="world_65" mesh="world_65" pos="0 0 0"/>
-        <geom name="world_66" mesh="world_66" pos="0 0 0"/>
-        <geom name="world_67" mesh="world_67" pos="0 0 0"/>
-        <geom name="world_68" mesh="world_68" pos="0 0 0"/>
-        <geom name="world_69" mesh="world_69" pos="0 0 0"/>
-        <geom name="world_7" mesh="world_7" pos="0 0 0"/>
-        <geom name="world_70" mesh="world_70" pos="0 0 0"/>
-        <geom name="world_71" mesh="world_71" pos="0 0 0"/>
-        <geom name="world_72" mesh="world_72" pos="0 0 0"/>
-        <geom name="world_73" mesh="world_73" pos="0 0 0"/>
-        <geom name="world_74" mesh="world_74" pos="0 0 0"/>
-        <geom name="world_75" mesh="world_75" pos="0 0 0"/>
-        <geom name="world_76" mesh="world_76" pos="0 0 0"/>
-        <geom name="world_77" mesh="world_77" pos="0 0 0"/>
-        <geom name="world_78" mesh="world_78" pos="0 0 0"/>
-        <geom name="world_79" mesh="world_79" pos="0 0 0"/>
-        <geom name="world_8" mesh="world_8" pos="0 0 0"/>
-        <geom name="world_80" mesh="world_80" pos="0 0 0"/>
-        <geom name="world_81" mesh="world_81" pos="0 0 0"/>
-        <geom name="world_82" mesh="world_82" pos="0 0 0"/>
-        <geom name="world_83" mesh="world_83" pos="0 0 0"/>
-        <geom name="world_84" mesh="world_84" pos="0 0 0"/>
-        <geom name="world_85" mesh="world_85" pos="0 0 0"/>
-        <geom name="world_86" mesh="world_86" pos="0 0 0"/>
-        <geom name="world_87" mesh="world_87" pos="0 0 0"/>
-        <geom name="world_88" mesh="world_88" pos="0 0 0"/>
-        <geom name="world_89" mesh="world_89" pos="0 0 0"/>
-        <geom name="world_9" mesh="world_9" pos="0 0 0"/>
-        <geom name="world_90" mesh="world_90" pos="0 0 0"/>
-        <geom name="world_91" mesh="world_91" pos="0 0 0"/>
-        <geom name="world_92" mesh="world_92" pos="0 0 0"/>
-        <geom name="world_93" mesh="world_93" pos="0 0 0"/>
-        <geom name="world_94" mesh="world_94" pos="0 0 0"/>
-        <geom name="world_95" mesh="world_95" pos="0 0 0"/>
-        <geom name="world_96" mesh="world_96" pos="0 0 0"/>
-        <geom name="world_97" mesh="world_97" pos="0 0 0"/>
-        <geom name="world_98" mesh="world_98" pos="0 0 0"/>
-        <geom name="world_99" mesh="world_99" pos="0 0 0"/>
+        <geom name="temp_0" mesh="temp_0" pos="0 0 0"/>
+        <geom name="temp_1" mesh="temp_1" pos="0 0 0"/>
+        <geom name="temp_10" mesh="temp_10" pos="0 0 0"/>
+        <geom name="temp_11" mesh="temp_11" pos="0 0 0"/>
+        <geom name="temp_12" mesh="temp_12" pos="0 0 0"/>
+        <geom name="temp_13" mesh="temp_13" pos="0 0 0"/>
+        <geom name="temp_14" mesh="temp_14" pos="0 0 0"/>
+        <geom name="temp_15" mesh="temp_15" pos="0 0 0"/>
+        <geom name="temp_16" mesh="temp_16" pos="0 0 0"/>
+        <geom name="temp_17" mesh="temp_17" pos="0 0 0"/>
+        <geom name="temp_18" mesh="temp_18" pos="0 0 0"/>
+        <geom name="temp_19" mesh="temp_19" pos="0 0 0"/>
+        <geom name="temp_2" mesh="temp_2" pos="0 0 0"/>
+        <geom name="temp_20" mesh="temp_20" pos="0 0 0"/>
+        <geom name="temp_21" mesh="temp_21" pos="0 0 0"/>
+        <geom name="temp_22" mesh="temp_22" pos="0 0 0"/>
+        <geom name="temp_23" mesh="temp_23" pos="0 0 0"/>
+        <geom name="temp_24" mesh="temp_24" pos="0 0 0"/>
+        <geom name="temp_25" mesh="temp_25" pos="0 0 0"/>
+        <geom name="temp_26" mesh="temp_26" pos="0 0 0"/>
+        <geom name="temp_27" mesh="temp_27" pos="0 0 0"/>
+        <geom name="temp_28" mesh="temp_28" pos="0 0 0"/>
+        <geom name="temp_29" mesh="temp_29" pos="0 0 0"/>
+        <geom name="temp_3" mesh="temp_3" pos="0 0 0"/>
+        <geom name="temp_30" mesh="temp_30" pos="0 0 0"/>
+        <geom name="temp_31" mesh="temp_31" pos="0 0 0"/>
+        <geom name="temp_32" mesh="temp_32" pos="0 0 0"/>
+        <geom name="temp_33" mesh="temp_33" pos="0 0 0"/>
+        <geom name="temp_34" mesh="temp_34" pos="0 0 0"/>
+        <geom name="temp_35" mesh="temp_35" pos="0 0 0"/>
+        <geom name="temp_36" mesh="temp_36" pos="0 0 0"/>
+        <geom name="temp_37" mesh="temp_37" pos="0 0 0"/>
+        <geom name="temp_38" mesh="temp_38" pos="0 0 0"/>
+        <geom name="temp_39" mesh="temp_39" pos="0 0 0"/>
+        <geom name="temp_4" mesh="temp_4" pos="0 0 0"/>
+        <geom name="temp_40" mesh="temp_40" pos="0 0 0"/>
+        <geom name="temp_41" mesh="temp_41" pos="0 0 0"/>
+        <geom name="temp_42" mesh="temp_42" pos="0 0 0"/>
+        <geom name="temp_43" mesh="temp_43" pos="0 0 0"/>
+        <geom name="temp_44" mesh="temp_44" pos="0 0 0"/>
+        <geom name="temp_45" mesh="temp_45" pos="0 0 0"/>
+        <geom name="temp_46" mesh="temp_46" pos="0 0 0"/>
+        <geom name="temp_47" mesh="temp_47" pos="0 0 0"/>
+        <geom name="temp_48" mesh="temp_48" pos="0 0 0"/>
+        <geom name="temp_49" mesh="temp_49" pos="0 0 0"/>
+        <geom name="temp_5" mesh="temp_5" pos="0 0 0"/>
+        <geom name="temp_50" mesh="temp_50" pos="0 0 0"/>
+        <geom name="temp_51" mesh="temp_51" pos="0 0 0"/>
+        <geom name="temp_52" mesh="temp_52" pos="0 0 0"/>
+        <geom name="temp_53" mesh="temp_53" pos="0 0 0"/>
+        <geom name="temp_54" mesh="temp_54" pos="0 0 0"/>
+        <geom name="temp_55" mesh="temp_55" pos="0 0 0"/>
+        <geom name="temp_56" mesh="temp_56" pos="0 0 0"/>
+        <geom name="temp_57" mesh="temp_57" pos="0 0 0"/>
+        <geom name="temp_58" mesh="temp_58" pos="0 0 0"/>
+        <geom name="temp_59" mesh="temp_59" pos="0 0 0"/>
+        <geom name="temp_6" mesh="temp_6" pos="0 0 0"/>
+        <geom name="temp_60" mesh="temp_60" pos="0 0 0"/>
+        <geom name="temp_61" mesh="temp_61" pos="0 0 0"/>
+        <geom name="temp_62" mesh="temp_62" pos="0 0 0"/>
+        <geom name="temp_63" mesh="temp_63" pos="0 0 0"/>
+        <geom name="temp_64" mesh="temp_64" pos="0 0 0"/>
+        <geom name="temp_65" mesh="temp_65" pos="0 0 0"/>
+        <geom name="temp_66" mesh="temp_66" pos="0 0 0"/>
+        <geom name="temp_67" mesh="temp_67" pos="0 0 0"/>
+        <geom name="temp_68" mesh="temp_68" pos="0 0 0"/>
+        <geom name="temp_69" mesh="temp_69" pos="0 0 0"/>
+        <geom name="temp_7" mesh="temp_7" pos="0 0 0"/>
+        <geom name="temp_70" mesh="temp_70" pos="0 0 0"/>
+        <geom name="temp_71" mesh="temp_71" pos="0 0 0"/>
+        <geom name="temp_72" mesh="temp_72" pos="0 0 0"/>
+        <geom name="temp_73" mesh="temp_73" pos="0 0 0"/>
+        <geom name="temp_74" mesh="temp_74" pos="0 0 0"/>
+        <geom name="temp_75" mesh="temp_75" pos="0 0 0"/>
+        <geom name="temp_76" mesh="temp_76" pos="0 0 0"/>
+        <geom name="temp_77" mesh="temp_77" pos="0 0 0"/>
+        <geom name="temp_78" mesh="temp_78" pos="0 0 0"/>
+        <geom name="temp_79" mesh="temp_79" pos="0 0 0"/>
+        <geom name="temp_8" mesh="temp_8" pos="0 0 0"/>
+        <geom name="temp_80" mesh="temp_80" pos="0 0 0"/>
+        <geom name="temp_81" mesh="temp_81" pos="0 0 0"/>
+        <geom name="temp_82" mesh="temp_82" pos="0 0 0"/>
+        <geom name="temp_83" mesh="temp_83" pos="0 0 0"/>
+        <geom name="temp_84" mesh="temp_84" pos="0 0 0"/>
+        <geom name="temp_85" mesh="temp_85" pos="0 0 0"/>
+        <geom name="temp_86" mesh="temp_86" pos="0 0 0"/>
+        <geom name="temp_87" mesh="temp_87" pos="0 0 0"/>
+        <geom name="temp_88" mesh="temp_88" pos="0 0 0"/>
+        <geom name="temp_89" mesh="temp_89" pos="0 0 0"/>
+        <geom name="temp_9" mesh="temp_9" pos="0 0 0"/>
+        <geom name="temp_90" mesh="temp_90" pos="0 0 0"/>
+        <geom name="temp_91" mesh="temp_91" pos="0 0 0"/>
+        <geom name="temp_92" mesh="temp_92" pos="0 0 0"/>
+        <geom name="temp_93" mesh="temp_93" pos="0 0 0"/>
+        <geom name="temp_94" mesh="temp_94" pos="0 0 0"/>
+        <geom name="temp_95" mesh="temp_95" pos="0 0 0"/>
+        <geom name="temp_96" mesh="temp_96" pos="0 0 0"/>
+        <geom name="temp_97" mesh="temp_97" pos="0 0 0"/>
+        <geom name="temp_98" mesh="temp_98" pos="0 0 0"/>
+        <geom name="temp_99" mesh="temp_99" pos="0 0 0"/>
     </worldbody>
 
     <asset>
-        <mesh name="world_0" file="world_0.stl"/>
-        <mesh name="world_1" file="world_1.stl"/>
-        <mesh name="world_10" file="world_10.stl"/>
-        <mesh name="world_11" file="world_11.stl"/>
-        <mesh name="world_12" file="world_12.stl"/>
-        <mesh name="world_13" file="world_13.stl"/>
-        <mesh name="world_14" file="world_14.stl"/>
-        <mesh name="world_15" file="world_15.stl"/>
-        <mesh name="world_16" file="world_16.stl"/>
-        <mesh name="world_17" file="world_17.stl"/>
-        <mesh name="world_18" file="world_18.stl"/>
-        <mesh name="world_19" file="world_19.stl"/>
-        <mesh name="world_2" file="world_2.stl"/>
-        <mesh name="world_20" file="world_20.stl"/>
-        <mesh name="world_21" file="world_21.stl"/>
-        <mesh name="world_22" file="world_22.stl"/>
-        <mesh name="world_23" file="world_23.stl"/>
-        <mesh name="world_24" file="world_24.stl"/>
-        <mesh name="world_25" file="world_25.stl"/>
-        <mesh name="world_26" file="world_26.stl"/>
-        <mesh name="world_27" file="world_27.stl"/>
-        <mesh name="world_28" file="world_28.stl"/>
-        <mesh name="world_29" file="world_29.stl"/>
-        <mesh name="world_3" file="world_3.stl"/>
-        <mesh name="world_30" file="world_30.stl"/>
-        <mesh name="world_31" file="world_31.stl"/>
-        <mesh name="world_32" file="world_32.stl"/>
-        <mesh name="world_33" file="world_33.stl"/>
-        <mesh name="world_34" file="world_34.stl"/>
-        <mesh name="world_35" file="world_35.stl"/>
-        <mesh name="world_36" file="world_36.stl"/>
-        <mesh name="world_37" file="world_37.stl"/>
-        <mesh name="world_38" file="world_38.stl"/>
-        <mesh name="world_39" file="world_39.stl"/>
-        <mesh name="world_4" file="world_4.stl"/>
-        <mesh name="world_40" file="world_40.stl"/>
-        <mesh name="world_41" file="world_41.stl"/>
-        <mesh name="world_42" file="world_42.stl"/>
-        <mesh name="world_43" file="world_43.stl"/>
-        <mesh name="world_44" file="world_44.stl"/>
-        <mesh name="world_45" file="world_45.stl"/>
-        <mesh name="world_46" file="world_46.stl"/>
-        <mesh name="world_47" file="world_47.stl"/>
-        <mesh name="world_48" file="world_48.stl"/>
-        <mesh name="world_49" file="world_49.stl"/>
-        <mesh name="world_5" file="world_5.stl"/>
-        <mesh name="world_50" file="world_50.stl"/>
-        <mesh name="world_51" file="world_51.stl"/>
-        <mesh name="world_52" file="world_52.stl"/>
-        <mesh name="world_53" file="world_53.stl"/>
-        <mesh name="world_54" file="world_54.stl"/>
-        <mesh name="world_55" file="world_55.stl"/>
-        <mesh name="world_56" file="world_56.stl"/>
-        <mesh name="world_57" file="world_57.stl"/>
-        <mesh name="world_58" file="world_58.stl"/>
-        <mesh name="world_59" file="world_59.stl"/>
-        <mesh name="world_6" file="world_6.stl"/>
-        <mesh name="world_60" file="world_60.stl"/>
-        <mesh name="world_61" file="world_61.stl"/>
-        <mesh name="world_62" file="world_62.stl"/>
-        <mesh name="world_63" file="world_63.stl"/>
-        <mesh name="world_64" file="world_64.stl"/>
-        <mesh name="world_65" file="world_65.stl"/>
-        <mesh name="world_66" file="world_66.stl"/>
-        <mesh name="world_67" file="world_67.stl"/>
-        <mesh name="world_68" file="world_68.stl"/>
-        <mesh name="world_69" file="world_69.stl"/>
-        <mesh name="world_7" file="world_7.stl"/>
-        <mesh name="world_70" file="world_70.stl"/>
-        <mesh name="world_71" file="world_71.stl"/>
-        <mesh name="world_72" file="world_72.stl"/>
-        <mesh name="world_73" file="world_73.stl"/>
-        <mesh name="world_74" file="world_74.stl"/>
-        <mesh name="world_75" file="world_75.stl"/>
-        <mesh name="world_76" file="world_76.stl"/>
-        <mesh name="world_77" file="world_77.stl"/>
-        <mesh name="world_78" file="world_78.stl"/>
-        <mesh name="world_79" file="world_79.stl"/>
-        <mesh name="world_8" file="world_8.stl"/>
-        <mesh name="world_80" file="world_80.stl"/>
-        <mesh name="world_81" file="world_81.stl"/>
-        <mesh name="world_82" file="world_82.stl"/>
-        <mesh name="world_83" file="world_83.stl"/>
-        <mesh name="world_84" file="world_84.stl"/>
-        <mesh name="world_85" file="world_85.stl"/>
-        <mesh name="world_86" file="world_86.stl"/>
-        <mesh name="world_87" file="world_87.stl"/>
-        <mesh name="world_88" file="world_88.stl"/>
-        <mesh name="world_89" file="world_89.stl"/>
-        <mesh name="world_9" file="world_9.stl"/>
-        <mesh name="world_90" file="world_90.stl"/>
-        <mesh name="world_91" file="world_91.stl"/>
-        <mesh name="world_92" file="world_92.stl"/>
-        <mesh name="world_93" file="world_93.stl"/>
-        <mesh name="world_94" file="world_94.stl"/>
-        <mesh name="world_95" file="world_95.stl"/>
-        <mesh name="world_96" file="world_96.stl"/>
-        <mesh name="world_97" file="world_97.stl"/>
-        <mesh name="world_98" file="world_98.stl"/>
-        <mesh name="world_99" file="world_99.stl"/>
+        <mesh name="temp_0" file="temp_0.stl"/>
+        <mesh name="temp_1" file="temp_1.stl"/>
+        <mesh name="temp_10" file="temp_10.stl"/>
+        <mesh name="temp_11" file="temp_11.stl"/>
+        <mesh name="temp_12" file="temp_12.stl"/>
+        <mesh name="temp_13" file="temp_13.stl"/>
+        <mesh name="temp_14" file="temp_14.stl"/>
+        <mesh name="temp_15" file="temp_15.stl"/>
+        <mesh name="temp_16" file="temp_16.stl"/>
+        <mesh name="temp_17" file="temp_17.stl"/>
+        <mesh name="temp_18" file="temp_18.stl"/>
+        <mesh name="temp_19" file="temp_19.stl"/>
+        <mesh name="temp_2" file="temp_2.stl"/>
+        <mesh name="temp_20" file="temp_20.stl"/>
+        <mesh name="temp_21" file="temp_21.stl"/>
+        <mesh name="temp_22" file="temp_22.stl"/>
+        <mesh name="temp_23" file="temp_23.stl"/>
+        <mesh name="temp_24" file="temp_24.stl"/>
+        <mesh name="temp_25" file="temp_25.stl"/>
+        <mesh name="temp_26" file="temp_26.stl"/>
+        <mesh name="temp_27" file="temp_27.stl"/>
+        <mesh name="temp_28" file="temp_28.stl"/>
+        <mesh name="temp_29" file="temp_29.stl"/>
+        <mesh name="temp_3" file="temp_3.stl"/>
+        <mesh name="temp_30" file="temp_30.stl"/>
+        <mesh name="temp_31" file="temp_31.stl"/>
+        <mesh name="temp_32" file="temp_32.stl"/>
+        <mesh name="temp_33" file="temp_33.stl"/>
+        <mesh name="temp_34" file="temp_34.stl"/>
+        <mesh name="temp_35" file="temp_35.stl"/>
+        <mesh name="temp_36" file="temp_36.stl"/>
+        <mesh name="temp_37" file="temp_37.stl"/>
+        <mesh name="temp_38" file="temp_38.stl"/>
+        <mesh name="temp_39" file="temp_39.stl"/>
+        <mesh name="temp_4" file="temp_4.stl"/>
+        <mesh name="temp_40" file="temp_40.stl"/>
+        <mesh name="temp_41" file="temp_41.stl"/>
+        <mesh name="temp_42" file="temp_42.stl"/>
+        <mesh name="temp_43" file="temp_43.stl"/>
+        <mesh name="temp_44" file="temp_44.stl"/>
+        <mesh name="temp_45" file="temp_45.stl"/>
+        <mesh name="temp_46" file="temp_46.stl"/>
+        <mesh name="temp_47" file="temp_47.stl"/>
+        <mesh name="temp_48" file="temp_48.stl"/>
+        <mesh name="temp_49" file="temp_49.stl"/>
+        <mesh name="temp_5" file="temp_5.stl"/>
+        <mesh name="temp_50" file="temp_50.stl"/>
+        <mesh name="temp_51" file="temp_51.stl"/>
+        <mesh name="temp_52" file="temp_52.stl"/>
+        <mesh name="temp_53" file="temp_53.stl"/>
+        <mesh name="temp_54" file="temp_54.stl"/>
+        <mesh name="temp_55" file="temp_55.stl"/>
+        <mesh name="temp_56" file="temp_56.stl"/>
+        <mesh name="temp_57" file="temp_57.stl"/>
+        <mesh name="temp_58" file="temp_58.stl"/>
+        <mesh name="temp_59" file="temp_59.stl"/>
+        <mesh name="temp_6" file="temp_6.stl"/>
+        <mesh name="temp_60" file="temp_60.stl"/>
+        <mesh name="temp_61" file="temp_61.stl"/>
+        <mesh name="temp_62" file="temp_62.stl"/>
+        <mesh name="temp_63" file="temp_63.stl"/>
+        <mesh name="temp_64" file="temp_64.stl"/>
+        <mesh name="temp_65" file="temp_65.stl"/>
+        <mesh name="temp_66" file="temp_66.stl"/>
+        <mesh name="temp_67" file="temp_67.stl"/>
+        <mesh name="temp_68" file="temp_68.stl"/>
+        <mesh name="temp_69" file="temp_69.stl"/>
+        <mesh name="temp_7" file="temp_7.stl"/>
+        <mesh name="temp_70" file="temp_70.stl"/>
+        <mesh name="temp_71" file="temp_71.stl"/>
+        <mesh name="temp_72" file="temp_72.stl"/>
+        <mesh name="temp_73" file="temp_73.stl"/>
+        <mesh name="temp_74" file="temp_74.stl"/>
+        <mesh name="temp_75" file="temp_75.stl"/>
+        <mesh name="temp_76" file="temp_76.stl"/>
+        <mesh name="temp_77" file="temp_77.stl"/>
+        <mesh name="temp_78" file="temp_78.stl"/>
+        <mesh name="temp_79" file="temp_79.stl"/>
+        <mesh name="temp_8" file="temp_8.stl"/>
+        <mesh name="temp_80" file="temp_80.stl"/>
+        <mesh name="temp_81" file="temp_81.stl"/>
+        <mesh name="temp_82" file="temp_82.stl"/>
+        <mesh name="temp_83" file="temp_83.stl"/>
+        <mesh name="temp_84" file="temp_84.stl"/>
+        <mesh name="temp_85" file="temp_85.stl"/>
+        <mesh name="temp_86" file="temp_86.stl"/>
+        <mesh name="temp_87" file="temp_87.stl"/>
+        <mesh name="temp_88" file="temp_88.stl"/>
+        <mesh name="temp_89" file="temp_89.stl"/>
+        <mesh name="temp_9" file="temp_9.stl"/>
+        <mesh name="temp_90" file="temp_90.stl"/>
+        <mesh name="temp_91" file="temp_91.stl"/>
+        <mesh name="temp_92" file="temp_92.stl"/>
+        <mesh name="temp_93" file="temp_93.stl"/>
+        <mesh name="temp_94" file="temp_94.stl"/>
+        <mesh name="temp_95" file="temp_95.stl"/>
+        <mesh name="temp_96" file="temp_96.stl"/>
+        <mesh name="temp_97" file="temp_97.stl"/>
+        <mesh name="temp_98" file="temp_98.stl"/>
+        <mesh name="temp_99" file="temp_99.stl"/>
     </asset>
 </mujoco>
 

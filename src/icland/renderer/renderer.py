@@ -1,3 +1,5 @@
+"""Renderer module."""
+
 from functools import partial  # noqa: D100
 from typing import Any, Callable, List
 
@@ -136,11 +138,12 @@ def __scene_sdf_from_tilemap(
 def __raycast(
     sdf: Callable[[jax.Array], jnp.float32],
     p0: jax.Array,
-    dir: jax.Array,
+    rdir: jax.Array,
     step_n: jnp.int32 = 50,
-) -> Any:
-    def f(_: Any, p: jax.Array) -> Any:
-        return p + sdf(p) * dir
+) -> Any:  # typing: ignore
+    def f(_: jnp.int32, p: jax.Array) -> Any:  # typing: ignore
+        res = p + sdf(p) * rdir
+        return res
 
     return jax.lax.fori_loop(0, step_n, f, p0)
 
@@ -202,7 +205,7 @@ def __camera_rays(
 
 
 def __cast_shadow(
-    sdf: partial[Any],
+    sdf: Callable[[Any], Any],
     light_dir: jax.Array,
     p0: jax.Array,
     step_n: jnp.int32 = 50,
@@ -261,7 +264,7 @@ def __scene_sdf_with_objs(
     terrain_color: jax.Array = DEFAULT_COLOR,
     # with_color: bool = False,
     floor_height: jnp.float32 = 0.0,
-):
+) -> tuple[jnp.float32, jax.Array]:
     """SDF for the agents and props."""
     # Pre: the lengths of player_pos and player_col are the same.
     # Pre: the lengths of prop_pos, prop_rot and prop_col are the same.
@@ -277,24 +280,26 @@ def __scene_sdf_with_objs(
         transform = jnp.array(
             [
                 [1, 0, 0, -curr_pos[0]],
-                [0, 1, 0, -curr_pos[1] + 0.2],
+                [0, 1, 0, -curr_pos[1] - 0.2],
                 [0, 0, 1, -curr_pos[2]],
                 [0, 0, 0, 1],
             ]
         )
 
         return capsule_sdf(
-            jnp.matmul(transform, jnp.append(p, 1))[:3], 2, 1
+            jnp.matmul(transform, jnp.append(p, 1))[:3], 0.4, 0.06
         ), curr_col
 
-    def process_prop_sdf(i: jnp.int32):
+    def process_prop_sdf(i: jnp.int32) -> tuple[jnp.float32, jax.Array]:
         curr_pos = prop_pos[i]
         curr_rot = prop_rot[i]
         curr_col = prop_col[i]
 
         curr_type = props[i]
 
-        def get_transformation_matrix(qpos, curr_pos):
+        def get_transformation_matrix(
+            qpos: jax.Array, curr_pos: jax.Array
+        ) -> jax.Array:
             # Extract rotation matrix from quaternion
             R = Rotation.from_quat(qpos[:4]).as_matrix()  # 3x3 rotation matrix
 
@@ -302,7 +307,7 @@ def __scene_sdf_with_objs(
             transform = jnp.eye(4)  # Start with an identity matrix
             transform = transform.at[:3, :3].set(R)  # Set the rotation part
             transform = transform.at[:3, 3].set(
-                jnp.array(curr_pos)
+                jnp.array(curr_pos) + jnp.array([0, 0.25, 0])
             )  # Set the translation part
 
             return transform
@@ -314,8 +319,8 @@ def __scene_sdf_with_objs(
             curr_type,
             [
                 lambda _: jnp.inf,
-                partial(cube_sdf, size=1),
-                partial(sphere_sdf, r=5),
+                partial(cube_sdf, size=0.5),
+                partial(sphere_sdf, r=0.25),
             ],
             jnp.matmul(
                 jnp.linalg.inv(get_transformation_matrix(curr_rot, curr_pos)),
@@ -368,6 +373,7 @@ def __shade_f(
     light = 0.7 * diffuse + 0.2 * ambient
     return surf_color * light + spec
 
+
 # tilemap: jax.Array,
 # props: jax.Array,
 # player_pos: jax.Array,
@@ -378,6 +384,7 @@ def __shade_f(
 # p: jax.Array,
 # terrain_color: jax.Array = DEFAULT_COLOR,
 # floor_height: jnp.float32 = 0.0,
+
 
 @partial(jax.jit, static_argnames=["view_width", "view_height"])
 def render_frame_with_objects(
@@ -392,15 +399,25 @@ def render_frame_with_objects(
     # view_size: tuple[jnp.int32, jnp.int32] = DEFAULT_VIEWSIZE,
 ) -> jax.Array:
     """Renders one frame given camera position, direction, and world terrain."""
-    player_pos = jnp.array([[8.5, 4, 1]])
+    player_pos = jnp.array([[8.5, 3, 1]])
     player_col = jnp.array([[1.0, 0.0, 0.0]])
-    prop_pos = jnp.array([[4, 3.5, 1]])
+    prop_pos = jnp.array([[4, 3, 1]])
     prop_rot = jnp.array([[1, 0, 0, 0]])
     prop_col = jnp.array([[1.0, 1.0, 0.0]])
-    
+
     # Ray casting
     ray_dir = __camera_rays(cam_pos, cam_dir, view_width, view_height, fx=0.6)
-    sdf = partial(__scene_sdf_with_objs, tilemap, props, player_pos, player_col, prop_pos, prop_rot, prop_col, terrain_color=terrain_color)
+    sdf = partial(
+        __scene_sdf_with_objs,
+        tilemap,
+        props,
+        player_pos,
+        player_col,
+        prop_pos,
+        prop_rot,
+        prop_col,
+        terrain_color=terrain_color,
+    )
     sdf_dists_only = lambda p: sdf(p)[0]
     hit_pos = jax.vmap(partial(__raycast, sdf_dists_only, cam_pos))(ray_dir)
 
@@ -414,7 +431,7 @@ def render_frame_with_objects(
     frame = jax.vmap(f)(surf_color, shadow, raw_normal, ray_dir)
     frame = frame ** (1.0 / 2.2)  # gamma correction
 
-    return frame.reshape((view_height, view_width, NUM_CHANNELS))
+    return frame.reshape((view_height, view_width, NUM_CHANNELS))  # type: ignore
 
 
 @partial(jax.jit, static_argnames=["view_width", "view_height"])
@@ -450,7 +467,7 @@ def render_frame(
     frame = jax.vmap(f)(surf_color, shadow, raw_normal, ray_dir)
     frame = frame ** (1.0 / 2.2)  # gamma correction
 
-    return frame.reshape((view_height, view_width, NUM_CHANNELS))
+    return frame.reshape((view_height, view_width, NUM_CHANNELS))  # type: ignore
 
 
 transform_axes = jnp.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]])
@@ -485,7 +502,7 @@ def get_agent_camera_from_mjx(
 
 
 if __name__ == "__main__":  # pragma: no cover
-    tilemap = jnp.array(
+    tilemap2 = jnp.array(
         [
             [
                 [0, 0, 0, 2],
@@ -609,15 +626,139 @@ if __name__ == "__main__":  # pragma: no cover
             ],
         ]
     )
+    tilemap = jnp.array(
+        [
+            [
+                [0, 0, 0, 6],
+                [0, 2, 0, 6],
+                [0, 1, 0, 6],
+                [0, 1, 0, 4],
+                [0, 3, 0, 4],
+                [0, 3, 0, 6],
+                [0, 2, 0, 6],
+                [0, 0, 0, 2],
+                [0, 2, 0, 2],
+                [0, 1, 0, 2],
+            ],
+            [
+                [0, 0, 0, 3],
+                [0, 0, 0, 3],
+                [0, 2, 0, 3],
+                [0, 0, 0, 4],
+                [0, 1, 0, 4],
+                [0, 0, 0, 6],
+                [0, 1, 0, 6],
+                [0, 3, 0, 5],
+                [0, 2, 0, 5],
+                [0, 3, 0, 3],
+            ],
+            [
+                [0, 0, 0, 3],
+                [0, 0, 0, 3],
+                [0, 0, 0, 3],
+                [0, 2, 0, 3],
+                [0, 3, 0, 5],
+                [0, 0, 0, 5],
+                [0, 2, 0, 5],
+                [0, 1, 0, 5],
+                [0, 3, 0, 5],
+                [0, 1, 0, 3],
+            ],
+            [
+                [0, 0, 0, 3],
+                [0, 0, 0, 3],
+                [0, 0, 0, 3],
+                [0, 3, 0, 3],
+                [0, 0, 0, 5],
+                [0, 2, 0, 5],
+                [0, 1, 0, 5],
+                [0, 1, 0, 5],
+                [0, 3, 0, 5],
+                [0, 1, 0, 3],
+            ],
+            [
+                [0, 0, 0, 3],
+                [0, 0, 0, 3],
+                [0, 0, 0, 3],
+                [0, 3, 0, 3],
+                [0, 3, 0, 6],
+                [0, 0, 0, 6],
+                [0, 2, 0, 6],
+                [0, 0, 0, 5],
+                [0, 1, 0, 5],
+                [0, 1, 0, 3],
+            ],
+            [
+                [0, 0, 0, 3],
+                [0, 0, 0, 3],
+                [0, 0, 0, 3],
+                [0, 3, 0, 3],
+                [0, 0, 0, 6],
+                [0, 2, 0, 6],
+                [0, 1, 0, 6],
+                [0, 3, 0, 4],
+                [0, 2, 0, 4],
+                [1, 3, 3, 4],
+            ],
+            [
+                [0, 2, 0, 3],
+                [0, 0, 0, 3],
+                [0, 0, 0, 3],
+                [0, 0, 0, 3],
+                [0, 0, 0, 3],
+                [0, 0, 0, 3],
+                [0, 2, 0, 3],
+                [0, 0, 0, 4],
+                [0, 1, 0, 4],
+                [0, 0, 0, 3],
+            ],
+            [
+                [0, 1, 0, 3],
+                [0, 0, 0, 3],
+                [0, 0, 0, 3],
+                [0, 0, 0, 3],
+                [0, 0, 0, 3],
+                [0, 0, 0, 3],
+                [0, 0, 0, 3],
+                [0, 2, 0, 3],
+                [0, 3, 0, 6],
+                [0, 2, 0, 6],
+            ],
+            [
+                [0, 0, 0, 3],
+                [0, 2, 0, 3],
+                [0, 2, 0, 3],
+                [0, 2, 0, 3],
+                [0, 2, 0, 3],
+                [0, 2, 0, 3],
+                [0, 0, 0, 3],
+                [0, 3, 0, 3],
+                [0, 0, 0, 6],
+                [0, 1, 0, 6],
+            ],
+            [
+                [0, 3, 0, 6],
+                [0, 0, 0, 6],
+                [0, 2, 0, 6],
+                [0, 3, 0, 4],
+                [0, 2, 0, 4],
+                [0, 0, 0, 3],
+                [0, 2, 0, 3],
+                [2, 3, 2, 3],
+                [0, 0, 0, 2],
+                [0, 2, 0, 2],
+            ],
+        ]
+    )
     frames: List[Any] = []
     for i in range(72):
         # f = render_frame(
-            # cam_pos=jnp.array([5.0, 10.0, -10.0 + (i * 10 / 72)]),
-            # cam_dir=jnp.array([0.0, -0.5, 1.0]),
-            # tilemap=tilemap,
-            # terrain_color=jnp.array([1.0, 0.0, 0.0]),
-            # view_width=256,
-            # view_height=144,
+        # cam_pos=jnp.array([5.0, 10.0, -10.0 + (i * 10 / 72)]),
+        # cam_dir=jnp.array([0.0, -0.5, 1.0]),
+        # tilemap=tilemap,
+        # terrain_color=jnp.array([1.0, 0.0, 0.0]),
+        # view_width=256,
+        # view_height=144,
         # )
         f = render_frame_with_objects(
             cam_pos=jnp.array([5.0, 10.0, -10.0 + (i * 10 / 72)]),
@@ -631,5 +772,8 @@ if __name__ == "__main__":  # pragma: no cover
         print(f"Rendered frame {i}")
 
     imageio.mimsave(
-        f"tests/video_output/sdf_world_scene.mp4", frames, fps=24, quality=8
+        f"tests/video_output/sdf_world_scene_gpu.mp4",
+        frames,
+        fps=30,
+        quality=8,
     )
