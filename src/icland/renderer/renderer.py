@@ -1,5 +1,8 @@
-from functools import partial  # noqa: D100
-from typing import Any, Callable, List, Tuple
+"""Renderer for the ICLand environment."""
+
+from collections.abc import Callable
+from functools import partial
+from typing import Any
 
 import imageio
 import jax
@@ -10,7 +13,7 @@ from icland.renderer.sdfs import box_sdf, ramp_sdf
 from icland.types import ICLandState
 
 # Constants
-DEFAULT_VIEWSIZE: Tuple[jnp.int32, jnp.int32] = (92, 76)
+DEFAULT_VIEWSIZE: tuple[jnp.int32, jnp.int32] = (92, 76)
 DEFAULT_COLOR: jax.Array = jnp.array([0.2588, 0.5294, 0.9607])
 WORLD_UP: jax.Array = jnp.array([0.0, 1.0, 0.0], dtype=jnp.float32)
 NUM_CHANNELS: jnp.int32 = 3
@@ -229,16 +232,16 @@ def __scene_sdf_from_tilemap_color(
     terrain_color: jax.Array = DEFAULT_COLOR,
     with_color: bool = False,
     floor_height: jnp.float32 = 0.0,
-) -> Tuple[jnp.float32, jax.Array]:
+) -> tuple[jnp.float32, jax.Array]:
     """SDF for the world terrain."""
     tile_dist = __scene_sdf_from_tilemap(tilemap, p, floor_height - 1)
     floor_dist = p[1] - floor_height
     min_dist = jnp.minimum(tile_dist, floor_dist)
 
-    def process_without_color(_: Any) -> Tuple[jnp.float32, jax.Array]:
+    def process_without_color(_: Any) -> tuple[jnp.float32, jax.Array]:
         return min_dist, jnp.zeros((3,))
 
-    def process_with_color(_: Any) -> Tuple[jnp.float32, jax.Array]:
+    def process_with_color(_: Any) -> tuple[jnp.float32, jax.Array]:
         x, _, z = jnp.tanh(jnp.sin(p * jnp.pi) * 20.0)
         floor_color = (0.5 + (x * z) * 0.1) * jnp.ones(3)
         color = jnp.choose(
@@ -312,7 +315,7 @@ def get_agent_camera_from_mjx(
     body_id: jnp.int32,
     camera_height: jnp.float32 = 0.2,
     camera_offset: jnp.float32 = 0.06,
-) -> Tuple[jax.Array, jax.Array]:
+) -> tuple[jax.Array, jax.Array]:
     """Get the camera position and direction from the MuJoCo data."""
     data = icland_state.pipeline_state.mjx_data
     agent_id = icland_state.pipeline_state.component_ids[body_id, 0]
@@ -459,8 +462,8 @@ if __name__ == "__main__":  # pragma: no cover
             ],
         ]
     )
-    frames: List[Any] = []
-    for i in range(24):
+    frames: list[Any] = []
+    for i in range(72):
         f = render_frame(
             cam_pos=jnp.array([5.0, 10.0, -10.0 + (i * 10 / 72)]),
             cam_dir=jnp.array([0.0, -0.5, 1.0]),

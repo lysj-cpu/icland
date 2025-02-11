@@ -1,10 +1,11 @@
 """A temporary script showing how users would interact with the ICLand environment."""
 
 import functools
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict
 
 import jax
+import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from brax.envs import get_environment, register_environment
 from brax.training.agents.ppo import train as ppo
@@ -27,6 +28,16 @@ ENTROPY_COST = 1e-4
 NUM_ENVS = 8192
 BATCH_SIZE = 256
 SEED = 42
+
+
+@dataclass
+class ProgressData:
+    """Dataclass to store training progress data."""
+
+    steps: list[float] = field(default_factory=list)
+    rewards: list[jnp.ndarray] = field(default_factory=list)
+    reward_std: list[jnp.ndarray] = field(default_factory=list)
+    timestamps: list[datetime] = field(default_factory=lambda: [datetime.now()])
 
 
 def run_brax_test() -> None:
@@ -55,23 +66,17 @@ def run_brax_test() -> None:
         seed=SEED,
     )
 
-    # Containers for tracking training progress.
-    progress_data: Dict[str, Any] = {
-        "steps": [],
-        "rewards": [],
-        "reward_std": [],
-        "timestamps": [datetime.now()],
-    }
+    progress_data = ProgressData()
 
     # Set y-axis bounds for plotting.
     min_reward, max_reward = -10, 10
 
-    def progress_callback(num_steps: int, metrics: Dict[str, Any]) -> None:
+    def progress_callback(num_steps: int, metrics: dict[str, jax.Array]) -> None:
         """Callback function to track and plot training progress."""
-        progress_data["timestamps"].append(datetime.now())
-        progress_data["steps"].append(num_steps)
-        progress_data["rewards"].append(metrics["eval/episode_reward"])
-        progress_data["reward_std"].append(metrics["eval/episode_reward_std"])
+        progress_data.timestamps.append(datetime.now())
+        progress_data.steps.append(num_steps)
+        progress_data.rewards.append(metrics["eval/episode_reward"])
+        progress_data.reward_std.append(metrics["eval/episode_reward_std"])
 
         # Create a new figure for each progress update.
         plt.figure()
@@ -79,13 +84,13 @@ def run_brax_test() -> None:
         plt.ylim(min_reward, max_reward)
         plt.xlabel("# environment steps")
         plt.ylabel("Reward per episode")
-        plt.title(f"Reward = {progress_data['rewards'][-1]:.3f}")
+        plt.title(f"Reward = {progress_data.rewards[-1]:.3f}")
 
         # Plot the rewards with error bars.
         plt.errorbar(
-            progress_data["steps"],
-            progress_data["rewards"],
-            yerr=progress_data["reward_std"],
+            progress_data.steps,
+            progress_data.rewards,
+            yerr=progress_data.reward_std,
             fmt="-o",
         )
         plt.savefig(f"training_progress_{num_steps}.png")
@@ -95,8 +100,8 @@ def run_brax_test() -> None:
     inference_fn, params, _ = train_fn(environment=env, progress_fn=progress_callback)
 
     # Print timing information.
-    jit_time = progress_data["timestamps"][1] - progress_data["timestamps"][0]
-    training_time = progress_data["timestamps"][-1] - progress_data["timestamps"][1]
+    jit_time = progress_data.timestamps[1] - progress_data.timestamps[0]
+    training_time = progress_data.timestamps[-1] - progress_data.timestamps[1]
     print(f"Time to jit: {jit_time}")
     print(f"Time to train: {training_time}")
 

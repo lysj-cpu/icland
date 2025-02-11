@@ -1,6 +1,6 @@
 """ICLand Brax environment."""
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -14,7 +14,7 @@ from flax import struct
 
 import icland
 from icland.constants import AGENT_OBSERVATION_DIM
-from icland.types import ICLandState
+from icland.types import ICLandState, MjxModelType, MjxStateType
 
 
 @struct.dataclass
@@ -22,19 +22,19 @@ class ICLandBraxState(base.Base):  # type: ignore
     """Environment state for training and inference."""
 
     ic_state: ICLandState
-    pipeline_state: Optional[base.State]
+    pipeline_state: base.State | None
     obs: Observation
     reward: jax.Array
     done: jax.Array
-    metrics: Dict[str, jax.Array] = struct.field(default_factory=dict)  # type: ignore
-    info: Dict[str, Any] = struct.field(default_factory=dict)  # type: ignore
+    metrics: dict[str, jax.Array] = struct.field(default_factory=dict)  # type: ignore[no-untyped-call]
+    info: dict[str, Any] = struct.field(default_factory=dict)  # type: ignore[no-untyped-call]
 
 
 class ICLand(Env):  # type: ignore
     """ICLand Brax environment."""
 
     def __init__(
-        self, rng: jax.Array, params: Optional[icland.ICLandParams] = None
+        self, rng: jax.Array, params: icland.ICLandParams | None = None
     ) -> None:
         """Initializes the environment with a random seed.
 
@@ -109,7 +109,9 @@ class ICLand(Env):  # type: ignore
 
         return nstate
 
-    def _build_pipeline_state(self, model, data) -> base.State:  # type: ignore
+    def _build_pipeline_state(
+        self, model: MjxModelType, data: MjxStateType
+    ) -> base.State:
         """Helper method to create a pipeline state from the provided model and data.
 
         Args:

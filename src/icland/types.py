@@ -4,7 +4,8 @@ It includes types for model parameters, state, and action sets used in the proje
 """
 
 import inspect
-from typing import Callable, TypeAlias
+from collections.abc import Callable
+from typing import TypeAlias
 
 import jax
 import jax.numpy as jnp
@@ -13,8 +14,10 @@ from mujoco.mjx._src.dataclasses import PyTreeNode
 
 """Type variables from external modules."""
 
-MjxStateType: TypeAlias = mujoco.mjx._src.types.Data
-MjxModelType: TypeAlias = mujoco.mjx._src.types.Model
+# Replacing with `type` keyword breaks tests
+# https://docs.astral.sh/ruff/rules/non-pep695-type-alias/
+MjxStateType: TypeAlias = mujoco.mjx._src.types.Data  # noqa: UP040
+MjxModelType: TypeAlias = mujoco.mjx._src.types.Model  # noqa: UP040
 
 """Type aliases for ICLand project."""
 
