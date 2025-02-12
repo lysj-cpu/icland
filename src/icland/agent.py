@@ -1,10 +1,57 @@
 """This module contains functions for simulating agent behavior in a physics environment."""
 
+from typing import Any
+
 import jax
 import jax.numpy as jnp
+import mujoco
 
 from .constants import *
 from .types import *
+
+
+def create_agent(
+    id: int, pos: jax.Array, specification: mujoco.MjSpec
+) -> mujoco.MjSpec:
+    """Create an agent in the physics environment.
+
+    Args:
+        id: The ID of the agent.
+        pos: The initial position of the agent.
+        specification: The Mujoco specification object.
+
+    Returns:
+        The updated Mujoco specification object.
+    """
+    # Define the agent's body.
+    agent = specification.worldbody.add_body(
+        name=f"agent{id}",
+        pos=pos,
+    )
+
+    # Add transformational freedom.
+    agent.add_joint(type=mujoco.mjtJoint.mjJNT_SLIDE, axis=[1, 0, 0])
+    agent.add_joint(type=mujoco.mjtJoint.mjJNT_SLIDE, axis=[0, 1, 0])
+    agent.add_joint(type=mujoco.mjtJoint.mjJNT_SLIDE, axis=[0, 0, 1])
+
+    # Add rotational freedom.
+    agent.add_joint(type=mujoco.mjtJoint.mjJNT_HINGE, axis=[0, 0, 1])
+
+    # Add agent's geometry.
+    agent.add_geom(
+        name=f"agent{id}_geom",
+        type=mujoco.mjtGeom.mjGEOM_CAPSULE,
+        size=[0.06, 0.06, 0.06],
+        fromto=[0, 0, 0, 0, 0, -0.4],
+        mass=1,
+    )
+
+    # This is just to make rotation visible.
+    agent.add_geom(
+        type=mujoco.mjtGeom.mjGEOM_BOX, size=[0.05, 0.05, 0.05], pos=[0, 0, 0.2], mass=0
+    )
+
+    return specification
 
 
 @jax.jit
@@ -13,12 +60,19 @@ def step_agent(
     action: jnp.ndarray,
     agent_data: jnp.ndarray,
 ) -> MjxStateType:
-    """Perform a simulation step for the agent.
+    """Perform a simulation step for the agent (optimized).
+
+    This updated version no longer applies a rotational torque. Instead, it
+    directly updates the agent's rotation in `qpos` (the hinge angle about z
+    at index 3) using the rotation command provided by `action[3]`. This avoids
+    rotational inertia. The translational movement is handled exactly as before.
 
     Args:
         mjx_data: The simulation data object.
-        action: The action to be performed by the agent.
-        agent_data: The body and geometry IDs of the agent.
+        action: The action to be performed by the agent. The first two components
+            define the local XY movement, and `action[3]` is an integer in {-1, 0, 1}
+            representing rotation (anticlockwise for positive, clockwise for negative).
+        agent_data: The body and geometry IDs of the agent, and the agent's DOF address.
 
     Returns:
         Updated simulation data object.
@@ -26,125 +80,181 @@ def step_agent(
     # --------------------------------------------------------------------------
     # (A) Determine local movement and rotate it to world frame
     # --------------------------------------------------------------------------
-    """
-    Calculate the movement direction in the world frame based on the action and
-    the agent's current orientation.
-    """
-    movement_direction = action[:2]
-
+    # Extract agent info: body id, geometry id, and DOF address.
     body_id, geom_id, dof_address = agent_data
 
-    # Hinge angle about z is in qpos[3]
-    angle = mjx_data.qpos[3]
+    # Extract the intended local movement (XY) from the action.
+    local_movement = action[:2]
 
-    # 2D rotation matrix for the angle
-    R = jnp.array([[jnp.cos(angle), -jnp.sin(angle)], [jnp.sin(angle), jnp.cos(angle)]])
-
-    # Transform local movement direction to world frame
-    world_dir = R @ movement_direction
-
-    # Our force is in the XY plane only
-    movement_direction = jnp.array([world_dir[0], world_dir[1], 0])
+    # The hinge angle about z is at qpos[3]
+    angle = mjx_data.qpos[dof_address + 3]
+    # Compute cosine and sine of the angle.
+    c, s = jnp.cos(angle), jnp.sin(angle)
+    # Rotate the local movement directly into the world frame.
+    world_dir = jnp.array(
+        [
+            c * local_movement[0] - s * local_movement[1],
+            s * local_movement[0] + c * local_movement[1],
+            0.0,
+        ]
+    )
+    movement_direction = world_dir
 
     # --------------------------------------------------------------------------
-    # (B) Optionally check contacts to handle slopes
+    # (B) Adjust movement based on contacts (handle slopes)
     # --------------------------------------------------------------------------
-    """
-    Adjust the movement direction if the agent is in contact with a slope that
-    is too steep.
-    """
-    for nth_contact in range(mjx_data.ncon):
-        normal = mjx_data.contact.frame[nth_contact][0]
+    ncon = mjx_data.ncon
 
-        # Compute the projection onto the contact plane
-        slope_component = (
-            movement_direction - jnp.dot(movement_direction, normal) * normal
+    # Extract contact normals for the first ncon contacts.
+    normals = jnp.where(
+        (mjx_data.contact.geom[:ncon, 1] == geom_id)[:, None],
+        mjx_data.contact.frame[:ncon, 0, :],
+        -mjx_data.contact.frame[:ncon, 0, :],
+    )
+
+    # Compute the projection of the movement onto each contact plane.
+    dots = jnp.einsum("i,ni->n", movement_direction, normals)
+    slope_components = movement_direction - dots[:, None] * normals
+    slope_mags = jnp.linalg.norm(slope_components, axis=1)
+
+    # Determine valid collisions: a valid collision occurs if the agent's geom_id
+    # appears in either geom, and the contact distance is negative (touching).
+    is_agent_collision = jnp.logical_or(
+        mjx_data.contact.geom[:ncon, 0] == geom_id,
+        mjx_data.contact.geom[:ncon, 1] == geom_id,
+    )
+    is_touching = mjx_data.contact.dist[:ncon] < 0.0
+    valid_mask = is_agent_collision & is_touching
+
+    def collision_true(_: Any) -> Any:
+        # Use argmax to pick the first valid collision.
+        idx = jnp.argmax(valid_mask)
+        mag = slope_mags[idx]
+        new_dir = jnp.where(
+            mag > 0.7,
+            slope_components[idx] / (mag + SMALL_VALUE),
+            jnp.zeros_like(movement_direction),
         )
-        slope_mag = jnp.linalg.norm(slope_component)
+        return new_dir
 
-        is_agent_collision = jnp.logical_or(
-            mjx_data.contact.geom1[nth_contact] == geom_id,
-            mjx_data.contact.geom2[nth_contact] == geom_id,
-        )
+    def collision_false(_: Any) -> Any:
+        return movement_direction
 
-        is_touching = mjx_data.contact.dist[nth_contact] < 0.0
-
-        valid_collision = jnp.logical_and(is_agent_collision, is_touching)
-
-        # If slope is too steep (angle > ~45deg), remove that direction
-        movement_direction = jnp.where(
-            jnp.logical_and(valid_collision, slope_mag > 0.7),
-            slope_component / (slope_mag + 1e-10),
-            movement_direction,
-        )
-
-    # --------------------------------------------------------------------------
-    # (C) Apply the linear force in xfrc_applied
-    # --------------------------------------------------------------------------
-    """
-    Apply the calculated linear force to the agent.
-    """
-    mjx_data = mjx_data.replace(
-        xfrc_applied=mjx_data.xfrc_applied.at[body_id, :3].set(movement_direction)
+    movement_direction = jax.lax.cond(
+        jnp.any(valid_mask),
+        collision_true,
+        collision_false,
+        operand=None,
     )
 
     # --------------------------------------------------------------------------
-    # (D) Apply rotation torque about z hinge
+    # (C) Apply linear force (update xfrc_applied)
     # --------------------------------------------------------------------------
-    """
-    Apply the rotation torque to the agent based on the action.
-    """
-    rotation_torque = action[3] * jnp.pi
-    mjx_data = mjx_data.replace(
-        qfrc_applied=mjx_data.qfrc_applied.at[3].set(
-            mjx_data.qfrc_applied[3] + rotation_torque
-        )
+    new_xfrc_applied = mjx_data.xfrc_applied.at[body_id, :3].set(
+        movement_direction * AGENT_DRIVING_FORCE
     )
 
     # --------------------------------------------------------------------------
-    # (E) Clamp linear speed in XY
+    # (D) Directly update the agent's rotation in qpos (avoiding torque/inertia)
     # --------------------------------------------------------------------------
-    """
-    Clamp the agent's linear speed in the XY plane to the maximum allowed speed.
-    """
-    vel_2d = jax.lax.dynamic_slice(mjx_data.qvel, (dof_address,), (2,))  # [vx, vy]
+    # The rotation command is in action[3] (an int in {-1, 0, 1}). We update the
+    # hinge angle (qpos[3]) directly, scaled by AGENT_ROTATION_SPEED.
+    new_angle = mjx_data.qpos[dof_address + 3] - AGENT_ROTATION_SPEED * action[3]
+    new_qpos = mjx_data.qpos.at[dof_address + 3].set(new_angle)
+
+    # Since we are directly setting the rotation, we do not want any angular inertia.
+    # We leave qfrc_applied unchanged (i.e. no torque is applied).
+    new_qfrc_applied = mjx_data.qfrc_applied
+
+    # --------------------------------------------------------------------------
+    # (E) Clamp linear speed in the XY plane
+    # --------------------------------------------------------------------------
+    vel_2d = jax.lax.dynamic_slice(mjx_data.qvel, (dof_address,), (2,))
     speed = jnp.linalg.norm(vel_2d)
-
     scale = jnp.where(
-        speed > AGENT_MAX_MOVEMENT_SPEED, AGENT_MAX_MOVEMENT_SPEED / speed, 1.0
+        speed > AGENT_MAX_MOVEMENT_SPEED,
+        AGENT_MAX_MOVEMENT_SPEED / speed,
+        1.0,
     )
-    mjx_data = mjx_data.replace(
-        qvel=jax.lax.dynamic_update_slice(mjx_data.qvel, scale * vel_2d, (dof_address,))
-    )
-
-    # --------------------------------------------------------------------------
-    # (F) Clamp angular velocity about z
-    # --------------------------------------------------------------------------
-    """
-    Clamp the agent's angular velocity about the z-axis to the maximum allowed
-    rotation speed.
-    """
-    omega = mjx_data.qvel[dof_address + 3]
-    mjx_data = mjx_data.replace(
-        qvel=mjx_data.qvel.at[dof_address + 3].set(
-            jnp.where(
-                abs(omega) > AGENT_MAX_ROTATION_SPEED,
-                jnp.sign(omega) * AGENT_MAX_ROTATION_SPEED,
-                mjx_data.qvel[dof_address + 3],
-            )
-        )
+    new_vel_2d = scale * vel_2d
+    qvel_updated = jax.lax.dynamic_update_slice(
+        mjx_data.qvel, new_vel_2d, (dof_address,)
     )
 
     # --------------------------------------------------------------------------
-    # (G) Apply linear and rotational friction
+    # (F) Clamp angular velocity about z (for other potential dynamics)
     # --------------------------------------------------------------------------
-    """
-    Apply friction to the agent's linear and rotational velocities.
-    """
-    mjx_data = mjx_data.replace(
-        qvel=mjx_data.qvel.at[
-            jnp.array([dof_address, dof_address + 1, dof_address + 3])
-        ].multiply(1.0 - AGENT_MOVEMENT_FRICTION_COEFFICIENT)
+    omega = qvel_updated[dof_address + 3]
+    new_omega = jnp.where(
+        jnp.abs(omega) > AGENT_MAX_ROTATION_SPEED,
+        jnp.sign(omega) * AGENT_MAX_ROTATION_SPEED,
+        omega,
+    )
+    qvel_updated = qvel_updated.at[dof_address + 3].set(new_omega)
+
+    # --------------------------------------------------------------------------
+    # (G) Apply linear and rotational friction to the velocities
+    # --------------------------------------------------------------------------
+    indices = jnp.array([dof_address, dof_address + 1, dof_address + 3])
+    qvel_updated = qvel_updated.at[indices].multiply(
+        1.0 - AGENT_MOVEMENT_FRICTION_COEFFICIENT
     )
 
-    return mjx_data
+    # --------------------------------------------------------------------------
+    # (H) Remove rotational inertia by zeroing the angular velocity about z.
+    # --------------------------------------------------------------------------
+    qvel_updated = qvel_updated.at[dof_address + 3].set(0.0)
+
+    # --------------------------------------------------------------------------
+    # Combine updates and return the new state
+    # --------------------------------------------------------------------------
+    return mjx_data.replace(
+        xfrc_applied=new_xfrc_applied,
+        qfrc_applied=new_qfrc_applied,
+        qvel=qvel_updated,
+        qpos=new_qpos,
+    )
+
+
+@jax.jit
+def collect_body_scene_info(
+    component_ids: jnp.ndarray, mjx_data: MjxStateType
+) -> ICLandInfo:
+    """Collects information about the bodies in the scene including position and rotation.
+
+    Args:
+        component_ids: Array of shape (num_bodies, 3) with rows [body_id, geom_id, dof_address].
+        mjx_data: Simulation state with attributes:
+                  - xpos: jnp.ndarray of shape (num_bodies, 3), global positions.
+                  - qpos: jnp.ndarray (used here to extract rotation info).
+
+    Returns:
+        A dictionary with:
+            - "pos": jnp.ndarray of positions for the requested bodies.
+            - "rot": jnp.ndarray of rotations extracted from qpos.
+    """
+    # Extract the indices (making sure they are integers)
+    body_ids = component_ids[:, 0].astype(jnp.int32)
+    dof_addresses = component_ids[:, 2].astype(jnp.int32)
+
+    # Vectorized indexing into the simulation state arrays.
+    # This gathers the positions and the corresponding rotations.
+    positions = mjx_data.xpos[body_ids]
+    velocities = jnp.stack(
+        [
+            mjx_data.qvel[dof_addresses],
+            mjx_data.qvel[dof_addresses + 1],
+            mjx_data.qvel[dof_addresses + 2],
+            mjx_data.qvel[dof_addresses + 3],
+        ],
+        axis=1,
+    )
+    rotations = mjx_data.qpos[
+        dof_addresses + 3
+    ]  # Adjusting index for rotation extraction.
+
+    return ICLandInfo(
+        agent_positions=positions,
+        agent_rotations=rotations,
+        agent_velocities=velocities,
+    )

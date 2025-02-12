@@ -1,20 +1,16 @@
 """This file contains the base Model class for WaveFunctionCollapse and helper functions."""
 
-from dataclasses import dataclass
 from enum import Enum
 from functools import partial
-from typing import Any, Tuple, cast
+from typing import cast
 
 import jax
 import jax.numpy as jnp
 from flax import struct
 
-from icland.world_gen.converter import (
-    create_world,
-    export_stls,
-    generate_mjcf_from_meshes,
-)
+from icland.world_gen.converter import sample_spawn_points
 from icland.world_gen.tile_data import NUM_ACTIONS, PROPAGATOR, TILECODES, WEIGHTS
+from icland.world_gen.XMLReader import XMLReader
 
 
 @jax.jit
@@ -261,50 +257,26 @@ def _ban(model: JITModel, i: jax.Array, t1: jax.Array) -> JITModel:
     return cast(JITModel, jax.lax.cond(condition_1, identity, process_ban, model))
 
 
-@dataclass
-class RunState:
-    """Class for storing the run state of the model."""
-
-    model: JITModel
-    steps: jnp.int32
-    done: jnp.bool_
-    success: jnp.bool_
-
-    def tree_flatten(
-        self,
-    ) -> Tuple[Tuple[JITModel, jnp.int32, jnp.bool_, jnp.bool_], Tuple[()]]:
-        """Function to flatten the tree to a list of tuples."""
-        return ((self.model, self.steps, self.done, self.success), ())
-
-    @classmethod
-    def tree_unflatten(cls, aux_data: Any, children: Any):  # type: ignore
-        """Function to unflatten the tree."""
-        return RunState(*children)
-
-
-jax.tree_util.register_pytree_node_class(RunState)
-
-
-@jax.jit
 def _run(
     model: JITModel, max_steps: jax.Array = jnp.array(1000, dtype=jnp.int32)
-) -> Tuple[JITModel, bool]:
+) -> tuple[JITModel, bool]:
     """Run the WaveFunctionCollapse algorithm with the given seed and iteration limit."""
     # Pre: the model is freshly initialized
+
     model = _clear(model)
+    # Define the loop state
+    init_state = (model, 0, False, True)
 
-    # Initialise state using JAX-compatible dataclass
-    init_state = RunState(
-        model=model, steps=jnp.int32(0), done=jnp.bool_(False), success=jnp.bool_(True)
-    )
-
-    def cond_fun(state: RunState) -> jax.Array:
+    def cond_fun(state: tuple[JITModel, jnp.int32, jnp.bool, jnp.bool]) -> jax.Array:
         """Condition function for the while loop."""
-        return jnp.logical_and(jnp.logical_not(state.done), state.steps < max_steps)
+        _, steps, done, _ = state
+        return jnp.bitwise_and(~done, (steps < max_steps))
 
-    def body_fun(state: RunState) -> RunState:
+    def body_fun(
+        state: tuple[JITModel, jnp.int32, jnp.bool, jnp.bool],
+    ) -> tuple[JITModel, jnp.int32, jnp.bool, jnp.bool]:
         """Body function for the while loop."""
-        model, steps = state.model, state.steps
+        model, steps, done, success = state
 
         # Generate new key for this iteration
         key, _ = jax.random.split(model.key)
@@ -315,8 +287,8 @@ def _run(
 
         # Use lax.cond instead of if/else
         def handle_node(
-            args: Tuple[JITModel, jax.Array],
-        ) -> Tuple[JITModel, jax.Array, jax.Array]:
+            args: tuple[JITModel, jax.Array],
+        ) -> tuple[JITModel, jax.Array, jax.Array]:
             model, node = args
             # Observe and propagate
             model = _observe(model, node)
@@ -324,8 +296,8 @@ def _run(
             return model, jnp.logical_not(success), success
 
         def handle_completion(
-            args: Tuple[JITModel, jax.Array],
-        ) -> Tuple[JITModel, jax.Array, jax.Array]:
+            args: tuple[JITModel, jax.Array],
+        ) -> tuple[JITModel, jax.Array, jax.Array]:
             model, node = args
 
             # Final observation assignment
@@ -352,21 +324,22 @@ def _run(
             model = jax.lax.fori_loop(
                 0, model.wave.shape[0], handle_completion_inner, model
             )
-            return model, jnp.bool_(True), jnp.bool_(True)
+            return model, jnp.array(True, dtype=bool), jnp.array(True, dtype=bool)
 
         model, done, success = jax.lax.cond(
             node >= 0, handle_node, handle_completion, (model, node)
         )
-        return RunState(model=model, steps=steps + 1, done=done, success=success)
+
+        return (model, steps + 1, done, success)
 
     # Run the while loop
-    final_state = jax.lax.while_loop(cond_fun, body_fun, init_state)
+    final_model, _, _, success = jax.lax.while_loop(cond_fun, body_fun, init_state)
 
-    return final_state.model, final_state.success
+    return final_model, success
 
 
 @jax.jit
-def _next_unobserved_node(model: JITModel) -> Tuple[JITModel, jax.Array]:
+def _next_unobserved_node(model: JITModel) -> tuple[JITModel, jax.Array]:
     """Selects the next cell to observe according to the chosen heuristic (Scanline, Entropy, or MRV).
 
     Returns:
@@ -397,7 +370,7 @@ def _next_unobserved_node(model: JITModel) -> Tuple[JITModel, jax.Array]:
     all_indices = jnp.arange(model.wave.shape[0])
     valid_nodes_mask = jax.vmap(within_bounds)(all_indices)
 
-    def scanline_heuristic(_: None) -> Tuple[JITModel, jax.Array]:
+    def scanline_heuristic(_: None) -> tuple[JITModel, jax.Array]:
         observed_mask = all_indices >= observed_so_far
         sum_of_ones_mask = model.sums_of_ones[all_indices] > 1
 
@@ -408,7 +381,7 @@ def _next_unobserved_node(model: JITModel) -> Tuple[JITModel, jax.Array]:
         )
 
         # Use lax.dynamic_slice_in_dim to select the first element
-        def process_node(_: None) -> Tuple[JITModel, jax.Array]:
+        def process_node(_: None) -> tuple[JITModel, jax.Array]:
             indices = jnp.nonzero(
                 valid_scanline_nodes_with_choices,
                 size=model.wave.shape[0],
@@ -423,7 +396,7 @@ def _next_unobserved_node(model: JITModel) -> Tuple[JITModel, jax.Array]:
             )
 
         return cast(
-            Tuple[JITModel, jax.Array],
+            tuple[JITModel, jax.Array],
             jax.lax.cond(
                 jnp.any(valid_scanline_nodes_with_choices),
                 process_node,
@@ -432,7 +405,7 @@ def _next_unobserved_node(model: JITModel) -> Tuple[JITModel, jax.Array]:
             ),
         )
 
-    def entropy_mrv_heuristic(_: None) -> Tuple[JITModel, jax.Array]:
+    def entropy_mrv_heuristic(_: None) -> tuple[JITModel, jax.Array]:
         node_entropies = jax.lax.cond(
             heuristic == Heuristic.ENTROPY.value,
             lambda _: entropies,
@@ -446,7 +419,7 @@ def _next_unobserved_node(model: JITModel) -> Tuple[JITModel, jax.Array]:
             jnp.logical_and(valid_nodes_mask, sum_of_ones_mask)
         )
 
-        def process_node(node_entropies: jax.Array) -> Tuple[JITModel, jax.Array]:
+        def process_node(node_entropies: jax.Array) -> tuple[JITModel, jax.Array]:
             key, subkey = jax.random.split(model.key)
             node_entropies = node_entropies + 1e-6 * jax.random.normal(
                 subkey, shape=node_entropies.shape
@@ -462,7 +435,7 @@ def _next_unobserved_node(model: JITModel) -> Tuple[JITModel, jax.Array]:
             ), min_entropy_idx
 
         return cast(
-            Tuple[JITModel, jax.Array],
+            tuple[JITModel, jax.Array],
             jax.lax.cond(
                 jnp.any(node_entropies_mask),
                 process_node,
@@ -472,7 +445,7 @@ def _next_unobserved_node(model: JITModel) -> Tuple[JITModel, jax.Array]:
         )
 
     return cast(
-        Tuple[JITModel, jax.Array],
+        tuple[JITModel, jax.Array],
         jax.lax.cond(
             heuristic == Heuristic.SCANLINE.value,
             scanline_heuristic,
@@ -529,7 +502,7 @@ def _clear(model: JITModel) -> JITModel:
 
 
 @jax.jit
-def _propagate(model: JITModel) -> Tuple[JITModel, jax.Array]:
+def _propagate(model: JITModel) -> tuple[JITModel, jax.Array]:
     """Propagates constraints across the wave."""
     dx = jnp.array([-1, 0, 1, 0])
     dy = jnp.array([0, 1, 0, -1])
@@ -628,7 +601,7 @@ def sample_world(
     key: jax.Array,
     periodic: jax.Array,
     heuristic: jax.Array,
-) -> Tuple[JITModel, jax.Array]:  # pragma: no cover
+) -> tuple[JITModel, jax.Array]:  # pragma: no cover
     """Samples a world such that its complete and has a playable area."""
     model = _init(
         width, height, NUM_ACTIONS, 1, periodic, heuristic, WEIGHTS, PROPAGATOR, key
@@ -636,7 +609,7 @@ def sample_world(
     condition = lambda x: jnp.logical_not(x[1])
     success = False
 
-    def body_func(state: Tuple[JITModel, bool]) -> Tuple[JITModel, bool]:
+    def body_func(state: tuple[JITModel, bool]) -> tuple[JITModel, bool]:
         model, b = state
         model, b = _run(model)
         key, _ = jax.random.split(model.key)
@@ -644,18 +617,20 @@ def sample_world(
         return (model, b)
 
     return cast(
-        Tuple[JITModel, jax.Array],
+        tuple[JITModel, jax.Array],
         jax.lax.while_loop(condition, body_func, (model, success))[0],
     )
 
 
 if __name__ == "__main__":  # Drive code used for testing.
-    model = sample_world(10, 10, 1000, jax.random.key(69), True, 1)
-    one_hot = export(model, TILECODES, 10, 10)
-    # one_hot = jnp.array([[[0, 0, 0, 2], [0, 2, 0, 2], [0, 2, 0, 2], [0, 1, 0, 2], [0, 0, 0, 5], [0, 2, 0, 5], [0, 1, 0, 5], [0, 0, 0, 3], [0, 2, 0, 3], [0, 1, 0, 3]], [[0, 3, 0, 3], [0, 0, 0, 3], [0, 2, 0, 3], [0, 3, 0, 4], [0, 2, 0, 4], [0, 3, 0, 5], [0, 0, 0, 5], [0, 2, 0, 5], [0, 3, 0, 6], [0, 2, 0, 6]], [[0, 1, 0, 3], [0, 0, 0, 3], [1, 1, 3, 4], [0, 0, 0, 4], [0, 1, 0, 4], [0, 0, 0, 5], [0, 2, 0, 5], [0, 1, 0, 5], [0, 0, 0, 6], [0, 1, 0, 6]], [[1, 3, 3, 4], [0, 0, 0, 3], [0, 3, 0, 3], [0, 3, 0, 6], [0, 2, 0, 6], [0, 3, 0, 4], [0, 0, 0, 4], [1, 2, 4, 5], [0, 0, 0, 4], [0, 2, 0, 4]], [[0, 1, 0, 3], [0, 0, 0, 3], [0, 3, 0, 3], [0, 0, 0, 6], [0, 1, 0, 6], [0, 1, 0, 4], [0, 0, 0, 4], [0, 0, 0, 4], [0, 0, 0, 4], [0, 3, 0, 4]], [[1, 3, 3, 4], [0, 0, 0, 3], [0, 0, 0, 3], [0, 2, 0, 3], [0, 3, 0, 4], [0, 1, 0, 4], [0, 0, 0, 4], [0, 3, 0, 4], [0, 2, 0, 4], [0, 1, 0, 4]], [[0, 1, 0, 3], [0, 0, 0, 3], [0, 0, 0, 3], [0, 3, 0, 3], [0, 1, 0, 4], [0, 0, 0, 4], [0, 3, 0, 4], [2, 1, 4, 6], [0, 0, 0, 6], [0, 2, 0, 6]], [[0, 1, 0, 3], [0, 0, 0, 3], [0, 0, 0, 3], [1, 1, 3, 4], [0, 1, 0, 4], [0, 0, 0, 4], [0, 3, 0, 4], [0, 1, 0, 6], [0, 0, 0, 6], [0, 3, 0, 6]], [[0, 0, 0, 3], [0, 2, 0, 3], [0, 2, 0, 3], [0, 1, 0, 3], [0, 0, 0, 4], [0, 2, 0, 4], [0, 1, 0, 4], [0, 0, 0, 6], [0, 2, 0, 6], [0, 1, 0, 6]], [[0, 3, 0, 2], [0, 0, 0, 2], [0, 0, 0, 2], [0, 2, 0, 2], [0, 3, 0, 5], [0, 0, 0, 5], [0, 2, 0, 5], [0, 3, 0, 3], [0, 0, 0, 3], [0, 2, 0, 3]]])
-    # one_hot = jnp.full((10, 10, 4), jnp.array([0, 0, 0, 3]))
-    world_mesh = create_world(one_hot)
-    export_stls(world_mesh, "meshes3/world")
-    generate_mjcf_from_meshes(
-        one_hot, output_file="generated_mjcf_new.xml", mesh_dir="meshes3/"
-    )
+    xml_reader = XMLReader("src/icland/world_gen/tilemap/data.xml")
+    key_no = 216
+    key = jax.random.key(key_no)
+    w = 10
+    h = 10
+    model = sample_world(w, h, 1000, key, True, 1)
+    one_hot = export(model, TILECODES, w, h)
+    xml_reader.save(model.observed, w, h, f"tilemap_{key_no}.png")
+    print(one_hot.tolist())
+    spawnable = sample_spawn_points(key, one_hot, num_objects=3)
+    print(spawnable.tolist())
