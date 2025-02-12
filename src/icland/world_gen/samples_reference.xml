@@ -1,28 +1,4 @@
 <samples>
-	<!-- <comment name="Skyline" N="3" symmetry="2" ground="-1" periodic="True"/>
-	<simpletiled name="Summer" width="15" height="15"/>
-	<simpletiled name="Castle" width="20" height="20"/>
-	<simpletiled name="Circuit" subset="Turnless" width="34" height="34" periodic="True" screenshots="3"/>
-	<simpletiled name="Knots" subset="Standard" width="24" height="24" periodic="True"/>
-	<simpletiled name="Knots" subset="Dense" width="24" height="24" periodic="True"/>
-	<simpletiled name="Knots" subset="Crossless" width="24" height="24"/>
-	<simpletiled name="Knots" subset="TE" width="24" height="24"/>
-	<simpletiled name="Knots" subset="T" width="24" height="24"/>
-	<simpletiled name="Knots" subset="CL" width="24" height="24"/>
-	<simpletiled name="Knots" subset="CE" width="24" height="24" periodic="True"/>
-	<simpletiled name="Knots" subset="C" width="24" height="24" periodic="True"/>
-	<simpletiled name="Knots" subset="Fabric" width="24" height="24" periodic="True"/>
-	<simpletiled name="Knots" subset="Dense Fabric" width="24" height="24" periodic="True"/>
-	<simpletiled name="Rooms" width="30" height="30"/>
-	<simpletiled name="Circles" width="24" height="24"/>
-	<simpletiled name="Circles" subset="Large Circles" width="24" height="24"/>
-	<simpletiled name="Circles" subset="Large Circles and Solid" width="24" height="24"/>
-	<simpletiled name="Circles" subset="No Solid" width="24" height="24"/>
-
-	<simpletiled name="Summer" width="15" height="15" periodic="False"/>
-	<simpletiled name="Knots" subset="Standard" width="5" height="5" periodic="True" textOutput="True"/>
-	<simpletiled name="Summer" width="6" height="6" periodic="False" textOutput="True"/>
-	<simpletiled name="Circuit" subset="Turnless" width="7" height="7" periodic="True" textOutput="True"/> -->
 	<simpletiled name="XLand" width="10" height="10" periodic="False"/>
 	<simpletiled name="XLand" width="10" height="10" periodic="True"/>
 	<simpletiled name="XLand" width="10" height="10" periodic="True"/>
