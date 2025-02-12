@@ -97,13 +97,14 @@ class ICLand(Env):  # type: ignore
         data = ic_state.pipeline_state.mjx_data
 
         pipeline_state = self._build_pipeline_state(model, data)
-        reward: float = self.reward_function(ic_state.data)[0][0]  # type: ignore
+        # NOTE: Currently returns reward for first agent
+        reward = self.reward_function(ic_state.data)[0]  # type: ignore
 
         nstate: ICLandBraxState = state.replace(
             ic_state=ic_state,
             pipeline_state=pipeline_state,
             obs=ic_state.obs,
-            reward=jnp.array(reward),
+            reward=reward,
             done=jnp.array(0.0),
         )
 
