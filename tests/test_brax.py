@@ -23,7 +23,7 @@ def env(
     register_environment("icland", ICLand)
     mj_model = mujoco.MjModel.from_xml_string(world)
     agent_count = 1 if world == EMPTY_WORLD else 2
-    icland_params = ICLandParams(mj_model, lambda x: [[0]], agent_count)
+    icland_params = ICLandParams(mj_model, lambda _: jnp.array(0, ndmin=2), agent_count)
     env = get_environment("icland", rng=jax.random.key(42), params=icland_params)
 
     jit_reset = jax.jit(env.reset)
