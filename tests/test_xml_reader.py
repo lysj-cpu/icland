@@ -226,7 +226,7 @@ def test_get_tilemap_data(xml_reader: XMLReader) -> None:
     """Test the get_tilemap_data method of the XMLReader class."""
     T, j_weights, j_propagator, j_tilecodes = xml_reader.get_tilemap_data()
 
-    # Check the returned tuple structure
+    # Check the returned Tuple structure
     assert isinstance(T, int)
     assert isinstance(j_weights, jax.Array)
     assert isinstance(j_propagator, jax.Array)

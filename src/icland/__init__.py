@@ -1,82 +1,14 @@
 """Recreating Google DeepMind's XLand RL environment in JAX."""
 
-import os
-import shutil
-import warnings
-
-if shutil.which("nvidia-smi") is None:
-    warnings.warn("Cannot communicate with GPU")
-else:
-    # N.B. These need to be before the mujoco imports
-    # Fixes AttributeError: 'Renderer' object has no attribute '_mjr_context'
-    os.environ["MUJOCO_GL"] = "egl"
-
-    # Tell XLA to use Triton GEMM, this can improve steps/sec by ~30% on some GPUs
-    xla_flags = os.environ.get("XLA_FLAGS", "")
-    xla_flags += " --xla_gpu_triton_gemm_any=True"
-    os.environ["XLA_FLAGS"] = xla_flags
-
-
-from typing import Tuple
-
 import jax
 import jax.numpy as jnp
 import mujoco
 from mujoco import mjx
 
-from .agent import step_agent
+from .agent import collect_body_scene_info, create_agent, step_agent
 from .constants import *
+from .game import generate_game
 from .types import *
-
-TEST_XML_STRING: str = """
-<mujoco>
-  <worldbody>
-    <light name="main_light" pos="0 0 1" dir="0 0 -1"
-           diffuse="1 1 1" specular="0.1 0.1 0.1"/>
-
-    <body name="agent0" pos="0 0 1">
-      <joint type="slide" axis="1 0 0" />
-      <joint type="slide" axis="0 1 0" />
-      <joint type="slide" axis="0 0 1" />
-      <joint type="hinge" axis="0 0 1" stiffness="1"/>
-
-      <geom
-        name="agent0_geom"
-        type="capsule"
-        size="0.06"
-        fromto="0 0 0 0 0 -0.4"
-        solimp="0.9 0.995 0.001 1 1000"
-        friction="0.001 0.001 0.0001"
-        mass="0.01"
-      />
-
-      <geom
-        type="box"
-        size="0.05 0.05 0.05"
-        pos="0 0 0.2"
-        solimp="0.9 0.995 0.001 1 1000"
-        friction="0.001 0.001 0.0001"
-        mass="0.001"
-      />
-    </body>
-
-    <!-- Ground plane, also with low friction -->
-    <geom
-      name="ground"
-      type="plane"
-      size="0 0 0.01"
-      rgba="1 1 1 1"
-    />
-
-    <geom type="box" size="0.5 1 1" pos="0.45 2 -0.2" euler="0 -5 0"
-          rgba="1 0.8 0.8 1"
-          />
-    <geom type="box" size="0.5 1 1" rgba="1 0.8 0.8 1"
-          pos="1.5 0 0.1" euler="0 45 90"
-          />
-  </worldbody>
-</mujoco>
-"""
 
 
 def sample(key: jax.Array) -> ICLandParams:
@@ -86,7 +18,7 @@ def sample(key: jax.Array) -> ICLandParams:
         ICLandParams: Parameters for the ICLand environment.
 
         - mj_model: Mujoco model of the environment.
-        - game: Game string (placeholder, currently None).
+        - reward_function: Reward function for the environment.
         - agent_count: Number of agents in the environment.
 
     Examples:
@@ -94,10 +26,37 @@ def sample(key: jax.Array) -> ICLandParams:
         >>> import jax
         >>> key = jax.random.key(42)
         >>> sample(key)
-        ICLandParams(model=MjModel, game=None, agent_count=1)
+        ICLandParams(model=MjModel, reward_function=reward_function(info: icland.types.ICLandInfo) -> jax.Array, agent_count=1)
     """
-    mj_model: mujoco.MjModel = mujoco.MjModel.from_xml_string(TEST_XML_STRING)
-    return ICLandParams(mj_model, None, 1)
+    # Sample the number of agents in the environment
+    agent_count = int(
+        jax.random.randint(key, (), WORL_MIN_AGENT_COUNT, WORLD_MAX_AGENT_COUNT)
+    )
+
+    # Create the Mujoco model
+    specification = mujoco.MjSpec()
+
+    # Add the ground plane
+    specification.worldbody.add_geom(
+        name="ground",
+        type=mujoco.mjtGeom.mjGEOM_PLANE,
+        size=[0, 0, 0.01],
+        rgba=[1, 1, 1, 1],
+    )
+
+    # Add the agents
+    for agent_id in range(agent_count):
+        specification = create_agent(
+            agent_id, jnp.array([agent_id, 0, 0.5]), specification
+        )
+
+    # Compile the Mujoco model
+    mj_model: mujoco.MjModel = specification.compile()
+
+    # Generate the reward function
+    reward_function = generate_game(key, agent_count)
+
+    return ICLandParams(mj_model, reward_function, agent_count)
 
 
 def init(key: jax.Array, params: ICLandParams) -> ICLandState:
@@ -116,7 +75,7 @@ def init(key: jax.Array, params: ICLandParams) -> ICLandState:
         >>> key = jax.random.key(42)
         >>> params = sample(key)
         >>> init(key, params)
-        ICLandState(mjx_model=Model(...), mjx_data=Data(...), component_ids=Array(...))
+        ICLandState(pipeline_state=PipelineState(mjx_model=Model, mjx_data=Data, component_ids=[[1 1 0]]), observation=[0. 0. 0. 0.], data=ICLandInfo(...))
     """
     # Unpack params
     mj_model = params.model
@@ -127,7 +86,18 @@ def init(key: jax.Array, params: ICLandParams) -> ICLandState:
     mjx_model = mjx.put_model(mj_model)
     mjx_data = mjx.put_data(mj_model, mj_data)
 
-    # Collect object IDs for all agents
+    agent_components = collect_agent_components(mj_model, agent_count)
+    pipeline_state = PipelineState(mjx_model, mjx_data, agent_components)
+
+    return ICLandState(
+        pipeline_state,
+        jnp.zeros(AGENT_OBSERVATION_DIM),
+        collect_body_scene_info(agent_components, mjx_data),
+    )
+
+
+def collect_agent_components(mj_model: mujoco.MjModel, agent_count: int) -> jnp.ndarray:
+    """Collect object IDs for all agents."""
     agent_components = jnp.empty(
         (agent_count, AGENT_COMPONENT_IDS_DIM), dtype=jnp.int32
     )
@@ -141,13 +111,13 @@ def init(key: jax.Array, params: ICLandParams) -> ICLandState:
             mj_model, mujoco.mjtObj.mjOBJ_GEOM, f"agent{agent_id}_geom"
         )
 
-        dof_address = mjx_model.body_dofadr[body_id]
+        dof_address = mj_model.body_dofadr[body_id]
 
         agent_components = agent_components.at[agent_id].set(
             [body_id, geom_id, dof_address]
         )
 
-    return ICLandState(mjx_model, mjx_data, agent_components)
+    return agent_components
 
 
 @jax.jit
@@ -175,21 +145,24 @@ def step(
         >>> params = sample(key)
         >>> state = init(key, params)
         >>> step(key, state, params, forward_policy)
-        ICLandState(mjx_model=Model(...), mjx_data=Data(...), component_ids=Array(...))
+        ICLandState(pipeline_state=PipelineState(mjx_model=Model, mjx_data=Data, component_ids=[[1 1 0]]), observation=[ 4.0000002e-04  0.0000000e+00 -3.9240003e-05  0.0000000e+00], data=ICLandInfo(...))
     """
     # Unpack state
-    mjx_model = state.mjx_model
-    mjx_data = state.mjx_data
-    agent_components = state.component_ids
+    pipeline_state = state.pipeline_state
+
+    mjx_model = pipeline_state.mjx_model
+    mjx_data = pipeline_state.mjx_data
+
+    agent_components = pipeline_state.component_ids
 
     # Ensure actions are in the correct shape
     actions = actions.reshape(-1, AGENT_ACTION_SPACE_DIM)
 
     # Define a function to step a single agent
     def step_single_agent(
-        carry: Tuple[MjxStateType, jax.Array],
-        agent_components: Tuple[jnp.ndarray, jnp.ndarray],
-    ) -> Tuple[Tuple[MjxStateType, jax.Array], None]:
+        carry: tuple[MjxStateType, jax.Array],
+        agent_components: tuple[jnp.ndarray, jnp.ndarray],
+    ) -> tuple[tuple[MjxStateType, jax.Array], None]:
         mjx_data, action = carry
 
         agent_component, agent_index = agent_components
@@ -212,5 +185,8 @@ def step(
 
     # Step the environment after applying all agent actions
     updated_data = mjx.step(mjx_model, updated_data)
+    new_pipeline_state = PipelineState(mjx_model, updated_data, agent_components)
+    data: ICLandInfo = collect_body_scene_info(agent_components, mjx_data)
+    observation = updated_data.qpos
 
-    return ICLandState(mjx_model, updated_data, agent_components)
+    return ICLandState(new_pipeline_state, observation, data)
