@@ -256,13 +256,13 @@ def __scene_sdf_with_objs(
     # Props (list of ints to represent which prop it is)
     props: jax.Array,
     # Players positions and rotation
-    # TODO: Change to adapt with ICLand Pipeline State
-    player_pos: jax.Array,
-    player_col: jax.Array,
+    # TODO: Change to adapt with mjx data
+    player_pos: jax.Array,  # shape: (n_players, 3)
+    player_col: jax.Array,  # shape: (n_players, 3)
     # Prop positions and rotation
-    prop_pos: jax.Array,
-    prop_rot: jax.Array,
-    prop_col: jax.Array,
+    prop_pos: jax.Array,  # shape: (n_props, 3)
+    prop_rot: jax.Array,  # shape: (n_props, 4)
+    prop_col: jax.Array,  # shape: (n_props, 3)
     terrain_cmap: jax.Array,
     # Ray point
     p: jax.Array,
@@ -305,6 +305,7 @@ def __scene_sdf_with_objs(
             qpos: jax.Array, curr_pos: jax.Array
         ) -> jax.Array:
             # Extract rotation matrix from quaternion
+            # TODO: Transform from MJ coordinates to world coordinates
             R = Rotation.from_quat(qpos[:4]).as_matrix()  # 3x3 rotation matrix
 
             # Create the 4x4 transformation matrix
@@ -412,8 +413,6 @@ def can_see_object(
 
         d_obj = obj_sdf(pos - obj_pos)  # Relative to obj pos
         d_ter = terrain_sdf(pos)
-        jax.debug.print("Obj sdf: {}", d_obj)
-        jax.debug.print("Terrain sdf: {}", d_ter)
 
         flag = jax.lax.select(d_obj < eps, 1, flag)
         flag = jax.lax.select(d_ter < eps, -1, flag)

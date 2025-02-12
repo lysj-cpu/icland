@@ -65,9 +65,7 @@ def test_can_see_object_occluded() -> None:
 
 def test_get_agent_camera_from_mjx() -> None:
     """Test if the get_agent_camera_from_mjx transforms the positions."""
-    icland_params = ICLandParams(
-        mujoco.MjModel.from_xml_string(EMPTY_WORLD), None, 1
-    )
+    icland_params = ICLandParams(mujoco.MjModel.from_xml_string(EMPTY_WORLD), None, 1)
     icland_state = icland.init(jax.random.PRNGKey(0), icland_params)
     world_width = 10
 
