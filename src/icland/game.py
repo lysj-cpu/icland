@@ -49,7 +49,8 @@ def generate_game(
         def reward_function(info: ICLandInfo) -> jax.Array:
             """Compute reward based on agent position relative to a target position."""
             # Extract the first two coordinates (x, y) of agent positions.
-            agent_positions = info.agent_positions[:, :2]
+            # agent_positions = info.agent_positions[:, :2]
+            agent_positions = jnp.array([agent.position[:2] for agent in info.agents])
             # Compute Euclidean distance from each agent to its target.
             distance = jnp.linalg.norm(agent_positions - target_position, axis=1)
             # Reward is 1 if the distance is less than the acceptable threshold.
@@ -67,7 +68,8 @@ def generate_game(
         def reward_function(info: ICLandInfo) -> jax.Array:
             """Compute reward based on agent rotation relative to a target rotation."""
             # Extract the agent rotations.
-            agent_rotation = info.agent_rotations
+            # agent_rotation = info.agent_rotations
+            agent_rotation = jnp.array([agent.rotation for agent in info.agents])
             # Compute the absolute difference between agent rotation and target.
             distance = jnp.abs(agent_rotation - target_rotation)
             # Reward is 1 if the rotation difference is within the acceptable threshold.

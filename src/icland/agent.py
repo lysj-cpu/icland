@@ -254,7 +254,14 @@ def collect_body_scene_info(
     ]  # Adjusting index for rotation extraction.
 
     return ICLandInfo(
-        agent_positions=positions,
-        agent_rotations=rotations,
-        agent_velocities=velocities,
+        agents=[
+            Agent(position=positions[i], velocity=velocities[i], rotation=rotations[i])
+            for i in range(len(body_ids))
+        ]
     )
+
+    # return ICLandInfo(
+    #     agent_positions=positions,
+    #     agent_rotations=rotations,
+    #     agent_velocities=velocities,
+    # )

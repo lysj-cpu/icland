@@ -40,6 +40,14 @@ class PipelineState(PyTreeNode):  # type: ignore[misc]
         return f"PipelineState(mjx_model={type(self.mjx_model).__name__}, mjx_data={type(self.mjx_data).__name__}, component_ids={self.component_ids})"
 
 
+class Agent(PyTreeNode):  # type: ignore[misc]
+    """Information about an agent in the ICLand environment."""
+
+    position: jax.Array
+    velocity: jax.Array
+    rotation: jax.Array
+
+
 class ICLandInfo(PyTreeNode):  # type: ignore[misc]
     """Information about the ICLand environment.
 
@@ -49,9 +57,7 @@ class ICLandInfo(PyTreeNode):  # type: ignore[misc]
         agent_rotations: Quat of agent rotations, indexed by agent's body ID.
     """
 
-    agent_positions: jax.Array
-    agent_velocities: jax.Array
-    agent_rotations: jax.Array
+    agents: list[Agent]
 
 
 class ICLandState(PyTreeNode):  # type: ignore[misc]
