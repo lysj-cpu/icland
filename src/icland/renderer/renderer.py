@@ -101,7 +101,7 @@ def __process_ramp(
     return ramp_sdf(transformed[:3], w, h)
 
 
-def __scene_sdf_from_tilemap(
+def _scene_sdf_from_tilemap(  # pragma: no cover
     tilemap: jax.Array, p: jax.Array, floor_height: jnp.float32 = 0.0
 ) -> tuple[jnp.float32, jnp.int32, jnp.int32]:
     w, h = tilemap.shape[0], tilemap.shape[1]
@@ -232,7 +232,7 @@ def __scene_sdf_from_tilemap_color(
     floor_height: jnp.float32 = 0.0,
 ) -> tuple[jnp.float32, jax.Array]:
     """SDF for the world terrain."""
-    tile_dist, _, _ = __scene_sdf_from_tilemap(tilemap, p, floor_height - 1)
+    tile_dist, _, _ = _scene_sdf_from_tilemap(tilemap, p, floor_height - 1)
     floor_dist = p[1] - floor_height
     min_dist = jnp.minimum(tile_dist, floor_dist)
 
@@ -274,7 +274,7 @@ def __scene_sdf_with_objs(
     # Pre: the lengths of prop_pos, prop_rot and prop_col are the same.
 
     # Add distances computed by SDFs here
-    tile_dist, cx, cy = __scene_sdf_from_tilemap(tilemap, p, floor_height - 1)
+    tile_dist, cx, cy = _scene_sdf_from_tilemap(tilemap, p, floor_height - 1)
     floor_dist = p[1] - floor_height
 
     def process_player_sdf(i: jnp.int32) -> tuple[jnp.float32, jax.Array]:
@@ -380,6 +380,56 @@ def __shade_f(
     return surf_color * light + spec
 
 
+def can_see_object(
+    player_pos: jax.Array,
+    player_dir: jax.Array,
+    obj_pos: jax.Array,
+    obj_sdf: Callable[[Any], Any],
+    terrain_sdf: Callable[[Any], Any],
+    eps: jnp.float32 = 1e-03,
+    step_n: jnp.int32 = 100,
+) -> jnp.bool:
+    """Determines whether the specified player can see the object."""
+    # All the positions and directions are in world coords.
+
+    # Find ray from player direction towards object.
+    ray_length = jnp.linalg.norm(obj_pos - player_pos)
+    direction = player_dir / jnp.linalg.norm(player_dir)
+
+    state_init = (0.0, 0, 0)
+
+    def cond_fn(state: tuple[jnp.float32, jnp.int32, jnp.int32]) -> jnp.bool:
+        t, flag, step = state
+        return jnp.logical_and(
+            t < ray_length + eps, jnp.logical_and(flag == 0, step < step_n)
+        )
+
+    def body_fn(
+        state: tuple[jnp.float32, jnp.int32, jnp.int32],
+    ) -> tuple[jnp.float32, jnp.int32, jnp.int32]:
+        t, flag, step = state
+        pos = player_pos + t * direction
+
+        d_obj = obj_sdf(pos - obj_pos)  # Relative to obj pos
+        d_ter = terrain_sdf(pos)
+        jax.debug.print("Obj sdf: {}", d_obj)
+        jax.debug.print("Terrain sdf: {}", d_ter)
+
+        flag = jax.lax.select(d_obj < eps, 1, flag)
+        flag = jax.lax.select(d_ter < eps, -1, flag)
+
+        # Determine the next step: advance by the smallest safe distance.
+        step_size = jnp.minimum(d_obj, d_ter)
+        t_new = t + step_size
+        return t_new, flag, step + 1
+
+    t_f, flag_f, step_f = jax.lax.while_loop(cond_fn, body_fn, state_init)
+
+    visible = jnp.where(flag_f == 1, True, False)
+    visible = jnp.where((flag_f == 0) & (t_f >= ray_length), True, visible)
+    return visible
+
+
 def generate_colormap(key: jax.Array, width: jnp.int32, height: jnp.int32) -> jax.Array:
     """Generates a colormap array with random colors from a set."""
     colors = jnp.array(
@@ -468,7 +518,7 @@ def render_frame(
     """Renders one frame given camera position, direction, and world terrain."""
     # Ray casting
     ray_dir = __camera_rays(cam_pos, cam_dir, view_width, view_height, fx=0.6)
-    sdf = partial(__scene_sdf_from_tilemap, tilemap)
+    sdf = partial(_scene_sdf_from_tilemap, tilemap)
     sdf_dist_only = lambda p: sdf(p)[0]
     hit_pos = jax.vmap(partial(__raycast, sdf_dist_only, cam_pos))(ray_dir)
 
@@ -491,16 +541,13 @@ def render_frame(
     return frame.reshape((view_height, view_width, NUM_CHANNELS))  # type: ignore
 
 
-transform_axes = jnp.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]])
-
-
 def get_agent_camera_from_mjx(
     icland_state: ICLandState,
     world_width: jnp.int32,
     body_id: jnp.int32,
     camera_height: jnp.float32 = 0.2,
     camera_offset: jnp.float32 = 0.06,
-) -> tuple[jax.Array, jax.Array]:
+) -> tuple[jax.Array, jax.Array]:  # pragma: no cover
     """Get the camera position and direction from the MuJoCo data."""
     data = icland_state.pipeline_state.mjx_data
     agent_id = icland_state.pipeline_state.component_ids[body_id, 0]
@@ -797,6 +844,6 @@ if __name__ == "__main__":  # pragma: no cover
     imageio.mimsave(
         f"tests/video_output/sdf_world_scene.mp4",
         frames,
-        fps=30,
+        fps=24,
         quality=8,
     )
