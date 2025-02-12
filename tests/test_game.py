@@ -3,7 +3,7 @@
 import jax
 import jax.numpy as jnp
 
-from icland.game_generator import generate_game
+from icland.game import generate_game
 from icland.types import ICLandInfo
 
 

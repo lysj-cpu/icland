@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from brax.envs import get_environment, register_environment
 from brax.training.agents.ppo import train as ppo
 
-from icland.brax_env import ICLand
+from icland.brax import ICLand
 
 # Training parameters
 NUM_TIMESTEPS = 100_000_000

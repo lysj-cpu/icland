@@ -30,12 +30,12 @@ import jax
 import jax.numpy as jnp
 import keyboard  # For polling the state of multiple keys simultaneously.
 import mujoco
-
-# Import your policies and worlds from your assets.
-from assets.policies import *
 from mujoco import mjx
 
 import icland
+
+# Import your policies and worlds from your assets.
+from icland.presets import *
 from icland.types import *
 
 

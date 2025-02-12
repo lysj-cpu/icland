@@ -4,11 +4,10 @@ import jax
 import jax.numpy as jnp
 import mujoco
 import pytest
-from assets.policies import *
-from assets.worlds import *
 
 import icland
 from icland.constants import SMALL_VALUE
+from icland.presets import *
 from icland.types import *
 
 
