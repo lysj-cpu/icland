@@ -5,23 +5,21 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 import mujoco
-from assets.frames import *
-from assets.worlds import EMPTY_WORLD
 
 import icland
 import icland.renderer.sdfs as Sdf
-from icland.renderer.renderer import (
-    _scene_sdf_from_tilemap,
-    can_see_object,
-    generate_colormap,
-    get_agent_camera_from_mjx,
-    render_frame,
-    render_frame_with_objects,
+from icland.presets import (
+    EMPTY_WORLD,
+    TEST_FRAME,
+    TEST_FRAME_WITH_PROPS,
+    TEST_TILEMAP_BUMP,
+    TEST_TILEMAP_FLAT,
 )
+from icland.renderer.renderer import *
 from icland.types import ICLandParams
 
 
-def test_can_see_object_free() -> None:
+def test_can_see_object() -> None:
     """Test if the can_see_object func returns true in unoccluded case."""
     # Player                       Sphere
     #  [] ----------------------->   ()
@@ -32,35 +30,25 @@ def test_can_see_object_free() -> None:
     prop_pos = jnp.array([0.5, 3.5, 10])
     prop_sdf = partial(Sdf.sphere_sdf, r=0.5)
 
-    terrain_sdf = lambda x: _scene_sdf_from_tilemap(TEST_TILEMAP_FLAT, x)[0]
-    assert can_see_object(
+    terrain_sdf = lambda x: scene_sdf_from_tilemap(TEST_TILEMAP_FLAT, x)[0]
+    visible = can_see_object(
         player_pos=player_pos,
         player_dir=player_dir,
         obj_pos=prop_pos,
         obj_sdf=prop_sdf,
         terrain_sdf=terrain_sdf,
     )
+    assert visible
 
-
-def test_can_see_object_occluded() -> None:
-    """Test if the can_see_object func returns false in occluded case."""
-    # Player                       Sphere
-    #  [] ---------> ||              ()
-    # ===============||==================
-    player_pos = jnp.array([0.5, 3.4, 0])
-    player_dir = jnp.array([0, 0, 1])
-
-    prop_pos = jnp.array([0.5, 3.5, 10])
-    prop_sdf = partial(Sdf.sphere_sdf, r=0.5)
-
-    terrain_sdf = lambda x: _scene_sdf_from_tilemap(TEST_TILEMAP_BUMP, x)[0]
-    assert not can_see_object(
+    terrain_sdf_2 = lambda x: scene_sdf_from_tilemap(TEST_TILEMAP_BUMP, x)[0]
+    visible = can_see_object(
         player_pos=player_pos,
         player_dir=player_dir,
         obj_pos=prop_pos,
         obj_sdf=prop_sdf,
-        terrain_sdf=terrain_sdf,
+        terrain_sdf=terrain_sdf_2,
     )
+    assert not visible
 
 
 def test_get_agent_camera_from_mjx() -> None:
@@ -96,7 +84,7 @@ def test_get_agent_camera_from_mjx() -> None:
 
 
 def test_render_frame() -> None:
-    """Tests if the renderer can correctly render one frame."""
+    """Tests if render_frame can correctly render one frame."""
     frame = render_frame(
         jnp.array([0, 5.0, -10]),
         jnp.array([0, -0.5, 1.0]),
@@ -108,7 +96,7 @@ def test_render_frame() -> None:
 
 
 def test_generate_colormap() -> None:
-    """Test the dummy colormap generation function."""
+    """Test the dummy generate_colormap function."""
     w, h = 10, 10
     cmap = generate_colormap(jax.random.PRNGKey(42), w, h)
     assert cmap.shape == (w, h, 3)
@@ -116,8 +104,8 @@ def test_generate_colormap() -> None:
     assert jnp.all(res, axis=None)
 
 
-def test_render_frame_with_objs() -> None:
-    """Test if the renderer can correctly render one frame with props."""
+def test_render_frame_with_objects() -> None:
+    """Test if the render_frame_with_objects can correctly render one frame with props."""
     key = jax.random.PRNGKey(42)
     frame = render_frame_with_objects(
         jnp.array([0, 5.0, -10]),

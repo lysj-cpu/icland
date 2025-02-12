@@ -6,12 +6,11 @@ import jax
 import jax.numpy as jnp
 import mujoco
 import pytest
-from assets.policies import *
-from assets.worlds import EMPTY_WORLD, TWO_AGENT_EMPTY_WORLD
 from brax.envs import get_environment, register_environment
 
-from icland.brax_env import ICLand, ICLandBraxState
+from icland.brax import ICLand, ICLandBraxState
 from icland.constants import SMALL_VALUE
+from icland.presets import *
 from icland.types import ICLandParams
 
 

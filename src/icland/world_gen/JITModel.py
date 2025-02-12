@@ -257,9 +257,13 @@ def _ban(model: JITModel, i: jax.Array, t1: jax.Array) -> JITModel:
     return cast(JITModel, jax.lax.cond(condition_1, identity, process_ban, model))
 
 
-RunState = TypedDict(
-    "RunState", {"model": JITModel, "steps": int, "done": bool, "success": bool}
-)
+class RunState(TypedDict):
+    """Type definition for the state of the WaveFunctionCollapse algorithm."""
+
+    model: JITModel
+    steps: int
+    done: bool
+    success: bool
 
 
 def _run(

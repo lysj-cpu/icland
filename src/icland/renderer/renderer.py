@@ -1,7 +1,8 @@
-"""Renderer module."""
+"""Renderer for the ICLand environment."""
 
-from functools import partial  # noqa: D100
-from typing import Any, Callable, List
+from collections.abc import Callable
+from functools import partial
+from typing import Any
 
 import imageio
 import jax
@@ -19,21 +20,24 @@ WORLD_UP: jax.Array = jnp.array([0.0, 1.0, 0.0], dtype=jnp.float32)
 NUM_CHANNELS: jnp.int32 = 3
 
 
+@partial(jax.jit, static_argnames=["axis", "keepdims"])
 def __norm(
     v: jax.Array,
     axis: jnp.int32 = -1,
     keepdims: jnp.bool = False,
     eps: jnp.float32 = 0.0,
 ) -> jax.Array:
-    return jnp.sqrt((v * v).sum(axis, keepdims=keepdims).clip(eps))
+    return jnp.sqrt((v * v).sum(axis, keepdims=keepdims).clip(min=eps))
 
 
+@jax.jit
 def __normalize(
     v: jax.Array, axis: jnp.int32 = -1, eps: jnp.float32 = 1e-20
 ) -> jax.Array:
-    return v / __norm(v, axis, keepdims=True, eps=eps)
+    return v / __norm(v, axis, keepdims=True, eps=eps)  # type: ignore
 
 
+@jax.jit
 def __process_column(
     p: jax.Array,
     x: jnp.float32,
@@ -61,6 +65,7 @@ def __process_column(
     return box_sdf(transformed[:3], w, (h * w) / 2)
 
 
+@jax.jit
 def __process_ramp(
     p: jax.Array,
     x: jnp.float32,
@@ -101,9 +106,11 @@ def __process_ramp(
     return ramp_sdf(transformed[:3], w, h)
 
 
-def _scene_sdf_from_tilemap(  # pragma: no cover
+@jax.jit
+def scene_sdf_from_tilemap(  # pragma: no cover
     tilemap: jax.Array, p: jax.Array, floor_height: jnp.float32 = 0.0
-) -> tuple[jnp.float32, jnp.int32, jnp.int32]:
+) -> tuple[jax.Array, jnp.int32, jnp.int32]:
+    """Generates the signed distance function from the terrain."""
     w, h = tilemap.shape[0], tilemap.shape[1]
     dists = jnp.arange(w * h, dtype=jnp.int32)
     tile_width = 1
@@ -140,8 +147,9 @@ def _scene_sdf_from_tilemap(  # pragma: no cover
     )
 
 
+@partial(jax.jit, static_argnames=["sdf"])
 def __raycast(
-    sdf: Callable[[jax.Array], jnp.float32],
+    sdf: Callable[[jax.Array], jax.Array],
     p0: jax.Array,
     rdir: jax.Array,
     step_n: jnp.int32 = 50,
@@ -209,8 +217,9 @@ def __camera_rays(
     return ray_dir
 
 
+@partial(jax.jit, static_argnames=["sdf"])
 def __cast_shadow(
-    sdf: Callable[[Any], Any],
+    sdf: Callable[[jax.Array], jax.Array],
     light_dir: jax.Array,
     p0: jax.Array,
     step_n: jnp.int32 = 50,
@@ -224,6 +233,7 @@ def __cast_shadow(
     return jax.lax.fori_loop(0, step_n, f, (1e-2, 1.0))[1]
 
 
+@jax.jit
 def __scene_sdf_from_tilemap_color(
     tilemap: jax.Array,
     p: jax.Array,
@@ -232,7 +242,7 @@ def __scene_sdf_from_tilemap_color(
     floor_height: jnp.float32 = 0.0,
 ) -> tuple[jnp.float32, jax.Array]:
     """SDF for the world terrain."""
-    tile_dist, _, _ = _scene_sdf_from_tilemap(tilemap, p, floor_height - 1)
+    tile_dist, _, _ = scene_sdf_from_tilemap(tilemap, p, floor_height - 1)
     floor_dist = p[1] - floor_height
     min_dist = jnp.minimum(tile_dist, floor_dist)
 
@@ -268,13 +278,13 @@ def __scene_sdf_with_objs(
     p: jax.Array,
     # Extra kwargs
     floor_height: jnp.float32 = 0.0,
-) -> tuple[jnp.float32, jax.Array]:
+) -> tuple[jax.Array, jax.Array]:
     """SDF for the agents and props."""
     # Pre: the lengths of player_pos and player_col are the same.
     # Pre: the lengths of prop_pos, prop_rot and prop_col are the same.
 
     # Add distances computed by SDFs here
-    tile_dist, cx, cy = _scene_sdf_from_tilemap(tilemap, p, floor_height - 1)
+    tile_dist, cx, cy = scene_sdf_from_tilemap(tilemap, p, floor_height - 1)
     floor_dist = p[1] - floor_height
 
     def process_player_sdf(i: jnp.int32) -> tuple[jnp.float32, jax.Array]:
@@ -378,7 +388,7 @@ def __shade_f(
     half = __normalize(light_dir - ray_dir)
     spec = 0.3 * shadow * half.dot(normal).clip(0.0) ** 200.0
     light = 0.7 * diffuse + 0.2 * ambient
-    return surf_color * light + spec
+    return surf_color * light + spec  # type: ignore
 
 
 def can_see_object(
@@ -465,7 +475,6 @@ def render_frame_with_objects(
     light_dir: jax.Array = __normalize(jnp.array([5.0, 10.0, 5.0])),
     view_width: jnp.int32 = DEFAULT_VIEWSIZE[0],
     view_height: jnp.int32 = DEFAULT_VIEWSIZE[1],
-    # view_size: tuple[jnp.int32, jnp.int32] = DEFAULT_VIEWSIZE,
 ) -> jax.Array:
     """Renders one frame given camera position, direction, and world terrain."""
     player_pos = jnp.array([[8.5, 3, 1]])
@@ -517,7 +526,7 @@ def render_frame(
     """Renders one frame given camera position, direction, and world terrain."""
     # Ray casting
     ray_dir = __camera_rays(cam_pos, cam_dir, view_width, view_height, fx=0.6)
-    sdf = partial(_scene_sdf_from_tilemap, tilemap)
+    sdf = partial(scene_sdf_from_tilemap, tilemap)
     sdf_dist_only = lambda p: sdf(p)[0]
     hit_pos = jax.vmap(partial(__raycast, sdf_dist_only, cam_pos))(ray_dir)
 
@@ -540,13 +549,14 @@ def render_frame(
     return frame.reshape((view_height, view_width, NUM_CHANNELS))  # type: ignore
 
 
+@jax.jit
 def get_agent_camera_from_mjx(
     icland_state: ICLandState,
     world_width: jnp.int32,
     body_id: jnp.int32,
     camera_height: jnp.float32 = 0.2,
     camera_offset: jnp.float32 = 0.06,
-) -> tuple[jax.Array, jax.Array]:  # pragma: no cover
+) -> tuple[jax.Array, jax.Array]:
     """Get the camera position and direction from the MuJoCo data."""
     data = icland_state.pipeline_state.mjx_data
     agent_id = icland_state.pipeline_state.component_ids[body_id, 0]
@@ -817,7 +827,7 @@ if __name__ == "__main__":  # pragma: no cover
             ],
         ]
     )
-    frames: List[Any] = []
+    frames: list[Any] = []
     cmap = generate_colormap(jax.random.PRNGKey(0), 10, 10)
     print(cmap.shape)
     for i in range(72):

@@ -3,7 +3,8 @@
 
 import os
 import time
-from typing import Any, Callable, Dict, List, Optional, Union
+from collections.abc import Callable
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -20,7 +21,7 @@ import icland
 #       - "parameters": dictionary of relevant parameters
 # --------------------------------------------------------------------------------------
 
-SCENARIOS: Dict[str, Dict[str, Any]] = {
+SCENARIOS: dict[str, dict[str, Any]] = {
     "vary_batch_size": {
         "description": "Benchmark performance across different batch sizes.",
         "parameters": {
@@ -115,7 +116,7 @@ def measure_batched_steps_per_second_and_resources(
     init_state: Any,
     batched_step: Callable[..., Any],
     num_steps: int = 100,
-) -> Dict[str, Union[int, float, List[float]]]:
+) -> dict[str, int | float | list[float]]:
     """Measure batched steps per second and resource usage.
 
     Measures:
@@ -151,8 +152,8 @@ def measure_batched_steps_per_second_and_resources(
     try:
         pynvml.nvmlInit()
         num_gpus = pynvml.nvmlDeviceGetCount()
-        max_gpu_usage_percent: List[float] = [0.0] * num_gpus
-        max_gpu_memory_usage_mb: List[float] = [0.0] * num_gpus
+        max_gpu_usage_percent: list[float] = [0.0] * num_gpus
+        max_gpu_memory_usage_mb: list[float] = [0.0] * num_gpus
     except pynvml.NVMLError:
         gpu_available = False
         max_gpu_usage_percent = []
@@ -203,13 +204,13 @@ def measure_batched_steps_per_second_and_resources(
 
 
 def plot_metric(
-    x_values: List[Union[int, float]],
-    metric_list: List[Union[float, List[float]]],
+    x_values: list[int | float],
+    metric_list: list[float | list[float]],
     ylabel: str,
     xlabel: str,
     title: str,
     filename: str,
-    labels: Optional[List[str]] = None,
+    labels: list[str] | None = None,
 ) -> str:
     """General plotting utility for one or more lines on the same figure.
 
@@ -253,8 +254,8 @@ def plot_metric(
 #     runs the relevant benchmarking steps, collects results, and returns them.
 # --------------------------------------------------------------------------------------
 def run_scenario_benchmark(
-    scenario_name: str, scenario_def: Dict[str, Any]
-) -> Dict[str, Any]:
+    scenario_name: str, scenario_def: dict[str, Any]
+) -> dict[str, Any]:
     """Runs one scenario's benchmarks, including compile time measurement.
 
     Returns a dictionary with scenario results: compile_time, benchmark_runs, graphics, etc.
@@ -282,7 +283,7 @@ def run_scenario_benchmark(
     )
 
     # 2) Actual runs (example: vary batch size)
-    benchmark_runs: List[Dict[str, Union[int, float, List[float]]]] = []
+    benchmark_runs: list[dict[str, int | float | list[float]]] = []
     if "batch_sizes" in params:
         for b_size in params["batch_sizes"]:
             metrics = measure_batched_steps_per_second_and_resources(
@@ -301,7 +302,7 @@ def run_scenario_benchmark(
 
     # 3) Generate scenario-specific plots (optional)
     #    For "vary_batch_size", we can plot e.g. Steps/sec vs. batch_size
-    graphics: Dict[str, Optional[str]] = {}
+    graphics: dict[str, str | None] = {}
     if "batch_sizes" in params and len(benchmark_runs) > 0:
         output_dir = f"benchmarking/output/graphics/{scenario_name}"
         # X-axis is batch_sizes
@@ -374,7 +375,7 @@ def run_scenario_benchmark(
     # For a different scenario, you'd generate different plots.
 
     # Return scenario results
-    scenario_results: Dict[str, Any] = {
+    scenario_results: dict[str, Any] = {
         "description": desc,
         "compile_time_s": compile_time_s,
         "benchmark_runs": benchmark_runs,
@@ -389,8 +390,8 @@ def run_scenario_benchmark(
 #   - returns a dictionary keyed by scenario name
 # --------------------------------------------------------------------------------------
 def run_all_scenarios(
-    scenarios_dict: Optional[Dict[str, Dict[str, Any]]] = None,
-) -> Dict[str, Dict[str, Any]]:
+    scenarios_dict: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, dict[str, Any]]:
     """Runs all scenarios in the SCENARIOS dictionary.
 
     Args:
@@ -403,7 +404,7 @@ def run_all_scenarios(
     if scenarios_dict is None:
         scenarios_dict = SCENARIOS
 
-    all_results: Dict[str, Dict[str, Any]] = {}
+    all_results: dict[str, dict[str, Any]] = {}
     for scenario_name, scenario_def in scenarios_dict.items():
         print(f"\n--- Running scenario: {scenario_name} ---")
         scenario_results = run_scenario_benchmark(scenario_name, scenario_def)

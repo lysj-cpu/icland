@@ -13,17 +13,16 @@ xla_flags += " --xla_gpu_triton_gemm_any=True"
 os.environ["XLA_FLAGS"] = xla_flags
 
 import itertools
-from typing import Any, List
+from typing import Any
 
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import mujoco
-from assets.policies import *
-from assets.worlds import *
 from video_generator import _generate_mjcf_string
 
 import icland
+from icland.presets import *
 from icland.renderer.renderer import get_agent_camera_from_mjx
 from icland.types import *
 from icland.world_gen.converter import create_world, export_stls, sample_spawn_points
@@ -33,8 +32,8 @@ from icland.world_gen.tile_data import TILECODES
 
 def plot_trajectories_multi_policies(
     key: jax.Array,
-    policies: List[jax.Array],
-    switch_intervals: List[float],
+    policies: list[jax.Array],
+    switch_intervals: list[float],
     duration: int,
 ) -> list[jax.Array]:
     """Renders a video where the agent follows multiple policies sequentially.
@@ -61,7 +60,7 @@ def plot_trajectories_multi_policies(
 
     icland_state = icland.init(key, icland_params)
     mjx_data = icland_state.pipeline_state.mjx_data
-    trajectory: List[Any] = []
+    trajectory: list[Any] = []
 
     current_policy_idx = 0
     policy = policies[current_policy_idx]

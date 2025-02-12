@@ -5,11 +5,13 @@ import jax.numpy as jnp
 
 
 # Smooth approximations to minimum and maximum that avoid exact kinks.
+@jax.jit
 def __safe_max(a: jnp.float32, b: jnp.float32, eps: jnp.float32 = 1e-6) -> jnp.float32:
     # Smooth maximum: approx max(a, b) that is differentiable everywhere.
     return 0.5 * (a + b + jnp.sqrt((a - b) ** 2 + eps))
 
 
+@jax.jit
 def __safe_min(a: jnp.float32, b: jnp.float32, eps: jnp.float32 = 1e-6) -> jnp.float32:
     # Smooth minimum: approx min(a, b) that is differentiable everywhere.
     return 0.5 * (a + b - jnp.sqrt((a - b) ** 2 + eps))

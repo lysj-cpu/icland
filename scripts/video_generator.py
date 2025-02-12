@@ -25,46 +25,28 @@ xla_flags = os.environ.get("XLA_FLAGS", "")
 xla_flags += " --xla_gpu_triton_gemm_any=True"
 os.environ["XLA_FLAGS"] = xla_flags
 
-from typing import Any, Dict, List
+from typing import Any
 
 import imageio
 import jax
 import jax.numpy as jnp
 import mujoco
-from assets.policies import *
-from assets.worlds import *
 from mujoco import mjx
 
 import icland
+from icland.presets import *
 from icland.renderer.renderer import get_agent_camera_from_mjx, render_frame
 from icland.types import *
 from icland.world_gen.converter import create_world, export_stls, sample_spawn_points
 from icland.world_gen.JITModel import export, sample_world
 from icland.world_gen.tile_data import TILECODES
 
-SIMULATION_PRESETS: List[Dict[str, Any]] = [
+SIMULATION_PRESETS: list[dict[str, Any]] = [
     # {
-    #     "name": "two_agent_move_collide",
-    #     "world": TWO_AGENT_EMPTY_WORLD_COLLIDE,
-    #     "policy": jnp.array([FORWARD_POLICY, BACKWARD_POLICY]),
+    #     "name": "world_42_convex",
+    #     "world": WORLD_42_CONVEX,
+    #     "policy": FORWARD_POLICY,
     #     "duration": 4,
-    #     "agent_count": 2,
-    # },
-    # {"name": "ramp_30", "world": RAMP_30, "policy": FORWARD_POLICY, "duration": 4},
-    # {"name": "ramp_60", "world": RAMP_60, "policy": FORWARD_POLICY, "duration": 4},
-    # {"name": "ramp_45", "world": RAMP_45, "policy": FORWARD_POLICY, "duration": 4},
-    {
-        "name": "world_42_convex",
-        "world": WORLD_42_CONVEX,
-        "policy": FORWARD_POLICY,
-        "duration": 4,
-    },
-    # {
-    #     "name": "two_agent_move_parallel",
-    #     "world": TWO_AGENT_EMPTY_WORLD,
-    #     "policy": jnp.array([FORWARD_POLICY, FORWARD_POLICY]),
-    #     "duration": 4,
-    #     "agent_count": 2,
     # },
     # {
     #     "name": "world_42_convex",
@@ -72,6 +54,23 @@ SIMULATION_PRESETS: List[Dict[str, Any]] = [
     #     "policy": RIGHT_POLICY,
     #     "duration": 2.5,
     # },
+    {
+        "name": "two_agent_move_collide",
+        "world": TWO_AGENT_EMPTY_WORLD_COLLIDE,
+        "policy": jnp.array([FORWARD_POLICY, BACKWARD_POLICY]),
+        "duration": 4,
+        "agent_count": 2,
+    },
+    {"name": "ramp_30", "world": RAMP_30, "policy": FORWARD_POLICY, "duration": 4},
+    {"name": "ramp_60", "world": RAMP_60, "policy": FORWARD_POLICY, "duration": 4},
+    {"name": "ramp_45", "world": RAMP_45, "policy": FORWARD_POLICY, "duration": 4},
+    {
+        "name": "two_agent_move_parallel",
+        "world": TWO_AGENT_EMPTY_WORLD,
+        "policy": jnp.array([FORWARD_POLICY, FORWARD_POLICY]),
+        "duration": 4,
+        "agent_count": 2,
+    },
 ]
 
 
@@ -90,7 +89,7 @@ def _generate_mjcf_string(  # pragma: no cover
     <default>
         <geom type=\"mesh\" />
     </default>
-    
+
     <worldbody>\n"""
 
     for i, s in enumerate(agent_spawns):
@@ -186,7 +185,7 @@ def render_video_from_world(
     icland_state = icland.step(key, icland_state, icland_params, policy)
     print(f"Init mjX model and data...")
     mjx_data = icland_state.pipeline_state.mjx_data
-    frames: List[Any] = []
+    frames: list[Any] = []
 
     print(f"Starting simulation: {video_name}")
     last_printed_time = -0.1
@@ -202,12 +201,6 @@ def render_video_from_world(
         icland_state = icland.step(key, icland_state, icland_params, policy)
         mjx_data = icland_state.pipeline_state.mjx_data
         if len(frames) < mjx_data.time * 30:
-            print(
-                "Agent pos:",
-                mjx_data.xpos[
-                    icland_state.pipeline_state.component_ids[default_agent_1, 0]
-                ][:3],
-            )
             camera_pos, camera_dir = get_camera_info(
                 icland_state, world_width, default_agent_1
             )
@@ -254,7 +247,7 @@ def render_video(
     icland_state = icland.step(key, icland_state, icland_params, policy)
     mjx_data = icland_state.pipeline_state.mjx_data
 
-    third_person_frames: List[Any] = []
+    third_person_frames: list[Any] = []
 
     cam = mujoco.MjvCamera()
     mujoco.mjv_defaultCamera(cam)
@@ -281,10 +274,6 @@ def render_video(
             mjx_data = icland_state.pipeline_state.mjx_data
             if len(third_person_frames) < mjx_data.time * 30:
                 mj_data = mjx.get_data(mj_model, mjx_data)
-                print(
-                    "Agent pos:",
-                    mjx_data.xpos[icland_state.pipeline_state.component_ids[0, 0]][:3],
-                )
                 mujoco.mjv_updateScene(
                     mj_model,
                     mj_data,
@@ -301,8 +290,8 @@ def render_video(
 
 def render_video_from_world_with_policies(
     key: jax.Array,
-    policies: List[jax.Array],
-    switch_intervals: List[float],
+    policies: list[jax.Array],
+    switch_intervals: list[float],
     duration: int,
     video_name: str,
 ) -> None:
@@ -329,7 +318,7 @@ def render_video_from_world_with_policies(
 
     icland_state = icland.init(key, icland_params)
     mjx_data = icland_state.pipeline_state.mjx_data
-    frames: List[Any] = []
+    frames: list[Any] = []
 
     current_policy_idx = 0
     policy = policies[current_policy_idx]
@@ -360,10 +349,6 @@ def render_video_from_world_with_policies(
         mjx_data = icland_state.pipeline_state.mjx_data
 
         if len(frames) < mjx_data.time * 30:
-            print(
-                "Agent pos:",
-                mjx_data.xpos[icland_state.pipeline_state.component_ids[0, 0]][:3],
-            )
             camera_pos, camera_dir = get_camera_info(
                 icland_state, world_width, default_agent_1
             )
@@ -376,14 +361,23 @@ def render_video_from_world_with_policies(
 
 
 if __name__ == "__main__":
-    keys = [
-        jax.random.PRNGKey(42),
-        # jax.random.PRNGKey(420),
-        # jax.random.PRNGKey(2004),
-    ]
-    for k in keys:
-        render_video_from_world(
-            k, FORWARD_POLICY, 4, f"tests/video_output/world_convex_{k[1]}_mjx.mp4"
+    # keys = [
+    #     jax.random.PRNGKey(42),
+    #     # jax.random.PRNGKey(420),
+    #     # jax.random.PRNGKey(2004),
+    # ]
+    # for k in keys:
+    #     render_video_from_world(
+    #         k, FORWARD_POLICY, 4, f"tests/video_output/world_convex_{k[1]}_mjx.mp4")
+    for i, preset in enumerate(SIMULATION_PRESETS):
+        print(f"Running preset {i + 1}/{len(SIMULATION_PRESETS)}: {preset['name']}")
+        render_video(
+            jax.random.PRNGKey(42),
+            preset["world"],
+            preset["policy"],
+            preset["duration"],
+            f"scripts/video_output/{preset['name']}.mp4",
+            agent_count=preset.get("agent_count", 1),
         )
     # for i, preset in enumerate(SIMULATION_PRESETS):
     #     print(f"Running preset {i + 1}/{len(SIMULATION_PRESETS)}: {preset['name']}")
