@@ -1,76 +1,223 @@
-import icland
-from icland.world_gen.converter import *
-from icland.types import *
+from typing import Any  # noqa: D100
+
 import jax
 import jax.numpy as jnp
-import os
+import mujoco
+import numpy as np
+from mujoco import mjx
 
-def __generate_mjcf_string(  # pragma: no cover
+from icland.constants import *
+from icland.types import *
+from icland.world_gen.converter import sample_spawn_points
+from icland.world_gen.JITModel import export, sample_world
+from icland.world_gen.tile_data import TILECODES
+
+
+def __generate_mjcf_spec(
     tile_map: jax.Array,
-    agent_spawns: jax.Array,
-    mesh_dir: str = "meshes/",
-) -> str:
-    """Generates MJCF file from column meshes that form the world."""
-    mesh_files = [f for f in os.listdir(mesh_dir) if f.endswith(".stl")]
+    # agent_spawns: jax.Array,
+    # prop_spawns: jax.Array,
+) -> mujoco.MjSpec:
+    """Generates MJCF spec from column meshes that form the world."""
+    spec = mujoco.MjSpec()
 
-    mjcf = f"""<mujoco model=\"generated_mesh_world\">
-    <compiler meshdir=\"{mesh_dir}\"/>
-    <default>
-        <geom type=\"mesh\" />
-    </default>
-    
-    <worldbody>\n"""
+    spec.compiler.degree = 1
 
-    for i, s in enumerate(agent_spawns):
-        spawn_loc = s.tolist()
-        spawn_loc[2] += 1
-        mjcf += f'            <body name="agent{i}" pos="{" ".join([str(s) for s in spawn_loc])}">'
-        mjcf += """
-            <joint type="slide" axis="1 0 0" />
-            <joint type="slide" axis="0 1 0" />
-            <joint type="slide" axis="0 0 1" />
-            <joint type="hinge" axis="0 0 1" stiffness="1"/>
-
-            <geom"""
-        mjcf += f'        name="agent{i}_geom"'
-        mjcf += """        type="capsule"
-                size="0.06"
-                fromto="0 0 0 0 0 -0.4"
-                mass="1"
-            />
-
-            <geom
-                type="box"
-                size="0.05 0.05 0.05"
-                pos="0 0 0.2"
-                mass="0"
-            />
-        </body>"""
-
-    for i, mesh_file in enumerate(mesh_files):
-        mesh_name = os.path.splitext(mesh_file)[0]
-        mjcf += (
-            f'        <geom name="{mesh_name}" mesh="{mesh_name}" pos="0 0 0"/>' + "\n"
+    w, h = tile_map.shape[0], tile_map.shape[1]
+    # Add assets
+    # Columns: 1 to 6
+    for i in range(1, WORLD_HEIGHT + 1):
+        spec.add_mesh(
+            name=f"c{i}",  # ci for column level i
+            uservert=[
+                -0.5,
+                -0.5,
+                0,
+                0.5,
+                -0.5,
+                0,
+                0.5,
+                0.5,
+                0,
+                -0.5,
+                0.5,
+                0,
+                -0.5,
+                -0.5,
+                i,
+                0.5,
+                -0.5,
+                i,
+                0.5,
+                0.5,
+                i,
+                -0.5,
+                0.5,
+                i,
+            ],
         )
 
-    mjcf += "    </worldbody>\n\n    <asset>\n"
+    # Ramps: 1-2 to 5-6
+    for i in range(1, WORLD_HEIGHT):
+        spec.add_mesh(
+            name=f"r{i + 1}",  # ri for ramp to i
+            uservert=[
+                -0.5,
+                -0.5,
+                0,
+                0.5,
+                -0.5,
+                0,
+                0.5,
+                0.5,
+                0,
+                -0.5,
+                0.5,
+                0,
+                -0.5,
+                -0.5,
+                i,
+                0.5,
+                -0.5,
+                i + 1,
+                0.5,
+                0.5,
+                i + 1,
+                -0.5,
+                0.5,
+                i,
+            ],
+        )
 
-    for mesh_file in mesh_files:
-        mesh_name = os.path.splitext(mesh_file)[0]
-        mjcf += f'        <mesh name="{mesh_name}" file="{mesh_file}"/>' + "\n"
+    for i in range(w):
+        for j in range(h):
+            t_type, rot, _, to_h = tile_map[i, j]
+            t_type_str = "r" if t_type == 1 else "c"
+            spec.worldbody.add_geom(
+                type=mujoco.mjtGeom.mjGEOM_MESH,
+                euler=[0, 0, 90 * rot],
+                meshname=f"{t_type_str}{to_h}",
+                pos=[i + 0.5, j + 0.5, 0],
+            )
 
-    mjcf += "    </asset>\n</mujoco>\n"
+    # TODO: Add agents
+    return spec
 
-    return mjcf
 
-def pipeline(key: int, tile_map: jnp.ndarray) -> MjxModelType:
-    pieces = create_world(tile_map)
-    temp_dir = "temp"
-    export_stls(pieces, f"{temp_dir}/{temp_dir}")
-    xml_str = __generate_mjcf_string(tile_map, (1.5, 1, 4), f"{temp_dir}/")
-    mj_model = mujoco.MjModel.from_xml_string(xml_str)
-    icland_params = ICLandParams(model=mj_model, game=None, agent_count=1)
+def compare_dataclass_instances(
+    inst1: Any, inst2: Any, atol: float = 1e-8, rtol: float = 1e-5
+) -> None:  # pragma: ignore
+    """Compares two JAX/JIT-compatible dataclass instances and print the fields that differ.
 
-    icland_state = icland.init(key, icland_params)
-    return icland_state.pipeline_state.mjx_model
+    Parameters:
+      inst1, inst2: Two instances of the same dataclass.
+      atol: Absolute tolerance for numerical comparisons.
+      rtol: Relative tolerance for numerical comparisons.
+    """
+    # Ensure both instances are of the same type.
+    if type(inst1) != type(inst2):
+        raise TypeError("Both instances must be of the same dataclass type.")
 
+    # Retrieve field names.
+    # For dataclasses (including flax.struct.dataclass), __dataclass_fields__ is available.
+    field_names = (
+        inst1.__dataclass_fields__.keys()
+        if hasattr(inst1, "__dataclass_fields__")
+        else vars(inst1).keys()
+    )
+
+    differences = {}
+    for field in field_names:
+        value1 = getattr(inst1, field)
+        value2 = getattr(inst2, field)
+
+        # If the field contains a JAX/NumPy array, compare numerically.
+        if isinstance(value1, jnp.ndarray | np.ndarray):
+            # Use jnp.allclose for floating point arrays.
+            if not jnp.allclose(value1, value2, atol=atol, rtol=rtol):
+                i, j = 0, 0
+                header1 = ""
+                header2 = ""
+                while i < len(value1) and j < len(value2):
+                    if not jnp.allclose(value1[i], value2[j], atol=atol, rtol=rtol):
+                        header1 += f"At {i}: {value1[i]}\n"
+                        header2 += f"At {j}: {value2[j]}\n"
+                    i += 1
+                    j += 1
+                differences[field] = (header1, header2)
+        elif isinstance(value1, int | bool | float):
+            # For non-array values, use the normal equality check.
+            # if not jnp.all(value1.data & value2.data):
+            if value1 != value2:
+                differences[field] = (str(value1), str(value2))
+        else:
+            differences[field] = (value1, value2)
+
+    # Print only fields with differences.
+
+    # Specify the file path where you want to save the differences
+    file_path = "differences.txt"
+
+    # Open the file in write mode
+    with open(file_path, "w") as f:
+        if differences:
+            for field, (val1, val2) in differences.items():
+                # Write the differences to the text file
+                f.write(
+                    f"Field '{field}' differs:\n  Instance 1: {val1}\n  Instance 2: {val2}\n\n"
+                )
+            print(f"Differences have been exported to {file_path}")
+
+        else:
+            print("No differences found.")
+
+
+def __compare_two_models(tilemap_1: jax.Array, tilemap_2: jax.Array) -> None:
+    spec_1 = __generate_mjcf_spec(tilemap_1)
+    spec_2 = __generate_mjcf_spec(tilemap_2)
+
+    mj_model_1 = spec_1.compile()
+    mj_model_2 = spec_2.compile()
+
+    mjx_model_1 = mjx.put_model(mj_model_1)
+    mjx_model_2 = mjx.put_model(mj_model_2)
+
+    compare_dataclass_instances(mjx_model_1, mjx_model_2)
+
+
+def pipeline(
+    key: jax.Array, height: int = 10, width: int = 10, num_agents: int = 1
+) -> MjxModelType:  # pragma: no cover
+    """Test pipeline."""
+    # Sample the world and create tile map.
+    MAX_STEPS = 1000
+    kn = key[1]
+    # TODO: Vary the sample world using globally-defined config
+    tile_map = export(
+        sample_world(height, width, MAX_STEPS, key, True, 1), TILECODES, height, width
+    )
+    key, s = jax.random.split(key)
+    # TODO: Change num_objs from num_agents to num_agents + num_props
+    spawnpoints = sample_spawn_points(s, tile_map, num_objects=num_agents)
+
+    # pieces = create_world(tile_map)
+    # temp_dir = "temp"
+    # export_stls(pieces, f"{temp_dir}/{temp_dir}")
+    # xml_str = __generate_mjcf_string(tile_map, (1.5, 1, 4), f"{temp_dir}/")
+    # mj_model = mujoco.MjModel.from_xml_string(xml_str)
+    mj_spec = __generate_mjcf_spec(tile_map)
+    # icland_params = ICLandParams(model=mj_model, game=None, agent_count=1)
+
+    # icland_state = icland.init(key, icland_params)
+    mj_model = mj_spec.compile()
+    xml_string = mj_spec.to_xml()
+
+    mjx_model = mjx.put_model(mj_model)
+
+    # Save as a .txt file
+    # with open(f"model_output_{kn}.txt", "w") as f:
+    #     f.write(mjx_model)
+    print(xml_string)
+
+    # output as .txt file
+    return mjx_model

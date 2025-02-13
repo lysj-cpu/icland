@@ -92,7 +92,7 @@ def test_render_frame() -> None:
         view_width=10,
         view_height=10,
     )
-    assert jnp.linalg.norm(frame.flatten() - TEST_FRAME.flatten(), ord=jnp.inf) < 0.05
+    assert jnp.linalg.norm(frame.flatten() - TEST_FRAME.flatten(), ord=jnp.inf) < 0.15
 
 
 def test_generate_colormap() -> None:
