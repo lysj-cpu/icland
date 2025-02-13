@@ -485,7 +485,7 @@ class XMLReader:
         """Returns relevant tilemap data.
 
         Returns:
-            Tuple: (T, j_weights, j_propagator, j_tilecodes)
+            tuple: (T, j_weights, j_propagator, j_tilecodes)
                 T (int): Number of unique tile variants.
                 j_weights (jax.numpy.array): Array of tile weights.
                 j_propagator (jax.numpy.array): Propagator data.
