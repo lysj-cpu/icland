@@ -41,12 +41,13 @@ def benchmark_batch_size(batch_size: int) -> BenchmarkMetrics:
     batched_step = jax.vmap(icland.step, in_axes=(0, 0, icland_params, 0))
 
     # Prepare batch
-    def stack_fn(x):
-        return jnp.stack([x] * batch_size)
+    def replicate(x):
+        return jnp.broadcast_to(x, (batch_size,) + x.shape)
 
-    icland_states = jax.tree_map(lambda x: jax.vmap(stack_fn)(x), init_state)
+    icland_states = jax.tree_map(replicate, init_state)
     actions = jnp.tile(jnp.array([1, 0, 0]), (batch_size, 1))
 
+    # Old code
     # icland_states = jax.tree.map(lambda x: jnp.stack([x] * batch_size), init_state)
     # actions = jnp.array([[1, 0, 0] for _ in range(batch_size)])
 
@@ -69,14 +70,16 @@ def benchmark_batch_size(batch_size: int) -> BenchmarkMetrics:
         max_gpu_memory_usage_mb = []
 
     # Timed run
-    start_time = time.time()
+    total_time = 0
     for i in range(NUM_STEPS):
         # The elements in each of the four arrays are the same, except for those in keys
         
-        step_start_time = time.time()
         print(f'Start of batched step {i}')
+        step_start_time = time.time()
         icland_states = batched_step(keys, icland_states, icland_params, actions)
         step_time = time.time() - step_start_time
+        total_time += step_time
+
         print(f'End of batched step {i}. Time taken: {step_time}')
         
         # CPU Memory & Usage
@@ -100,8 +103,6 @@ def benchmark_batch_size(batch_size: int) -> BenchmarkMetrics:
                 max_gpu_memory_usage_mb[i] = max(
                     max_gpu_memory_usage_mb[i], gpu_mem_usage_mb
                 )
-
-    total_time = time.time() - start_time
 
     if gpu_available:
         pynvml.nvmlShutdown()

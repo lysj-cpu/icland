@@ -53,7 +53,7 @@ BENCHMARKING_SCENARIOS: dict[str, BenchmarkScenario] = {
     "batched_step_performance": BenchmarkScenario(
         description="Batched step performance",
         function=benchmark_batch_size,
-        parameters=[2**i for i in range(10, 18)],
+        parameters=[2**i for i in range(0, 25)],
     )
 }
 
