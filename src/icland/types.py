@@ -3,6 +3,7 @@
 It includes types for model parameters, state, and action sets used in the project.
 """
 
+import dataclasses
 import inspect
 from collections.abc import Callable
 from typing import TypeAlias
@@ -10,6 +11,7 @@ from typing import TypeAlias
 import jax
 import jax.numpy as jnp
 import mujoco
+from jaxtyping import Array, Float
 from mujoco.mjx._src.dataclasses import PyTreeNode
 
 """Type variables from external modules."""
@@ -43,9 +45,15 @@ class PipelineState(PyTreeNode):  # type: ignore[misc]
 class Agent(PyTreeNode):  # type: ignore[misc]
     """Information about an agent in the ICLand environment."""
 
-    position: jax.Array
-    velocity: jax.Array
-    rotation: jax.Array
+    position: Float[Array, "3"]
+    velocity: Float[Array, "4"]
+    rotation: Float[Array, "1"] | Float[Array, ""]
+
+
+class Prop(PyTreeNode):  # type: ignore[misc]
+    """Information about a prop in the ICLand environment."""
+
+    centre_of_mass: Float[Array, "3"]
 
 
 class ICLandInfo(PyTreeNode):  # type: ignore[misc]
@@ -58,6 +66,8 @@ class ICLandInfo(PyTreeNode):  # type: ignore[misc]
     """
 
     agents: list[Agent]
+    # TODO: Initialise values of props
+    props: list[Prop] = dataclasses.field(default_factory=list)
 
 
 class ICLandState(PyTreeNode):  # type: ignore[misc]

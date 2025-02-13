@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 import jax
 import jax.numpy as jnp
+from jaxtyping import PRNGKeyArray
 
 from .constants import *
 from .types import *
@@ -13,7 +14,7 @@ ACCEPTABLE_DISTANCE = 0.5
 
 
 def generate_game(
-    key: jax.Array, agent_count: int
+    key: PRNGKeyArray, agent_count: int
 ) -> Callable[[ICLandInfo], jax.Array]:
     """Generate a game using the given random key and agent count.
 

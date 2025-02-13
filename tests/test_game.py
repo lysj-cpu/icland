@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from icland.game import generate_game
-from icland.types import ICLandInfo, Agent
+from icland.types import Agent, ICLandInfo
 
 
 # Define a minimal dummy ICLandInfo type with the attributes used by the reward functions.
@@ -32,7 +32,7 @@ def test_generate_game_runs_without_error() -> None:
     # Both fields are provided even though only one is used depending on mode.
     info = ICLandInfo(
         agents=[
-            Agent(position=jnp.zeros(2), rotation=jnp.zeros(1), velocity=jnp.zeros(2))
+            Agent(position=jnp.zeros(3), rotation=jnp.zeros(1), velocity=jnp.zeros(4))
             for _ in range(agent_count)
         ]
     )
