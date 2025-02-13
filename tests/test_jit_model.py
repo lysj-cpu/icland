@@ -158,7 +158,7 @@ def test_model_observe(model: JITModel) -> None:
     node = 12
 
     # Run the `observe` function
-    observed_model = _observe(model, node)
+    observed_model = _observe(model, jnp.array(node))
     assert model.key != observed_model.key, (
         "The random key should be updated after observation."
     )
@@ -190,7 +190,7 @@ def test_model_ban(model: JITModel) -> None:
     i = 5
     t = 1  # Pattern index to ban
 
-    updated_model = _ban(model, i, jnp.array(t))
+    updated_model = _ban(model, jnp.array(i), jnp.array(t))
 
     assert not updated_model.wave.at[i, t].get(), (
         f"Pattern {t} at cell {i} should be banned."
