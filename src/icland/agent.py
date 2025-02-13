@@ -9,6 +9,8 @@ import mujoco
 from .constants import *
 from .types import *
 
+AGENT_HEIGHT = 0.4
+
 
 def create_agent(
     id: int, pos: jax.Array, specification: mujoco.MjSpec
@@ -42,7 +44,7 @@ def create_agent(
         name=f"agent{id}_geom",
         type=mujoco.mjtGeom.mjGEOM_CAPSULE,
         size=[0.06, 0.06, 0.06],
-        fromto=[0, 0, 0, 0, 0, -0.4],
+        fromto=[0, 0, 0, 0, 0, -AGENT_HEIGHT],
         mass=1,
     )
 
@@ -254,7 +256,14 @@ def collect_body_scene_info(
     ]  # Adjusting index for rotation extraction.
 
     return ICLandInfo(
-        agent_positions=positions,
-        agent_rotations=rotations,
-        agent_velocities=velocities,
+        agents=[
+            Agent(position=positions[i], velocity=velocities[i], rotation=rotations[i])
+            for i in range(len(body_ids))
+        ]
     )
+
+    # return ICLandInfo(
+    #     agent_positions=positions,
+    #     agent_rotations=rotations,
+    #     agent_velocities=velocities,
+    # )

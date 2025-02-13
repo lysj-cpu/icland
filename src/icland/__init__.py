@@ -1,5 +1,11 @@
 """Recreating Google DeepMind's XLand RL environment in JAX."""
 
+from beartype.claw import beartype_this_package
+
+# Enforce runtime type-checking.
+# See: https://beartype.readthedocs.io/en/latest/api_claw/
+beartype_this_package()
+
 import jax
 import jax.numpy as jnp
 import mujoco

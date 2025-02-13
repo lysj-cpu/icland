@@ -7,6 +7,7 @@ from typing import TypedDict, cast
 import jax
 import jax.numpy as jnp
 from flax import struct
+from jaxtyping import Array, Bool, Float, Int
 
 from icland.world_gen.converter import sample_spawn_points
 from icland.world_gen.tile_data import NUM_ACTIONS, PROPAGATOR, TILECODES, WEIGHTS
@@ -15,7 +16,7 @@ from icland.world_gen.XMLReader import XMLReader
 
 @jax.jit
 def _random_index_from_distribution(
-    distribution: jax.Array, rand_value: jax.Array
+    distribution: jax.Array, rand_value: Float[Array, "1"] | Float[Array, ""] | float
 ) -> jax.Array:
     """Select an index from 'distribution' proportionally to the values in 'distribution'.
 
@@ -65,19 +66,19 @@ class JITModel(struct.PyTreeNode):  # type: ignore[no-untyped-call]
     """Base Model class for WaveFunctionCollapse algorithm."""
 
     # Basic config
-    MX: jnp.int32
-    MY: jnp.int32
-    periodic: bool
-    heuristic: jnp.int32
+    MX: int | Int[Array, ""]
+    MY: int | Int[Array, ""]
+    periodic: bool | Bool[Array, ""]
+    heuristic: int | Int[Array, ""]
 
     # number of possible tile/pattern indices
-    T: jnp.int32
+    T: int | Int[Array, ""]
     # Sample size (N=1 for simple tiles)
-    N: jnp.int32
+    N: int | Int[Array, ""]
 
     # Core arrays
     # how many elements in the stack are currently valid
-    stacksize: jnp.int32
+    stacksize: int | Int[Array, ""]
     wave: jax.Array  # shape: (MX*MY, T), dtype=bool
     compatible: jax.Array  # shape: (MX*MY, T, 4), dtype=int
     observed: jax.Array  # shape: (MX*MY, ), dtype=int
@@ -94,12 +95,12 @@ class JITModel(struct.PyTreeNode):  # type: ignore[no-untyped-call]
     entropies: jax.Array  # shape: (MX*MY,)
 
     # Precomputed sums for the entire set of patterns
-    sum_of_weights: jnp.float32
-    sum_of_weight_log_weights: jnp.float32
-    starting_entropy: jnp.float32
+    sum_of_weights: Float[Array, ""]
+    sum_of_weight_log_weights: Float[Array, ""]
+    starting_entropy: Float[Array, ""]
 
     # Because SCANLINE uses an incremental pointer
-    observed_so_far: jnp.int32
+    observed_so_far: int | Int[Array, ""]
 
     propagator: jax.Array  # (4, T, propagator_length)
     distribution: jax.Array  # shape: (T, )
@@ -109,12 +110,12 @@ class JITModel(struct.PyTreeNode):  # type: ignore[no-untyped-call]
 
 @partial(jax.jit, static_argnums=[0, 1, 2])
 def _init(
-    width: jnp.int32,
-    height: jnp.int32,
-    T: jnp.int32,
-    N: jnp.int32,
+    width: int,
+    height: int,
+    T: int,
+    N: int,
     periodic: bool,
-    heuristic: jnp.int32,
+    heuristic: int,
     weights: jax.Array,
     propagator: jax.Array,
     key: jax.Array,
@@ -180,7 +181,7 @@ def _init(
 
 
 @jax.jit
-def _observe(model: JITModel, node: jax.Array) -> JITModel:
+def _observe(model: JITModel, node: Int[Array, ""]) -> JITModel:
     """Collapses the wave at 'node' by picking a pattern index according to weights distribution.
 
     Then bans all other patterns at that node.
@@ -207,7 +208,7 @@ def _observe(model: JITModel, node: jax.Array) -> JITModel:
 
 
 @jax.jit
-def _ban(model: JITModel, i: jax.Array, t1: jax.Array) -> JITModel:
+def _ban(model: JITModel, i: Int[Array, ""], t1: jax.Array) -> JITModel:
     """Bans pattern t at cell i. Updates wave, compatibility, sums_of_ones, entropies, and stack."""
     t = jnp.int32(t1)
     condition_1 = jnp.logical_not(model.wave.at[i, t].get())
@@ -263,18 +264,23 @@ class RunState(TypedDict):
     model: JITModel
     steps: int
     done: bool
-    success: bool
+    success: Bool[Array, ""]
 
 
 def _run(
     model: JITModel, max_steps: jax.Array = jnp.array(1000, dtype=jnp.int32)
-) -> tuple[JITModel, bool]:
+) -> tuple[JITModel, Bool[Array, ""]]:
     """Run the WaveFunctionCollapse algorithm with the given seed and iteration limit."""
     # Pre: the model is freshly initialized
 
     model = _clear(model)
     # Define the loop state
-    init_state: RunState = {"model": model, "steps": 0, "done": False, "success": True}
+    init_state: RunState = {
+        "model": model,
+        "steps": 0,
+        "done": False,
+        "success": jnp.array(True, dtype=bool),
+    }
 
     def cond_fun(state: RunState) -> jax.Array:
         """Condition function for the while loop."""
@@ -343,7 +349,7 @@ def _run(
     final_state = jax.lax.while_loop(cond_fun, body_fun, init_state)
     final_model: JITModel = final_state["model"]
 
-    success: bool = final_state["success"]
+    success = final_state["success"]
 
     return final_model, success
 
@@ -379,7 +385,7 @@ def _next_unobserved_node(model: JITModel) -> tuple[JITModel, jax.Array]:
     all_indices = jnp.arange(model.wave.shape[0])
     valid_nodes_mask = jax.vmap(within_bounds)(all_indices)
 
-    def scanline_heuristic(_: None) -> tuple[JITModel, jax.Array]:
+    def scanline_heuristic(_: jax.Array) -> tuple[JITModel, jax.Array]:
         observed_mask = all_indices >= observed_so_far
         sum_of_ones_mask = model.sums_of_ones[all_indices] > 1
 
@@ -414,7 +420,7 @@ def _next_unobserved_node(model: JITModel) -> tuple[JITModel, jax.Array]:
             ),
         )
 
-    def entropy_mrv_heuristic(_: None) -> tuple[JITModel, jax.Array]:
+    def entropy_mrv_heuristic(_: jax.Array) -> tuple[JITModel, jax.Array]:
         node_entropies = jax.lax.cond(
             heuristic == Heuristic.ENTROPY.value,
             lambda _: entropies,
@@ -619,11 +625,11 @@ def sample_world(
     success = False
 
     def body_func(state: tuple[JITModel, bool]) -> tuple[JITModel, bool]:
-        model, b = state
+        model, _ = state
         model, b = _run(model)
         key, _ = jax.random.split(model.key)
         model = model.replace(key=key)
-        return (model, b)
+        return (model, bool(b))
 
     return cast(
         tuple[JITModel, jax.Array],
