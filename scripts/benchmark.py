@@ -53,7 +53,7 @@ BENCHMARKING_SCENARIOS: dict[str, BenchmarkScenario] = {
     "batched_step_performance": BenchmarkScenario(
         description="Batched step performance",
         function=benchmark_batch_size,
-        parameters=[2**i for i in range(0, 13)],
+        parameters=[2**i for i in range(10, 18)],
     )
 }
 
@@ -357,9 +357,13 @@ def create_report(output_pdf: str = "scripts/benchmark_output/report") -> None:
     """Create a PDF report with system information, benchmark results, and plots."""
     # 1) Gather System Info
     sys_info = gather_system_info()
+    print("System info:")
+    print(sys_info)
 
     # 2) Run Benchmark Scenarios
     bench_results = run_benchmarks()
+    print("Bench results")
+    print(bench_results)
 
     # 3) Build LaTeX document
     doc = Document()

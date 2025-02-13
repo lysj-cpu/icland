@@ -12,6 +12,10 @@ import icland
 
 SEED = 42
 
+# # # Enable JAX debug flags
+# # # jax.config.update("jax_debug_nans", True)  # Check for NaNs
+# jax.config.update("jax_log_compiles", True)  # Log compilations
+# # # jax.config.update("jax_debug_infs", True)  # Check for infinities
 
 @dataclass
 class BenchmarkMetrics:
@@ -37,8 +41,15 @@ def benchmark_batch_size(batch_size: int) -> BenchmarkMetrics:
     batched_step = jax.vmap(icland.step, in_axes=(0, 0, icland_params, 0))
 
     # Prepare batch
-    icland_states = jax.tree.map(lambda x: jnp.stack([x] * batch_size), init_state)
-    actions = jnp.array([[1, 0, 0] for _ in range(batch_size)])
+    def stack_fn(x):
+        return jnp.stack([x] * batch_size)
+
+    icland_states = jax.tree_map(lambda x: jax.vmap(stack_fn)(x), init_state)
+    actions = jnp.tile(jnp.array([1, 0, 0]), (batch_size, 1))
+
+    # icland_states = jax.tree.map(lambda x: jnp.stack([x] * batch_size), init_state)
+    # actions = jnp.array([[1, 0, 0] for _ in range(batch_size)])
+
     keys = jax.random.split(key, batch_size)
 
     process = psutil.Process()
@@ -59,9 +70,15 @@ def benchmark_batch_size(batch_size: int) -> BenchmarkMetrics:
 
     # Timed run
     start_time = time.time()
-    for _ in range(NUM_STEPS):
+    for i in range(NUM_STEPS):
+        # The elements in each of the four arrays are the same, except for those in keys
+        
+        step_start_time = time.time()
+        print(f'Start of batched step {i}')
         icland_states = batched_step(keys, icland_states, icland_params, actions)
-
+        step_time = time.time() - step_start_time
+        print(f'End of batched step {i}. Time taken: {step_time}')
+        
         # CPU Memory & Usage
         memory_usage_mb = process.memory_info().rss / (1024**2)  # in MB
         cpu_usage_percent = process.cpu_percent(interval=None) / psutil.cpu_count()
