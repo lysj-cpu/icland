@@ -338,6 +338,7 @@ RAMP_60 = """
 
 TEST_TILEMAP_FLAT = jnp.array([[[0, 0, 0, 3] for _ in range(10)] for _ in range(10)])
 TEST_TILEMAP_BUMP = TEST_TILEMAP_FLAT.at[:, 5].set(jnp.array([0, 0, 0, 5]))
+TEST_TILEMAP_MAX_HEIGHT = jnp.array([[[0, 0, 0, 6] for _ in range(10)] for _ in range(10)])
 TEST_FRAME = jnp.array(
     [
         [

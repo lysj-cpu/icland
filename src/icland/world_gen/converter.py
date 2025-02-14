@@ -1,14 +1,17 @@
 """The code defines functions to generate block, ramp, and vertical ramp columns in a 3D world using JAX arrays and exports the generated mesh to an STL file."""
 
-import os
+# import os
 from functools import partial
 
 import jax
 import jax.numpy as jnp
+import mujoco
 import numpy as np
 from stl import mesh
 from stl.base import RemoveDuplicates
 
+from icland.agent import create_agent
+from icland.types import MjxModelType
 from icland.world_gen.XMLReader import TileType
 
 # Previous constants (BLOCK_VECTORS, RAMP_VECTORS, ROTATION_MATRICES) remain the same...
@@ -605,37 +608,3 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
     return spawnable
 
 
-def generate_mjcf_from_meshes(  # pragma: no cover
-    tile_map: jax.Array,
-    mesh_dir: str = "meshes/",
-    output_file: str = "generated_mjcf.xml",
-) -> None:
-    """Generates MJCF file from column meshes that form the world."""
-    mesh_files = [f for f in os.listdir(mesh_dir) if f.endswith(".stl")]
-
-    mjcf = f"""<mujoco model=\"generated_mesh_world\">
-    <compiler meshdir=\"{mesh_dir}\"/>
-    <default>
-        <geom type=\"mesh\" contype=\"0\" conaffinity=\"0\"/>
-    </default>
-    
-    <worldbody>\n"""
-
-    for i, mesh_file in enumerate(mesh_files):
-        mesh_name = os.path.splitext(mesh_file)[0]
-        mjcf += (
-            f'        <geom name="{mesh_name}" mesh="{mesh_name}" pos="0 0 0"/>' + "\n"
-        )
-
-    mjcf += "    </worldbody>\n\n    <asset>\n"
-
-    for mesh_file in mesh_files:
-        mesh_name = os.path.splitext(mesh_file)[0]
-        mjcf += f'        <mesh name="{mesh_name}" file="{mesh_file}"/>' + "\n"
-
-    mjcf += "    </asset>\n</mujoco>\n"
-
-    with open(output_file, "w") as f:
-        f.write(mjcf)
-
-    print(f"MJCF file generated and saved as {output_file}")
