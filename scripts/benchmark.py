@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt  # For plotting
 import psutil
 
 # Import the benchmark function (ensure benchmark_functions is in your PYTHONPATH)
-from benchmark_functions import benchmark_batch_size
+from benchmark_functions import benchmark_batch_size, benchmark_step_non_empty_world
 from pylatex import Document, NoEscape
 
 
@@ -52,8 +52,8 @@ class BenchmarkScenario:
 BENCHMARKING_SCENARIOS: dict[str, BenchmarkScenario] = {
     "batched_step_performance": BenchmarkScenario(
         description="Batched step performance",
-        function=benchmark_batch_size,
-        parameters=[2**i for i in range(0, 25)],
+        function=benchmark_step_non_empty_world,
+        parameters=[2**i for i in range(0, 5)],
     )
 }
 
@@ -249,7 +249,14 @@ def run_benchmarks() -> dict[str, list[BenchmarkMetrics]]:
         print(f"Running scenario: {scenario_name}")
         for param in parameters:
             print(f"  Benchmarking with batch size = {param} ...")
-            metrics = benchmark_fn(param)
+            try:
+                metrics = benchmark_fn(param)
+            except RuntimeError as e:
+                if "out of memory" in str(e).lower() or "resource exhausted" in str(e).lower():
+                    print(f"Out of memory at batch size: {param}. Exiting safely.")
+                    break
+                else:
+                    raise  # Re-raise unexpected errors
             scenario_results.append(metrics)
         results[scenario_name] = scenario_results
     return results
@@ -469,8 +476,9 @@ def create_report(output_pdf: str = "scripts/benchmark_output/report") -> None:
 
     # 6) Generate final PDF
     os.makedirs(os.path.dirname(output_pdf), exist_ok=True)
-    doc.generate_pdf(filepath=output_pdf, clean_tex=False)
-    print(f"PDF generated at: {output_pdf}.pdf")
+    doc.generate_tex(filepath=output_pdf)
+
+    print(f".tex generated at: {output_pdf}.tex")
 
 
 if __name__ == "__main__":

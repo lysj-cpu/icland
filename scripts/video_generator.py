@@ -62,8 +62,7 @@ SIMULATION_PRESETS: list[dict[str, Any]] = [
 ]
 
 
-def __generate_mjcf_string(  # pragma: no cover
-    tile_map: jax.Array,
+def generate_mjcf_string(  # pragma: no cover
     agent_spawns: jax.Array,
     mesh_dir: str = "meshes/",
 ) -> str:
@@ -140,13 +139,13 @@ def render_video_from_world(
     os.makedirs(f"{temp_dir}", exist_ok=True)
     print(f"Exporting stls")
     export_stls(pieces, f"{temp_dir}/{temp_dir}")
-    xml_str = __generate_mjcf_string(tilemap, spawnpoints, f"{temp_dir}/")
+    xml_str = generate_mjcf_string(tilemap, spawnpoints, f"{temp_dir}/")
     print(f"Init mj model...")
     mj_model = mujoco.MjModel.from_xml_string(xml_str)
     icland_params = ICLandParams(model=mj_model, game=None, agent_count=1)
 
     icland_state = icland.init(key, icland_params)
-    icland_state = icland.step(key, icland_state, None, policy)
+    icland_state = icland.step(key, icland_state, icland_params, policy)
     print(f"Init mjX model and data...")
     mjx_data = icland_state.pipeline_state.mjx_data
     frames: list[Any] = []
@@ -162,7 +161,7 @@ def render_video_from_world(
         if int(mjx_data.time * 10) != int(last_printed_time * 10):
             print(f"Time: {mjx_data.time:.1f}")
             last_printed_time = mjx_data.time
-        icland_state = icland.step(key, icland_state, None, policy)
+        icland_state = icland.step(key, icland_state, icland_params, policy)
         mjx_data = icland_state.pipeline_state.mjx_data
         if len(frames) < mjx_data.time * 30:
             camera_pos, camera_dir = get_camera_info(
@@ -275,7 +274,7 @@ def render_video_from_world_with_policies(
     temp_dir = "temp"
     export_stls(pieces, f"{temp_dir}/{temp_dir}")
 
-    xml_str = __generate_mjcf_string(tilemap, jnp.array([[1.5, 1, 4]]), f"{temp_dir}/")
+    xml_str = generate_mjcf_string(tilemap, jnp.array([[1.5, 1, 4]]), f"{temp_dir}/")
     mj_model = mujoco.MjModel.from_xml_string(xml_str)
     icland_params = ICLandParams(model=mj_model, game=None, agent_count=1)
 
