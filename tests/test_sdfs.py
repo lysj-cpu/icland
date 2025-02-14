@@ -12,7 +12,9 @@ def test_ramp_sdf() -> None:
     """Test the ramp signed distance function."""
     dists = []
     for i in range(NUM_ITERS):
-        dists.append(float(ramp_sdf(jnp.full((3,), i * 1.0), 1, 1)))
+        dists.append(
+            float(ramp_sdf(jnp.full((3,), i * 1.0), jnp.array(1), jnp.array(1)))
+        )
 
     assert np.all(
         np.isclose(
@@ -40,7 +42,9 @@ def test_box_sdf() -> None:
     """Test the box signed distance function."""
     dists = []
     for i in range(NUM_ITERS):
-        dists.append(float(box_sdf(jnp.full((3,), i * 1.0), 1, 1)))
+        dists.append(
+            float(box_sdf(jnp.full((3,), i * 1.0), jnp.array(1), jnp.array(1)))
+        )
 
     assert np.all(
         np.isclose(
@@ -124,7 +128,7 @@ def test_cube_sdf() -> None:
     """Test the cube signed distance function."""
     dists = []
     for i in range(NUM_ITERS):
-        dists.append(float(cube_sdf(jnp.full((3,), i * 1.0), 1)))
+        dists.append(float(cube_sdf(jnp.full((3,), i * 1.0), 1.0)))
 
     assert np.all(
         np.isclose(

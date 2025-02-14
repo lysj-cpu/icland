@@ -2,27 +2,34 @@
 
 import jax
 import jax.numpy as jnp
+from jaxtyping import Array, Float, Int, Real
 
 
 # Smooth approximations to minimum and maximum that avoid exact kinks.
 @jax.jit
-def __safe_max(a: jnp.float32, b: jnp.float32, eps: jnp.float32 = 1e-6) -> jnp.float32:
+def __safe_max(
+    a: Float[Array, "..."], b: Real[Array, "..."] | float, eps: float = 1e-6
+) -> Float[Array, "..."]:
     # Smooth maximum: approx max(a, b) that is differentiable everywhere.
     return 0.5 * (a + b + jnp.sqrt((a - b) ** 2 + eps))
 
 
 @jax.jit
-def __safe_min(a: jnp.float32, b: jnp.float32, eps: jnp.float32 = 1e-6) -> jnp.float32:
+def __safe_min(
+    a: Float[Array, "..."], b: Real[Array, "..."] | float, eps: float = 1e-6
+) -> Float[Array, "..."]:
     # Smooth minimum: approx min(a, b) that is differentiable everywhere.
     return 0.5 * (a + b - jnp.sqrt((a - b) ** 2 + eps))
 
 
 @jax.jit
-def ramp_sdf(p: jax.Array, w: jnp.float32, h: jnp.float32) -> jnp.float32:
+def ramp_sdf(p: jax.Array, w: Int[Array, ""], h: Real[Array, ""]) -> Float[Array, ""]:
     """Signed distance for ramp."""
 
     @jax.jit
-    def sd_trapezoid_2d(p: jax.Array, w: jnp.float32, h: jnp.float32) -> jnp.float32:
+    def sd_trapezoid_2d(
+        p: jax.Array, w: Int[Array, ""], h: Int[Array, ""]
+    ) -> Float[Array, ""]:
         # --- Rectangle part ---
         rect_center = jnp.array([(w - h) * 0.5, h * 0.5])
         rect_half = jnp.array([(w - h) * 0.5, h * 0.5])
@@ -61,7 +68,7 @@ def ramp_sdf(p: jax.Array, w: jnp.float32, h: jnp.float32) -> jnp.float32:
 
 
 @jax.jit
-def box_sdf(p: jax.Array, w: jnp.float32, h: jnp.float32) -> jnp.float32:
+def box_sdf(p: jax.Array, w: Real[Array, ""], h: Real[Array, ""]) -> Float[Array, ""]:
     """Signed distance function for box."""
     q = jnp.abs(p[:3]) - jnp.array([w / 2, h, w / 2])
     return jnp.linalg.norm(__safe_max(q, jnp.zeros_like(q))) + __safe_min(
@@ -70,19 +77,19 @@ def box_sdf(p: jax.Array, w: jnp.float32, h: jnp.float32) -> jnp.float32:
 
 
 @jax.jit
-def capsule_sdf(p: jax.Array, h: jnp.float32, r: jnp.float32) -> jnp.float32:
+def capsule_sdf(p: jax.Array, h: float, r: float) -> Float[Array, ""]:
     """Signed distance function for capsule (agent)."""
     pn = p.at[1].subtract(__safe_min(__safe_max(p[1], 0.0), h))
     return jnp.linalg.norm(pn[:3]) - r
 
 
 @jax.jit
-def sphere_sdf(p: jax.Array, r: jnp.float32) -> jnp.float32:
+def sphere_sdf(p: jax.Array, r: float) -> Float[Array, ""]:
     """Signed distance function for a sphere."""
     return jnp.linalg.norm(p) - r
 
 
 @jax.jit
-def cube_sdf(p: jax.Array, size: jnp.float32) -> jnp.float32:
+def cube_sdf(p: jax.Array, size: float) -> Float[Array, ""]:
     """Signed distance function for a cube."""
-    return box_sdf(p, size, size / 2)
+    return box_sdf(p, jnp.array(size), jnp.array(size / 2))
