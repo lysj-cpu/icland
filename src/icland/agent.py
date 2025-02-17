@@ -81,13 +81,13 @@ def step_agents(
         contact_frame: jax.Array,
         contact_dist: jax.Array,
     ) -> tuple[
-        jnp.int32,
-        jnp.int32,
-        jnp.float16,
-        jnp.ndarray,
-        jnp.float16,
-        jnp.ndarray,
-        jnp.float16,
+        Any,  # body_id
+        Any,  # dof
+        Any,  # new_angle
+        Any,  # new_vel_2d
+        Any,  # new_omega
+        Any,  # force
+        Any,  # new_pitch
     ]:
         # Cast indices and read current pitch.
         body_id = agent[0].astype(jnp.int32)

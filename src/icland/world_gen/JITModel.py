@@ -268,14 +268,14 @@ def _run(
     # Define the loop state
     init_state = (model, 0, False, True)
 
-    def cond_fun(state: tuple[Any, Any, Any, Any]) -> jax.Array:
+    def cond_fun(state: tuple[JITModel, Any, Any, Any]) -> jax.Array:
         """Condition function for the while loop."""
         _, steps, done, _ = state
         return jnp.bitwise_and(~done, (steps < max_steps))
 
     def body_fun(
-        state: tuple[JITModel, Any, Any, Any],
-    ) -> tuple[JITModel, Any, Any, Any]:
+        state: tuple[JITModel, jnp.int32, jnp.bool, jnp.bool],
+    ) -> tuple[JITModel, jnp.int32, jnp.bool, jnp.bool]:
         """Body function for the while loop."""
         model, steps, done, success = state
 
