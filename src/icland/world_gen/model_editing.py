@@ -443,37 +443,33 @@ def edit_model(tilemap, base_model: MjxModelType, max_height: int = 6) -> MjxMod
     ) = jax.vmap(process_tile, in_axes=(0, 0))(
         jnp.arange(w * h, dtype=int), jnp.reshape(tilemap, (w * h, -1))
     )
-    b_geom_dataid = b_geom_dataid.at[0].set(0)
+
+    # b_geom_dataid = b_geom_dataid.at[0].set(0)
     # print(type(b_geom_dataid))
 
-    return base_model.replace(
-        geom_dataid = b_geom_dataid
-    )
-
-    # model = base_model.replace(
-    #     geom_dataid=jax.lax.dynamic_update_slice_in_dim(
-    #         b_geom_dataid, g_dataid, 0, axis=0
-    #     ),
-    #     geom_sameframe=jax.lax.dynamic_update_slice_in_dim(
-    #         b_geom_sameframe, g_sameframe, 0, axis=0
-    #     ),
-    #     geom_pos=jax.lax.dynamic_update_slice_in_dim(b_geom_pos, geom_pos, 0, axis=0),
-    #     geom_quat=jax.lax.dynamic_update_slice_in_dim(
-    #         b_geom_quat, geom_quat, 0, axis=0
-    #     ),
-    #     geom_size=jax.lax.dynamic_update_slice_in_dim(
-    #         b_geom_size, geom_size, 0, axis=0
-    #     ),
-    #     geom_aabb=jax.lax.dynamic_update_slice_in_dim(
-    #         b_geom_aabb, geom_aabb, 0, axis=0
-    #     ),
-    #     geom_rbound=jax.lax.dynamic_update_slice_in_dim(
-    #         b_geom_rbound, geom_rbound, 0, axis=0
-    #     ),
-    #     mesh_pos=mesh_pos,
-    #     mesh_quat=mesh_quat,
+    # return base_model.replace(
+    #     geom_dataid = b_geom_dataid
     # )
-    # return model
+    detaid = jax.lax.dynamic_update_slice_in_dim(b_geom_dataid, g_dataid, 0, axis=0)
+    sameframe = jax.lax.dynamic_update_slice_in_dim(b_geom_sameframe, g_sameframe, 0, axis=0)
+    pos = jax.lax.dynamic_update_slice_in_dim(b_geom_pos, g_pos, 0, axis=0)
+    quat = jax.lax.dynamic_update_slice_in_dim(b_geom_quat, g_quat, 0, axis=0)
+    size = jax.lax.dynamic_update_slice_in_dim(b_geom_size, g_size, 0, axis=0)
+    aabb = jax.lax.dynamic_update_slice_in_dim(b_geom_aabb, g_aabb, 0, axis=0)
+    rbound = jax.lax.dynamic_update_slice_in_dim(b_geom_rbound, g_rbound, 0, axis=0)
+
+    model = base_model.replace(
+        geom_dataid=detaid,
+        geom_sameframe=sameframe,
+        geom_pos=pos,
+        geom_quat=quat,
+        geom_size=size,
+        geom_aabb=aabb,
+        geom_rbound=rbound,
+        mesh_pos=mesh_pos,
+        mesh_quat=mesh_quat,
+    )
+    return model
 
 
 if __name__ == "__main__":
