@@ -139,10 +139,10 @@ def render_video_from_world(
     os.makedirs(f"{temp_dir}", exist_ok=True)
     print(f"Exporting stls")
     export_stls(pieces, f"{temp_dir}/{temp_dir}")
-    xml_str = generate_mjcf_string(tilemap, spawnpoints, f"{temp_dir}/")
+    xml_str = generate_mjcf_string(spawnpoints, f"{temp_dir}/")
     print(f"Init mj model...")
     mj_model = mujoco.MjModel.from_xml_string(xml_str)
-    icland_params = ICLandParams(model=mj_model, game=None, agent_count=1)
+    icland_params = ICLandParams(model=mj_model, reward_function=None, agent_count=1)
 
     icland_state = icland.init(key, icland_params)
     icland_state = icland.step(key, icland_state, icland_params, policy)
