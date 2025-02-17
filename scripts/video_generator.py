@@ -1,5 +1,4 @@
-"""
-This script generates videos of simulations using predefined simulation presets.
+"""This script generates videos of simulations using predefined simulation presets.
 
 It sets up the environment variables for MuJoCo and XLA, imports necessary libraries,
 and defines functions to render videos of simulations.
@@ -20,13 +19,14 @@ Execution:
 import os
 import shutil
 import sys
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
-import numpy
 import imageio
 import jax
 import jax.numpy as jnp
 import mujoco
+import numpy
 from mujoco import mjx
 
 # N.B. These need to be set before the MuJoCo imports
@@ -68,6 +68,7 @@ SIMULATION_PRESETS: list[dict[str, Any]] = [
         "agent_count": 2,
     },
 ]
+
 
 # ---------------------------------------------------------------------------
 # Helper Functions
@@ -158,13 +159,13 @@ def _simulate_frames(
     frame_callback: Callable[[Any], Any],
     policy: jax.Array,
     frame_rate: int = 30,
-    policy_switcher: Optional[Callable[[float, jax.Array], jax.Array]] = None,
+    policy_switcher: Callable[[float, jax.Array], jax.Array] | None = None,
 ) -> list[Any]:
-    """
-    Runs the simulation loop until `duration` and collects frames using `frame_callback`.
+    """Runs the simulation loop until `duration` and collects frames using `frame_callback`.
+
     Optionally, a `policy_switcher` function may update the policy based on simulation time.
     """
-    frames = []
+    frames = []  # type: list[Any]
     mjx_data = icland_state.pipeline_state.mjx_data
     last_printed_time = -0.1
     current_policy = policy
@@ -205,13 +206,19 @@ def render_sdfr(
 
     default_agent = 0
     world_width = tilemap.shape[1]
-    get_camera_info = jax.jit(get_agent_camera_from_mjx)
+    # get_camera_info = jax.jit(get_agent_camera_from_mjx)
     frame_callback = lambda state: render_frame(
-        *get_camera_info(state, world_width, default_agent), tilemap, view_width=96, view_height=72
+        *get_agent_camera_from_mjx(state, world_width, default_agent),
+        tilemap,
+        view_width=96,
+        view_height=72,
     )
 
     print(f"Starting simulation: {video_name}")
-    frames = _simulate_frames(key, icland_state, icland_params, duration, frame_callback, policy)
+    frames = _simulate_frames(
+        key, icland_state, icland_params, duration, frame_callback, policy
+    )
+    print(f"Exporting video: {video_name} number of frame {len(frames)}")
     imageio.mimsave(video_name, frames, fps=30, quality=8)
 
 
@@ -246,11 +253,16 @@ def render_video_from_world(
     world_width = tilemap.shape[1]
     get_camera_info = jax.jit(get_agent_camera_from_mjx)
     frame_callback = lambda state: render_frame(
-        *get_camera_info(state, world_width, default_agent), tilemap, view_width=96, view_height=72
+        *get_camera_info(state, world_width, default_agent),
+        tilemap,
+        view_width=96,
+        view_height=72,
     )
 
     print(f"Starting simulation: {video_name}")
-    frames = _simulate_frames(key, icland_state, icland_params, duration, frame_callback, policy)
+    frames = _simulate_frames(
+        key, icland_state, icland_params, duration, frame_callback, policy
+    )
     shutil.rmtree(temp_dir)
     imageio.mimsave(video_name, frames, fps=30, quality=8)
 
@@ -265,7 +277,9 @@ def render_video(
 ) -> None:
     """Renders a video of a simulation using a third-person view via MuJoCo's renderer."""
     mj_model = mujoco.MjModel.from_xml_string(model_xml)
-    icland_params = ICLandParams(model=mj_model, reward_function=None, agent_count=agent_count)
+    icland_params = ICLandParams(
+        model=mj_model, reward_function=None, agent_count=agent_count
+    )
 
     icland_state = icland.init(key, icland_params)
     icland_state = icland.step(key, icland_state, icland_params, policy)
@@ -317,8 +331,8 @@ def render_video_from_world_with_policies(
     duration: int,
     video_name: str,
 ) -> None:
-    """
-    Renders a video where the agent follows multiple policies sequentially.
+    """Renders a video where the agent follows multiple policies sequentially.
+
     The policy is switched at the times specified in `switch_intervals`.
     """
     print(f"Sampling world with key {key}")
@@ -348,7 +362,10 @@ def render_video_from_world_with_policies(
 
     def policy_switcher(time: float, current: jax.Array) -> jax.Array:
         nonlocal current_policy_idx
-        if current_policy_idx < len(switch_intervals) and time >= switch_intervals[current_policy_idx]:
+        if (
+            current_policy_idx < len(switch_intervals)
+            and time >= switch_intervals[current_policy_idx]
+        ):
             current_policy_idx += 1
             if current_policy_idx < len(policies):
                 print(f"Switching policy at {time:.1f}s")
@@ -357,7 +374,13 @@ def render_video_from_world_with_policies(
 
     print(f"Starting simulation: {video_name}")
     frames = _simulate_frames(
-        key, icland_state, icland_params, duration, frame_callback, current_policy, policy_switcher=policy_switcher
+        key,
+        icland_state,
+        icland_params,
+        duration,
+        frame_callback,
+        current_policy,
+        policy_switcher=policy_switcher,
     )
 
     shutil.rmtree(temp_dir)
@@ -371,7 +394,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "-sdfr":
         render_sdfr(
             jax.random.PRNGKey(42),
-            FORWARD_POLICY,
+            LOOK_UP_POLICY,
             4,
             "scripts/video_output/sdf.mp4",
         )

@@ -53,7 +53,7 @@ def test_agent_translation(
 ) -> None:
     """Test agent movement in ICLand Brax environment."""
     jit_step, state = env
-    body_id = state.ic_state.pipeline_state.component_ids[0, 0]
+    body_id = state.ic_state.pipeline_state.component_ids[0, 0].astype(int)
     pipeline_state = state.ic_state.pipeline_state
 
     # Get initial position, without height
@@ -154,7 +154,7 @@ def test_two_agents(
         pipeline_state = state.ic_state.pipeline_state
 
     # Get the positions of the two agents
-    body_id_1, body_id_2 = state.ic_state.pipeline_state.component_ids[:, 0]
+    body_id_1, body_id_2 = state.ic_state.pipeline_state.component_ids[:, 0].astype(int)
     agent_1_pos = pipeline_state.mjx_data.xpos[body_id_1][:2]
     agent_2_pos = pipeline_state.mjx_data.xpos[body_id_2][:2]
 

@@ -2,7 +2,7 @@
 
 from enum import Enum
 from functools import partial
-from typing import cast
+from typing import Any, cast
 
 import jax
 import jax.numpy as jnp
@@ -260,7 +260,7 @@ def _ban(model: JITModel, i: Int[Array, ""], t1: jax.Array) -> JITModel:
 
 def _run(
     model: JITModel, max_steps: jax.Array = jnp.array(1000, dtype=jnp.int32)
-) -> tuple[JITModel, Bool[Array, ""]]:
+) -> tuple[JITModel, bool]:
     """Run the WaveFunctionCollapse algorithm with the given seed and iteration limit."""
     # Pre: the model is freshly initialized
 
@@ -268,14 +268,14 @@ def _run(
     # Define the loop state
     init_state = (model, 0, False, True)
 
-    def cond_fun(state: tuple[JITModel, jnp.int32, jnp.bool, jnp.bool]) -> jax.Array:
+    def cond_fun(state: tuple[Any, Any, Any, Any]) -> jax.Array:
         """Condition function for the while loop."""
         _, steps, done, _ = state
         return jnp.bitwise_and(~done, (steps < max_steps))
 
     def body_fun(
-        state: tuple[JITModel, jnp.int32, jnp.bool, jnp.bool],
-    ) -> tuple[JITModel, jnp.int32, jnp.bool, jnp.bool]:
+        state: tuple[JITModel, Any, Any, Any],
+    ) -> tuple[JITModel, Any, Any, Any]:
         """Body function for the while loop."""
         model, steps, done, success = state
 

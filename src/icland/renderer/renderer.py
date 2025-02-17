@@ -558,7 +558,9 @@ def get_agent_camera_from_mjx(
 ) -> tuple[jax.Array, jax.Array]:
     """Get the camera position and direction from the MuJoCo data."""
     data = icland_state.pipeline_state.mjx_data
-    agent_id = icland_state.pipeline_state.component_ids[body_id, 0]
+    agent_id = icland_state.pipeline_state.component_ids[body_id, 0].astype(int)
+    pitch = icland_state.pipeline_state.component_ids[body_id, 3] * 0.5
+    dof_address = icland_state.pipeline_state.component_ids[body_id, 2].astype(int)
 
     agent_pos = jnp.array(
         [
@@ -568,9 +570,15 @@ def get_agent_camera_from_mjx(
         ]
     )
 
-    # Direct matrix multiplication using precomputed transform_axes
-    yaw = data.qpos[3]
-    forward_dir = jnp.array([-jnp.cos(yaw), 0.0, jnp.sin(yaw)])
+    # Get yaw from the MuJoCo data
+    yaw = data.qpos[dof_address + 3]
+
+    # Compute forward direction using both yaw and pitch.
+    # When pitch=0, this reduces to [-cos(yaw), 0, sin(yaw)] as before.
+    forward_dir = jnp.array(
+        [-jnp.cos(pitch) * jnp.cos(yaw), jnp.sin(pitch), jnp.cos(pitch) * jnp.sin(yaw)]
+    )
+
     height_offset = jnp.array([0, camera_height, 0])
     camera_pos = agent_pos + height_offset + forward_dir * camera_offset
 
