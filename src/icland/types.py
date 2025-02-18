@@ -11,7 +11,7 @@ from typing import TypeAlias
 import jax
 import jax.numpy as jnp
 import mujoco
-from jaxtyping import Array, Float
+from jaxtyping import Array, Float, Int
 from mujoco.mjx._src.dataclasses import PyTreeNode
 
 """Type variables from external modules."""
@@ -42,18 +42,32 @@ class PipelineState(PyTreeNode):  # type: ignore[misc]
         return f"PipelineState(mjx_model={type(self.mjx_model).__name__}, mjx_data={type(self.mjx_data).__name__}, component_ids={self.component_ids})"
 
 
-class Agent(PyTreeNode):  # type: ignore[misc]
-    """Information about an agent in the ICLand environment."""
+class Entity(PyTreeNode):  # type: ignore[misc]
+    """Information about an agent/prop in the ICLand environment."""
 
+    body_id: Int[Array, ""]
     position: Float[Array, "3"]
     velocity: Float[Array, "4"]
     rotation: Float[Array, "1"] | Float[Array, ""]
 
 
-class Prop(PyTreeNode):  # type: ignore[misc]
+class Prop(Entity):
     """Information about a prop in the ICLand environment."""
 
-    centre_of_mass: Float[Array, "3"]
+    terrain_sdf: Callable[[jax.Array], tuple[jax.Array, Int[Array, ""], Int[Array, ""]]]
+    sdf: Callable[[jax.Array], Float[Array, ""]]
+
+    def __repr__(self) -> str:
+        """Return a string representation of the Prop object."""
+        return f"Prop {self.body_id}"
+
+
+class Agent(Entity):
+    """Information about an agent in the ICLand environment."""
+
+    def __repr__(self) -> str:
+        """Return a string representation of the Agent object."""
+        return f"Agent {self.body_id}"
 
 
 class ICLandInfo(PyTreeNode):  # type: ignore[misc]

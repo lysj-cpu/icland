@@ -1,17 +1,15 @@
 """Recreating Google DeepMind's XLand RL environment in JAX."""
 
-from beartype import BeartypeConf
-from beartype.claw import beartype_this_package
-
 # Enforce runtime type-checking.
 # See: https://beartype.readthedocs.io/en/latest/api_claw/
 # Allow lossy conversion of integers to floating-point numbers
 # https://beartype.readthedocs.io/en/latest/api_decor/#beartype.BeartypeConf.is_pep484_tower
-beartype_this_package(conf=BeartypeConf(is_pep484_tower=True))
-
+# beartype_this_package(conf=BeartypeConf(is_pep484_tower=True))
 import jax
 import jax.numpy as jnp
 import mujoco
+from beartype import BeartypeConf
+from beartype.claw import beartype_this_package
 from mujoco import mjx
 
 from .agent import collect_body_scene_info, create_agent, step_agent

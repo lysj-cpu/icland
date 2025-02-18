@@ -257,7 +257,12 @@ def collect_body_scene_info(
 
     return ICLandInfo(
         agents=[
-            Agent(position=positions[i], velocity=velocities[i], rotation=rotations[i])
+            Agent(
+                body_id=body_ids[i],
+                position=positions[i],
+                velocity=velocities[i],
+                rotation=rotations[i],
+            )
             for i in range(len(body_ids))
         ]
     )
