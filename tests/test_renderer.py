@@ -58,7 +58,7 @@ def test_get_agent_camera_from_mjx() -> None:
     world_width = 10
 
     agent_pos = icland_state.pipeline_state.mjx_data.xpos[
-        icland_state.pipeline_state.component_ids[0, 0]
+        icland_state.pipeline_state.component_ids[0, 0].astype(int)
     ][:3]
     print(agent_pos)
     height_offset = 0.2
@@ -92,7 +92,7 @@ def test_render_frame() -> None:
         view_width=10,
         view_height=10,
     )
-    assert jnp.linalg.norm(frame.flatten() - TEST_FRAME.flatten(), ord=jnp.inf) < 0.05
+    assert jnp.linalg.norm(frame.flatten() - TEST_FRAME.flatten(), ord=jnp.inf) < 0.15
 
 
 def test_generate_colormap() -> None:

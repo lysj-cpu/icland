@@ -39,7 +39,7 @@ def test_agent_translation(
     icland_params = ICLandParams(mj_model, None, 1)
     icland_state = icland.init(key, icland_params)
     pipeline_state = icland_state.pipeline_state
-    body_id = pipeline_state.component_ids[0, 0]
+    body_id = pipeline_state.component_ids[0, 0].astype(int)
 
     # Get initial position, without height
     initial_pos = pipeline_state.mjx_data.xpos[body_id][:2]
@@ -136,7 +136,7 @@ def test_two_agents(key: jax.Array, name: str, policies: jnp.ndarray) -> None:
         pipeline_state = icland_state.pipeline_state
 
     # Get the positions of the two agents
-    body_id_1, body_id_2 = pipeline_state.component_ids[:, 0]
+    body_id_1, body_id_2 = pipeline_state.component_ids[:, 0].astype(int)
     agent_1_pos = pipeline_state.mjx_data.xpos[body_id_1][:2]
     agent_2_pos = pipeline_state.mjx_data.xpos[body_id_2][:2]
 

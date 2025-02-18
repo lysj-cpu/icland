@@ -1,38 +1,43 @@
 """This script generates videos of simulations using predefined simulation presets.
 
 It sets up the environment variables for MuJoCo and XLA, imports necessary libraries,
-and defines a function to render videos of simulations.
+and defines functions to render videos of simulations.
 
 Functions:
-    render_video(model_xml, policy, duration, video_name):
+    render_video(model_xml, policy, duration, video_name, agent_count):
+    render_video_from_world(key, policy, duration, video_name, height, width):
+    render_video_from_world_with_policies(key, policies, switch_intervals, duration, video_name):
+    render_sdfr(key, policy, duration, video_name, height, width):
 
 Simulation Presets:
     SIMULATION_PRESETS: A list of dictionaries containing simulation configurations.
 
 Execution:
-    Iterates over the simulation presets and generates videos for each preset.
+    Depending on command-line arguments, either the SDF renderer is run or each preset is iterated.
 """
 
 import os
 import shutil
-
-# N.B. These need to be before the mujoco imports
-# Fixes AttributeError: 'Renderer' object has no attribute '_mjr_context'
-os.environ["MUJOCO_GL"] = "egl"
-
-# Tell XLA to use Triton GEMM, this improves steps/sec by ~30% on some GPUs
-xla_flags = os.environ.get("XLA_FLAGS", "")
-xla_flags += " --xla_gpu_triton_gemm_any=True"
-os.environ["XLA_FLAGS"] = xla_flags
-
+import sys
+from collections.abc import Callable
 from typing import Any
 
 import imageio
 import jax
 import jax.numpy as jnp
 import mujoco
+import numpy
 from mujoco import mjx
 
+# N.B. These need to be set before the MuJoCo imports
+os.environ["MUJOCO_GL"] = "egl"
+
+# Tell XLA to use Triton GEMM; this improves steps/sec by ~30% on some GPUs
+xla_flags = os.environ.get("XLA_FLAGS", "")
+xla_flags += " --xla_gpu_triton_gemm_any=True"
+os.environ["XLA_FLAGS"] = xla_flags
+
+# Local module imports
 import icland
 from icland.presets import *
 from icland.renderer.renderer import get_agent_camera_from_mjx, render_frame
@@ -41,19 +46,10 @@ from icland.world_gen.converter import create_world, export_stls, sample_spawn_p
 from icland.world_gen.JITModel import export, sample_world
 from icland.world_gen.tile_data import TILECODES
 
+# ---------------------------------------------------------------------------
+# Simulation Presets
+# ---------------------------------------------------------------------------
 SIMULATION_PRESETS: list[dict[str, Any]] = [
-    # {
-    #     "name": "world_42_convex",
-    #     "world": WORLD_42_CONVEX,
-    #     "policy": FORWARD_POLICY,
-    #     "duration": 4,
-    # },
-    # {
-    #     "name": "world_42_convex",
-    #     "world": WORLD_42_CONVEX,
-    #     "policy": RIGHT_POLICY,
-    #     "duration": 2.5,
-    # },
     {
         "name": "two_agent_move_collide",
         "world": TWO_AGENT_EMPTY_WORLD_COLLIDE,
@@ -74,62 +70,63 @@ SIMULATION_PRESETS: list[dict[str, Any]] = [
 ]
 
 
-def _generate_mjcf_string(  # pragma: no cover
+# ---------------------------------------------------------------------------
+# Helper Functions
+# ---------------------------------------------------------------------------
+def _generate_mjcf_string(
     tile_map: jax.Array,
     agent_spawns: jax.Array,
     mesh_dir: str = "tests/assets/meshes/",
 ) -> str:
-    """Generates MJCF file from column meshes that form the world."""
+    """Generates an MJCF string from column meshes that form the world."""
     mesh_files = [f for f in os.listdir(mesh_dir) if f.endswith(".stl")]
-
     w, h = tile_map.shape[0], tile_map.shape[1]
 
-    mjcf = f"""<mujoco model=\"generated_mesh_world\">
-    <compiler meshdir=\"{mesh_dir}\"/>
+    mjcf = f"""<mujoco model="generated_mesh_world">
+    <compiler meshdir="{mesh_dir}"/>
     <default>
-        <geom type=\"mesh\" />
+        <geom type="mesh" />
     </default>
-
-    <worldbody>\n"""
-
+    <worldbody>
+"""
+    # Add agent bodies
     for i, s in enumerate(agent_spawns):
         spawn_loc = s.tolist()
         spawn_loc[2] += 1
-        mjcf += f'            <body name="agent{i}" pos="{" ".join([str(s) for s in spawn_loc])}">'
-        mjcf += """
-            <joint type="slide" axis="1 0 0" />
-            <joint type="slide" axis="0 1 0" />
-            <joint type="slide" axis="0 0 1" />
-            <joint type="hinge" axis="0 0 1" stiffness="1"/>
-
-            <geom"""
+        mjcf += (
+            f'            <body name="agent{i}" pos="{" ".join([str(s) for s in spawn_loc])}">'
+            + """
+                <joint type="slide" axis="1 0 0" />
+                <joint type="slide" axis="0 1 0" />
+                <joint type="slide" axis="0 0 1" />
+                <joint type="hinge" axis="0 0 1" stiffness="1"/>
+                <geom"""
+        )
         mjcf += f'        name="agent{i}_geom"'
         mjcf += """        type="capsule"
-                size="0.06"
-                fromto="0 0 0 0 0 -0.4"
-                mass="1"
-            />
-
-            <geom
-                type="box"
-                size="0.05 0.05 0.05"
-                pos="0 0 0.2"
-                mass="0"
-            />
-            </body>\n"""
-
-    for i, mesh_file in enumerate(mesh_files):
+                    size="0.06"
+                    fromto="0 0 0 0 0 -0.4"
+                    mass="1"
+                />
+                <geom
+                    type="box"
+                    size="0.05 0.05 0.05"
+                    pos="0 0 0.2"
+                    mass="0"
+                />
+            </body>
+"""
+    # Add mesh geoms
+    for mesh_file in mesh_files:
         mesh_name = os.path.splitext(mesh_file)[0]
-        mjcf += (
-            f'        <geom name="{mesh_name}" mesh="{mesh_name}" pos="0 0 0"/>' + "\n"
-        )
+        mjcf += f'        <geom name="{mesh_name}" mesh="{mesh_name}" pos="0 0 0"/>\n'
 
+    # Add walls
     mjcf += f'        <geom name="east_wall" type="plane"\n'
     mjcf += f"""            pos="{w} {h / 2} 10"
             quat="0.5 -0.5 -0.5 0.5"
             size="{h / 2} 10 0.01"
             rgba="1 0.819607843 0.859375 0.5" />\n"""
-
     mjcf += f'        <geom name="west_wall" type="plane"\n'
     mjcf += f"""            pos="0 {h / 2} 10"
             quat="0.5 0.5 0.5 0.5"
@@ -145,16 +142,84 @@ def _generate_mjcf_string(  # pragma: no cover
             quat="0.5 0.5 -0.5 0.5"
             size="10 {w / 2} 0.01"
             rgba="1 0.819607843 0.859375 0.5" />\n"""
-
     mjcf += "    </worldbody>\n\n    <asset>\n"
-
     for mesh_file in mesh_files:
         mesh_name = os.path.splitext(mesh_file)[0]
-        mjcf += f'        <mesh name="{mesh_name}" file="{mesh_file}"/>' + "\n"
-
+        mjcf += f'        <mesh name="{mesh_name}" file="{mesh_file}"/>\n'
     mjcf += "    </asset>\n</mujoco>\n"
 
     return mjcf
+
+
+def _simulate_frames(
+    key: jax.Array,
+    icland_state: Any,
+    icland_params: ICLandParams,
+    duration: float,
+    frame_callback: Callable[[Any], Any],
+    policy: jax.Array,
+    frame_rate: int = 30,
+    policy_switcher: Callable[[float, jax.Array], jax.Array] | None = None,
+) -> list[Any]:
+    """Runs the simulation loop until `duration` and collects frames using `frame_callback`.
+
+    Optionally, a `policy_switcher` function may update the policy based on simulation time.
+    """
+    frames = []  # type: list[Any]
+    mjx_data = icland_state.pipeline_state.mjx_data
+    last_printed_time = -0.1
+    current_policy = policy
+
+    while mjx_data.time < duration:
+        if policy_switcher is not None:
+            current_policy = policy_switcher(mjx_data.time, current_policy)
+        if int(mjx_data.time * 10) != int(last_printed_time * 10):
+            print(f"Time: {mjx_data.time:.1f}")
+            last_printed_time = mjx_data.time
+        icland_state = icland.step(key, icland_state, icland_params, current_policy)
+        mjx_data = icland_state.pipeline_state.mjx_data
+        if len(frames) < mjx_data.time * frame_rate:
+            frames.append(frame_callback(icland_state))
+    return frames
+
+
+# ---------------------------------------------------------------------------
+# Rendering Functions
+# ---------------------------------------------------------------------------
+def render_sdfr(
+    key: jax.Array,
+    policy: jax.Array,
+    duration: int,
+    video_name: str,
+    height: int = 10,
+    width: int = 10,
+) -> None:
+    """Renders a video using an SDF function."""
+    print(f"Sampling world with key {key[1]}")
+    model = sample_world(height, width, 1000, key, True, 1)
+    print("Exporting tilemap")
+    tilemap = numpy.zeros((width, height, 4), dtype=numpy.int32)
+    mj_model = mujoco.MjModel.from_xml_string(EMPTY_WORLD)
+    icland_params = ICLandParams(model=mj_model, reward_function=None, agent_count=1)
+    icland_state = icland.init(key, icland_params)
+    icland_state = icland.step(key, icland_state, icland_params, policy)
+
+    default_agent = 0
+    world_width = tilemap.shape[1]
+    # get_camera_info = jax.jit(get_agent_camera_from_mjx)
+    frame_callback = lambda state: render_frame(
+        *get_agent_camera_from_mjx(state, world_width, default_agent),
+        tilemap,
+        view_width=96,
+        view_height=72,
+    )
+
+    print(f"Starting simulation: {video_name}")
+    frames = _simulate_frames(
+        key, icland_state, icland_params, duration, frame_callback, policy
+    )
+    print(f"Exporting video: {video_name} number of frame {len(frames)}")
+    imageio.mimsave(video_name, frames, fps=30, quality=8)
 
 
 def render_video_from_world(
@@ -165,54 +230,40 @@ def render_video_from_world(
     height: int = 10,
     width: int = 10,
 ) -> None:
-    """Renders a video using SDF function."""
+    """Renders a video from a generated world."""
     print(f"Sampling world with key {key[1]}")
     model = sample_world(height, width, 1000, key, True, 1)
-    print(f"Exporting tilemap")
+    print("Exporting tilemap")
     tilemap = export(model, TILECODES, height, width)
     spawnpoints = sample_spawn_points(key, tilemap, num_objects=1)
     pieces = create_world(tilemap)
     temp_dir = "temp"
-    os.makedirs(f"{temp_dir}", exist_ok=True)
-    print(f"Exporting stls")
+    os.makedirs(temp_dir, exist_ok=True)
+    print("Exporting stls")
     export_stls(pieces, f"{temp_dir}/{temp_dir}")
     xml_str = _generate_mjcf_string(tilemap, spawnpoints, f"{temp_dir}/")
-    print(f"Init mj model...")
+    print("Init mj model...")
     mj_model = mujoco.MjModel.from_xml_string(xml_str)
     icland_params = ICLandParams(model=mj_model, reward_function=None, agent_count=1)
 
     icland_state = icland.init(key, icland_params)
     icland_state = icland.step(key, icland_state, icland_params, policy)
-    print(f"Init mjX model and data...")
-    mjx_data = icland_state.pipeline_state.mjx_data
-    frames: list[Any] = []
+
+    default_agent = 0
+    world_width = tilemap.shape[1]
+    get_camera_info = jax.jit(get_agent_camera_from_mjx)
+    frame_callback = lambda state: render_frame(
+        *get_camera_info(state, world_width, default_agent),
+        tilemap,
+        view_width=96,
+        view_height=72,
+    )
 
     print(f"Starting simulation: {video_name}")
-    last_printed_time = -0.1
-
-    default_agent_1 = 0
-    world_width = tilemap.shape[1]
-    print(f"Rendering...")
-    get_camera_info = jax.jit(get_agent_camera_from_mjx)
-    while mjx_data.time < duration:
-        if int(mjx_data.time * 10) != int(last_printed_time * 10):
-            print(f"Time: {mjx_data.time:.1f}")
-            last_printed_time = mjx_data.time
-        icland_state = icland.step(key, icland_state, icland_params, policy)
-        mjx_data = icland_state.pipeline_state.mjx_data
-        if len(frames) < mjx_data.time * 30:
-            camera_pos, camera_dir = get_camera_info(
-                icland_state, world_width, default_agent_1
-            )
-            # print("Got camera angle")
-            f = render_frame(
-                camera_pos, camera_dir, tilemap, view_width=96, view_height=72
-            )
-            # print("Rendered frame")
-            frames.append(f)
-
-    shutil.rmtree(f"{temp_dir}")
-
+    frames = _simulate_frames(
+        key, icland_state, icland_params, duration, frame_callback, policy
+    )
+    shutil.rmtree(temp_dir)
     imageio.mimsave(video_name, frames, fps=30, quality=8)
 
 
@@ -224,21 +275,8 @@ def render_video(
     video_name: str,
     agent_count: int = 1,
 ) -> None:
-    """Renders a video of a simulation using the given model and policy.
-
-    Args:
-        key (jax.Array): Random key for initialization.
-        model_xml (str): XML string defining the MuJoCo model.
-        policy (callable): Policy function to determine the agent's actions.
-        duration (float): Duration of the video in seconds.
-        video_name (str): Name of the output video file.
-        agent_count (int): Number of agents in the simulation.
-
-    Returns:
-        None
-    """
+    """Renders a video of a simulation using a third-person view via MuJoCo's renderer."""
     mj_model = mujoco.MjModel.from_xml_string(model_xml)
-
     icland_params = ICLandParams(
         model=mj_model, reward_function=None, agent_count=agent_count
     )
@@ -248,10 +286,8 @@ def render_video(
     mjx_data = icland_state.pipeline_state.mjx_data
 
     third_person_frames: list[Any] = []
-
     cam = mujoco.MjvCamera()
     mujoco.mjv_defaultCamera(cam)
-
     cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
     cam.trackbodyid = icland_state.pipeline_state.component_ids[0, 0]
     cam.distance = 1.5
@@ -297,19 +333,14 @@ def render_video_from_world_with_policies(
 ) -> None:
     """Renders a video where the agent follows multiple policies sequentially.
 
-    Args:
-        key: Random seed key.
-        policies: A list of policy arrays, applied sequentially.
-        switch_intervals: Time intervals at which to switch to the next policy.
-        duration: Total duration of the simulation.
-        video_name: Output video file name.
+    The policy is switched at the times specified in `switch_intervals`.
     """
     print(f"Sampling world with key {key}")
     model = sample_world(10, 10, 1000, key, True, 1)
     tilemap = export(model, TILECODES, 10, 10)
     pieces = create_world(tilemap)
     temp_dir = "temp"
-    os.makedirs(f"{temp_dir}", exist_ok=True)
+    os.makedirs(temp_dir, exist_ok=True)
     export_stls(pieces, f"{temp_dir}/{temp_dir}")
 
     xml_str = _generate_mjcf_string(tilemap, jnp.array([[1.5, 1, 4]]), f"{temp_dir}/")
@@ -317,75 +348,64 @@ def render_video_from_world_with_policies(
     icland_params = ICLandParams(model=mj_model, reward_function=None, agent_count=1)
 
     icland_state = icland.init(key, icland_params)
-    mjx_data = icland_state.pipeline_state.mjx_data
-    frames: list[Any] = []
 
-    current_policy_idx = 0
-    policy = policies[current_policy_idx]
-
-    print(f"Starting simulation: {video_name}")
-    last_printed_time = -0.1
-
-    default_agent_1 = 0
+    default_agent = 0
     world_width = tilemap.shape[1]
     get_camera_info = jax.jit(get_agent_camera_from_mjx)
+    frame_callback = lambda state: render_frame(
+        *get_camera_info(state, world_width, default_agent), tilemap
+    )
 
-    while mjx_data.time < duration:
-        # Switch policy at defined intervals
+    # Setup policy switching using a closure.
+    current_policy_idx = 0
+    current_policy = policies[current_policy_idx]
+
+    def policy_switcher(time: float, current: jax.Array) -> jax.Array:
+        nonlocal current_policy_idx
         if (
             current_policy_idx < len(switch_intervals)
-            and mjx_data.time >= switch_intervals[current_policy_idx]
+            and time >= switch_intervals[current_policy_idx]
         ):
             current_policy_idx += 1
             if current_policy_idx < len(policies):
-                policy = policies[current_policy_idx]
-                print(f"Switching policy at {mjx_data.time:.1f}s")
+                print(f"Switching policy at {time:.1f}s")
+                return policies[current_policy_idx]
+        return current
 
-        if int(mjx_data.time * 10) != int(last_printed_time * 10):
-            print(f"Time: {mjx_data.time:.1f}")
-            last_printed_time = mjx_data.time
+    print(f"Starting simulation: {video_name}")
+    frames = _simulate_frames(
+        key,
+        icland_state,
+        icland_params,
+        duration,
+        frame_callback,
+        current_policy,
+        policy_switcher=policy_switcher,
+    )
 
-        icland_state = icland.step(key, icland_state, icland_params, policy)
-        mjx_data = icland_state.pipeline_state.mjx_data
-
-        if len(frames) < mjx_data.time * 30:
-            camera_pos, camera_dir = get_camera_info(
-                icland_state, world_width, default_agent_1
-            )
-            f = render_frame(camera_pos, camera_dir, tilemap)
-            frames.append(f)
-
-    shutil.rmtree(f"{temp_dir}")
-
+    shutil.rmtree(temp_dir)
     imageio.mimsave(video_name, frames, fps=30, quality=8)
 
 
+# ---------------------------------------------------------------------------
+# Main Execution
+# ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    # keys = [
-    #     jax.random.PRNGKey(42),
-    #     # jax.random.PRNGKey(420),
-    #     # jax.random.PRNGKey(2004),
-    # ]
-    # for k in keys:
-    #     render_video_from_world(
-    #         k, FORWARD_POLICY, 4, f"tests/video_output/world_convex_{k[1]}_mjx.mp4")
-    for i, preset in enumerate(SIMULATION_PRESETS):
-        print(f"Running preset {i + 1}/{len(SIMULATION_PRESETS)}: {preset['name']}")
-        render_video(
+    if len(sys.argv) > 1 and sys.argv[1] == "-sdfr":
+        render_sdfr(
             jax.random.PRNGKey(42),
-            preset["world"],
-            preset["policy"],
-            preset["duration"],
-            f"scripts/video_output/{preset['name']}.mp4",
-            agent_count=preset.get("agent_count", 1),
+            LOOK_UP_POLICY,
+            4,
+            "scripts/video_output/sdf.mp4",
         )
-    # for i, preset in enumerate(SIMULATION_PRESETS):
-    #     print(f"Running preset {i + 1}/{len(SIMULATION_PRESETS)}: {preset['name']}")
-    #     render_video(
-    #         jax.random.PRNGKey(42),
-    #         preset["world"],
-    #         preset["policy"],
-    #         preset["duration"],
-    #         f"tests/video_output/{preset['name']}.mp4",
-    #         agent_count=preset.get("agent_count", 1),
-    #     )
+    else:
+        for i, preset in enumerate(SIMULATION_PRESETS):
+            print(f"Running preset {i + 1}/{len(SIMULATION_PRESETS)}: {preset['name']}")
+            render_video(
+                jax.random.PRNGKey(42),
+                preset["world"],
+                preset["policy"],
+                preset["duration"],
+                f"scripts/video_output/{preset['name']}.mp4",
+                agent_count=preset.get("agent_count", 1),
+            )

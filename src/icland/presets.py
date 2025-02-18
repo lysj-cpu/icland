@@ -31,13 +31,15 @@ import jax.numpy as jnp
 # Policy Definitions
 # ========================
 
-NOOP_POLICY = jnp.array([0, 0, 0])
-FORWARD_POLICY = jnp.array([1, 0, 0])
-BACKWARD_POLICY = jnp.array([-1, 0, 0])
-LEFT_POLICY = jnp.array([0, 1, 0])
-RIGHT_POLICY = jnp.array([0, -1, 0])
-ANTI_CLOCKWISE_POLICY = jnp.array([0, 0, -1])
-CLOCKWISE_POLICY = jnp.array([0, 0, 1])
+NOOP_POLICY = jnp.array([0, 0, 0, 0])
+FORWARD_POLICY = jnp.array([1, 0, 0, 0])
+BACKWARD_POLICY = jnp.array([-1, 0, 0, 0])
+LEFT_POLICY = jnp.array([0, 1, 0, 0])
+RIGHT_POLICY = jnp.array([0, -1, 0, 0])
+ANTI_CLOCKWISE_POLICY = jnp.array([0, 0, -1, 0])
+CLOCKWISE_POLICY = jnp.array([0, 0, 1, 0])
+LOOK_UP_POLICY = jnp.array([0, 0, 0, 1])
+LOOK_DOWN_POLICY = jnp.array([0, 0, 0, -1])
 
 
 # ========================

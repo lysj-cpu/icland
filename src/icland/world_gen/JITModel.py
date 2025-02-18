@@ -2,7 +2,7 @@
 
 from enum import Enum
 from functools import partial
-from typing import TypedDict, cast
+from typing import Any, cast
 
 import jax
 import jax.numpy as jnp
@@ -258,38 +258,26 @@ def _ban(model: JITModel, i: Int[Array, ""], t1: jax.Array) -> JITModel:
     return cast(JITModel, jax.lax.cond(condition_1, identity, process_ban, model))
 
 
-class RunState(TypedDict):
-    """Type definition for the state of the WaveFunctionCollapse algorithm."""
-
-    model: JITModel
-    steps: int
-    done: bool
-    success: Bool[Array, ""]
-
-
 def _run(
     model: JITModel, max_steps: jax.Array = jnp.array(1000, dtype=jnp.int32)
-) -> tuple[JITModel, Bool[Array, ""]]:
+) -> tuple[JITModel, bool]:
     """Run the WaveFunctionCollapse algorithm with the given seed and iteration limit."""
     # Pre: the model is freshly initialized
 
     model = _clear(model)
     # Define the loop state
-    init_state: RunState = {
-        "model": model,
-        "steps": 0,
-        "done": False,
-        "success": jnp.array(True, dtype=bool),
-    }
+    init_state = (model, 0, False, True)
 
-    def cond_fun(state: RunState) -> jax.Array:
+    def cond_fun(state: tuple[JITModel, Any, Any, Any]) -> jax.Array:
         """Condition function for the while loop."""
-        return (~state["done"]) & (state["steps"] < max_steps)
+        _, steps, done, _ = state
+        return jnp.bitwise_and(~done, (steps < max_steps))
 
-    def body_fun(state: RunState) -> RunState:
+    def body_fun(
+        state: tuple[JITModel, jnp.int32, jnp.bool, jnp.bool],
+    ) -> tuple[JITModel, jnp.int32, jnp.bool, jnp.bool]:
         """Body function for the while loop."""
-        model = state["model"]
-        steps = state["steps"]
+        model, steps, done, success = state
 
         # Generate new key for this iteration
         key, _ = jax.random.split(model.key)
@@ -343,17 +331,15 @@ def _run(
             node >= 0, handle_node, handle_completion, (model, node)
         )
 
-        return {"model": model, "steps": steps + 1, "done": done, "success": success}
+        return (model, steps + 1, done, success)
 
     # Run the while loop
-    final_state = jax.lax.while_loop(cond_fun, body_fun, init_state)
-    final_model: JITModel = final_state["model"]
-
-    success = final_state["success"]
+    final_model, _, _, success = jax.lax.while_loop(cond_fun, body_fun, init_state)
 
     return final_model, success
 
 
+@jax.jit
 def _next_unobserved_node(model: JITModel) -> tuple[JITModel, jax.Array]:
     """Selects the next cell to observe according to the chosen heuristic (Scanline, Entropy, or MRV).
 
@@ -629,7 +615,7 @@ def sample_world(
         model, b = _run(model)
         key, _ = jax.random.split(model.key)
         model = model.replace(key=key)
-        return (model, bool(b))
+        return (model, b)
 
     return cast(
         tuple[JITModel, jax.Array],
