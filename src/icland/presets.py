@@ -16,11 +16,11 @@ Worlds:
     RAMP_30: A world with a 30 degree ramp.
     RAMP_45: A world with a 45 degree ramp.
     RAMP_60: A world with a 60 degree ramp.
-    WORLD_42_CONVEX: A pre-generated world using seed 42 with ramps and terrain.
 
 Frames:
     TEST_TILEMAP_FLAT: A 10x10 flat world of height 3.
     TEST_TILEMAP_BUMP: A 10x10 flat world but with a bump of height 5 at z=5.
+    TEST_TILEMAP_WORLD42: A pre-generated world using seed 42 with ramps and terrain.
     TEST_FRAME: A 10x10 low-res frame of the rendered tilemap.
     TEST_FRAME_WITH_PROPS: A 10x10 low-res frame of the render with props.
 """
@@ -338,7 +338,133 @@ RAMP_60 = """
 
 TEST_TILEMAP_FLAT = jnp.array([[[0, 0, 0, 3] for _ in range(10)] for _ in range(10)])
 TEST_TILEMAP_BUMP = TEST_TILEMAP_FLAT.at[:, 5].set(jnp.array([0, 0, 0, 5]))
-TEST_TILEMAP_MAX_HEIGHT = jnp.array([[[0, 0, 0, 6] for _ in range(10)] for _ in range(10)])
+TEST_TILEMAP_WORLD42 = jnp.array(
+    [
+        [
+            [0, 0, 0, 2],
+            [0, 2, 0, 2],
+            [0, 2, 0, 2],
+            [0, 1, 0, 2],
+            [0, 0, 0, 5],
+            [0, 2, 0, 5],
+            [0, 1, 0, 5],
+            [0, 0, 0, 3],
+            [0, 2, 0, 3],
+            [0, 1, 0, 3],
+        ],
+        [
+            [0, 3, 0, 3],
+            [0, 0, 0, 3],
+            [0, 2, 0, 3],
+            [0, 3, 0, 4],
+            [0, 2, 0, 4],
+            [0, 3, 0, 5],
+            [0, 0, 0, 5],
+            [0, 2, 0, 5],
+            [0, 3, 0, 6],
+            [0, 2, 0, 6],
+        ],
+        [
+            [0, 1, 0, 3],
+            [0, 0, 0, 3],
+            [1, 1, 3, 4],
+            [0, 0, 0, 4],
+            [0, 1, 0, 4],
+            [0, 0, 0, 5],
+            [0, 2, 0, 5],
+            [0, 1, 0, 5],
+            [0, 0, 0, 6],
+            [0, 1, 0, 6],
+        ],
+        [
+            [1, 3, 3, 4],
+            [0, 0, 0, 3],
+            [0, 3, 0, 3],
+            [0, 3, 0, 6],
+            [0, 2, 0, 6],
+            [0, 3, 0, 4],
+            [0, 0, 0, 4],
+            [1, 2, 4, 5],
+            [0, 0, 0, 4],
+            [0, 2, 0, 4],
+        ],
+        [
+            [0, 1, 0, 3],
+            [0, 0, 0, 3],
+            [0, 3, 0, 3],
+            [0, 0, 0, 6],
+            [0, 1, 0, 6],
+            [0, 1, 0, 4],
+            [0, 0, 0, 4],
+            [0, 0, 0, 4],
+            [0, 0, 0, 4],
+            [0, 3, 0, 4],
+        ],
+        [
+            [1, 3, 3, 4],
+            [0, 0, 0, 3],
+            [0, 0, 0, 3],
+            [0, 2, 0, 3],
+            [0, 3, 0, 4],
+            [0, 1, 0, 4],
+            [0, 0, 0, 4],
+            [0, 3, 0, 4],
+            [0, 2, 0, 4],
+            [0, 1, 0, 4],
+        ],
+        [
+            [0, 1, 0, 3],
+            [0, 0, 0, 3],
+            [0, 0, 0, 3],
+            [0, 3, 0, 3],
+            [0, 1, 0, 4],
+            [0, 0, 0, 4],
+            [0, 3, 0, 4],
+            [2, 1, 4, 6],
+            [0, 0, 0, 6],
+            [0, 2, 0, 6],
+        ],
+        [
+            [0, 1, 0, 3],
+            [0, 0, 0, 3],
+            [0, 0, 0, 3],
+            [1, 1, 3, 4],
+            [0, 1, 0, 4],
+            [0, 0, 0, 4],
+            [0, 3, 0, 4],
+            [0, 1, 0, 6],
+            [0, 0, 0, 6],
+            [0, 3, 0, 6],
+        ],
+        [
+            [0, 0, 0, 3],
+            [0, 2, 0, 3],
+            [0, 2, 0, 3],
+            [0, 1, 0, 3],
+            [0, 0, 0, 4],
+            [0, 2, 0, 4],
+            [0, 1, 0, 4],
+            [0, 0, 0, 6],
+            [0, 2, 0, 6],
+            [0, 1, 0, 6],
+        ],
+        [
+            [0, 3, 0, 2],
+            [0, 0, 0, 2],
+            [0, 0, 0, 2],
+            [0, 2, 0, 2],
+            [0, 3, 0, 5],
+            [0, 0, 0, 5],
+            [0, 2, 0, 5],
+            [0, 3, 0, 3],
+            [0, 0, 0, 3],
+            [0, 2, 0, 3],
+        ],
+    ]
+)
+TEST_TILEMAP_MAX_HEIGHT = jnp.array(
+    [[[0, 0, 0, 6] for _ in range(10)] for _ in range(10)]
+)
 TEST_FRAME = jnp.array(
     [
         [
