@@ -5,13 +5,10 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
-import mujoco
 import numpy as np
 from stl import mesh
 from stl.base import RemoveDuplicates
 
-from icland.agent import create_agent
-from icland.types import MjxModelType
 from icland.world_gen.XMLReader import TileType
 
 # Previous constants (BLOCK_VECTORS, RAMP_VECTORS, ROTATION_MATRICES) remain the same...
@@ -606,5 +603,3 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
         spawnable == jnp.argmax(jnp.bincount(spawnable.flatten(), length=w * h)), 1, 0
     )
     return spawnable
-
-

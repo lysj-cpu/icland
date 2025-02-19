@@ -6,9 +6,8 @@ import mujoco
 import numpy as np
 from mujoco import mjx
 
-from icland.agent import create_agent
 from icland.constants import *
-from icland.presets import TEST_TILEMAP_FLAT, TEST_TILEMAP_MAX_HEIGHT
+from icland.presets import TEST_TILEMAP_FLAT
 from icland.types import *
 from icland.world_gen.converter import sample_spawn_points
 from icland.world_gen.JITModel import export, sample_world
@@ -181,8 +180,8 @@ def compare_dataclass_instances(
 
 
 def __compare_two_models(tilemap_1: jax.Array, tilemap_2: jax.Array) -> None:
-    spec_1 = __generate_mjcf_spec(tilemap_1, 0)
-    spec_2 = __generate_mjcf_spec(tilemap_2, 0)
+    spec_1 = __generate_mjcf_spec(tilemap_1)
+    spec_2 = __generate_mjcf_spec(tilemap_2)
 
     mj_model_1 = spec_1.compile()
     mj_model_2 = spec_2.compile()
