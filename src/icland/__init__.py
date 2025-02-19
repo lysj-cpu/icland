@@ -4,7 +4,8 @@ import jax
 import jax.numpy as jnp
 import mujoco
 from mujoco import mjx
-
+from mujoco.mjx._src.support import name2id
+import numpy as np
 from .agent import collect_body_scene_info, create_agent, step_agent
 from .constants import *
 from .game import generate_game
@@ -118,6 +119,75 @@ def collect_agent_components(mj_model: mujoco.MjModel, agent_count: int) -> jnp.
         )
 
     return agent_components
+
+def _getnum(m: mjx.Model, type: str) -> int:
+    return {
+        "body": m.nbody,
+        "joint": m.njnt,
+        "geom": m.ngeom,
+        "site": m.nsite,
+        "camera": m.ncam,
+        "mesh": m.nmesh,
+        "hfield": m.nhfield,
+        "pair": m.npair,
+        "equality": m.neq,
+        "tendon": m.ntendon,
+        "actuator": m.nu,
+        "sensor": m.nsensor,
+        "numeric": m.nnumeric,
+        "tuple": m.ntuple,
+        "key": m.nkey,
+    }.get(type, 0)
+
+def _getadr(m: mjx.Model, type: str) -> np.ndarray:
+    return {
+        "body": m.name_bodyadr,
+        "joint": m.name_jntadr,
+        "geom": m.name_geomadr,
+        "site": m.name_siteadr,
+        "camera": m.name_camadr,
+        "mesh": m.name_meshadr,
+        "hfield": m.name_hfieldadr,
+        "pair": m.name_pairadr,
+        "equality": m.name_eqadr,
+        "tendon": m.name_tendonadr,
+        "actuator": m.name_actuatoradr,
+        "sensor": m.name_sensoradr,
+        "numeric": m.name_numericadr,
+        "tuple": m.name_tupleadr,
+        "key": m.name_keyadr,
+    }.get(type, None)
+
+def _getid(m: mjx.Model, type: str, name: str) -> int:
+    num = _getnum(m, type)
+    adr = _getadr(m, type)
+    names_map = {
+        m.names[adr[i] :].decode('utf-8').split('\x00', 1)[0]: i
+        for i in range(num)
+    }
+    print(num, adr, name)
+    print("names map ", names_map)
+
+    
+    return names_map.get(name, -1)
+
+
+def collect_agent_components_mjx(mjx_model: mjx.Model, agent_count: int) -> jnp.ndarray:
+    """Collect object IDs for all agents in a GPU-optimized way using mjx.Model."""
+    agent_components = jnp.empty(
+        (agent_count, AGENT_COMPONENT_IDS_DIM), dtype=jnp.int32
+    )
+    for agent_id in range(agent_count):
+        body_id = _getid(mjx_model, "body", f"agent{agent_id}")
+        geom_id = _getid(mjx_model, "geom", f"agent{agent_id}_geom")
+        dof_address = mjx_model.body_dofadr[body_id]
+
+        agent_components = agent_components.at[agent_id].set(
+            [body_id, geom_id, dof_address]
+        )
+
+    return agent_components
+
 
 
 @jax.jit
