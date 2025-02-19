@@ -131,6 +131,7 @@ def edit_model_data(
     WALL_OFFSET = 5
     b_geom_xpos = base_model.geom_pos
     b_geom_xquat = base_model.geom_quat
+    b_agent_pos = base_model.agent_pos
     w, h = tilemap.shape[0], tilemap.shape[1]
 
     def rot_offset(i: jax.Array) -> jax.Array:
@@ -175,12 +176,16 @@ def edit_model_data(
     tile_quats_aligned = jnp.stack([t_cquat, t_rquat], axis=1).reshape(
         -1, t_cquat.shape[1]
     )
+    agent_positions = jnp.array()
 
     b_geom_xpos = jax.lax.dynamic_update_slice_in_dim(
         b_geom_xpos, tile_offsets_aligned, WALL_OFFSET, axis=0
     )
     b_geom_xquat = jax.lax.dynamic_update_slice_in_dim(
         b_geom_xquat, tile_quats_aligned, WALL_OFFSET, axis=0
+    )
+    b_agent_pos = jax.lax.dynamic_update_slice_in_dim(
+        b_agent_pos, agent_positions, 0, axis=0
     )
 
     return base_model.replace(geom_pos=b_geom_xpos, geom_quat=b_geom_xquat)
