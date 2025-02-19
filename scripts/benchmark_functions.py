@@ -199,58 +199,57 @@ class BenchmarkMetrics:
 
 def benchmark_step_non_empty_world(batch_size: int) -> BenchmarkMetrics:
     NUM_STEPS = 100
-    height = 5
-    width = 5
+    height = 2
+    width = 2
     key = jax.random.key(SEED)
-    keys = jax.random.split(key, batch_size)
+    agent_count = 1
+    print(f"Benchmarking non-empty world {SEED} of size {height}x{width}, with agent count of {agent_count}")
 
     # Maybe switch to use np ops instead of list comprehension
     print(f"Before sample_world...")
-    models = [sample_world(height, width, 1000, key, True, 1) for _ in range(batch_size)]
+    model = sample_world(height, width, 1000, key, True, 1)
 
     print(f"Before export...")
-    tilemaps = [export(model, TILECODES, height, width) for model in models]
+    tilemap = export(model, TILECODES, height, width)
 
     print(f"Before sample spawn points...")
-    spawnpoints = [sample_spawn_points(key, tilemap) for tilemap in tilemaps]
+    spawnpoints = sample_spawn_points(key, tilemap)
 
     # create_world is not fully jitted
     print(f"Before create world...")
-    pieces = [create_world(tilemap) for tilemap in tilemaps]
+    pieces = create_world(tilemap)
 
     temp_dir = "temp"
     os.makedirs(f"{temp_dir}", exist_ok=True)
 
     print(f"Before export stls...")
-    for i in range(batch_size):
-        os.makedirs(f"{temp_dir}/world_{i}", exist_ok=True)
-        export_stls(pieces[i], f"{temp_dir}/world_{i}/stl")
+    export_stls(pieces, f"{temp_dir}/stl")
 
     print(f"Before generate mjcf string...")
-    xml_strs = [generate_mjcf_string(spawnpoints[i], f"{temp_dir}/world_{i}") for i in range(batch_size)]
+    xml_str = generate_mjcf_string(spawnpoints, temp_dir)
     
     print(f"Before batched from xml string...")
-    mj_models = [mujoco.MjModel.from_xml_string(xml_str) for xml_str in xml_strs]
+    mj_model = mujoco.MjModel.from_xml_string(xml_str)
     
-    icland_params = [
-        ICLandParams(
-            model=mj_model, 
-            reward_function=None, 
-            agent_count=1
-        ) for mj_model in mj_models
-    ]
+    icland_params = ICLandParams(
+        model=mj_model, 
+        reward_function=None, 
+        agent_count=agent_count
+    )
 
     actions = jnp.tile(jnp.array([1, 0, 0]), (batch_size, 1))
 
     print(f"Before icland.init...")
-    icland_states = [icland.init(key, params) for params in icland_params]
+    init_state = icland.init(key, icland_params)
 
-    print(f"Before batched step...")
-    icland_states = [icland.step(key, state, None, action) for state, action in zip(icland_states, actions)]
-    icland_states = jax.tree_map(lambda *x: jnp.stack(x), *icland_states)
+    # Prepare batch
+    def replicate(x):
+        return jnp.broadcast_to(x, (batch_size,) + x.shape)
+
+    icland_states = jax.tree_map(replicate, init_state)
 
     # This seems bad
-    batched_step = jax.vmap(icland.step, in_axes=(0, 0, None, 0))
+    batched_step = jax.vmap(icland.step, in_axes=(None, 0, None, 0))
 
     print(f"Starting simulation...")
 
@@ -277,7 +276,7 @@ def benchmark_step_non_empty_world(batch_size: int) -> BenchmarkMetrics:
         
         print(f'Start of batched step {i}')
         step_start_time = time.time()
-        icland_states = batched_step(keys, icland_states, icland_params, actions)
+        icland_states = batched_step(None, icland_states, icland_params, actions)
         step_time = time.time() - step_start_time
         total_time += step_time
 
