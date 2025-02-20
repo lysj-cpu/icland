@@ -103,6 +103,17 @@ class BenchmarkMetrics:
     max_gpu_usage_percent: list[float]
     max_gpu_memory_usage_mb: list[float]
 
+@dataclass
+class SampleWorldBenchmarkMetrics:
+    """Dataclass for benchmark metrics."""
+
+    batch_size: int
+    sample_world_time: float
+    memory_usage_mb: float
+    cpu_usage_percent: float
+    gpu_usage_percent: list[float]
+    gpu_memory_usage_mb: list[float]
+
 # def benchmark_renderer_empty_world(batch_size: int) -> BenchmarkMetrics:
 #     NUM_STEPS = 100
 
@@ -197,32 +208,30 @@ class BenchmarkMetrics:
 #         max_gpu_memory_usage_mb=max_gpu_memory_usage_mb,
 #     )
 
-def benchmark_sample_world(batch_size: int) -> BenchmarkMetrics:
-    NUM_STEPS = 100
+def benchmark_sample_world(batch_size: int) -> SampleWorldBenchmarkMetrics:
     height = 2
     width = 2
     key = jax.random.key(SEED)
     keys = jax.random.split(key, batch_size)
     print(f"Benchmarking sample world of size {height}x{width}")
 
-    print(f"Before sample_world...")
     batched_sample_world = jax.vmap(sample_world, in_axes=(None, None, None, 0, None, None))
 
     process = psutil.Process()
-    max_memory_usage_mb = 0.0
-    max_cpu_usage_percent = 0.0
+    memory_usage_mb = 0.0
+    cpu_usage_percent = 0.0
 
     # Attempt to initialize NVML for GPU usage
     gpu_available = True
     try:
         pynvml.nvmlInit()
         num_gpus = pynvml.nvmlDeviceGetCount()
-        max_gpu_usage_percent: list[float] = [0.0] * num_gpus
-        max_gpu_memory_usage_mb: list[float] = [0.0] * num_gpus
+        gpu_usage_percent: list[float] = [0.0] * num_gpus
+        gpu_memory_usage_mb: list[float] = [0.0] * num_gpus
     except pynvml.NVMLError:
         gpu_available = False
-        max_gpu_usage_percent = []
-        max_gpu_memory_usage_mb = []
+        gpu_usage_percent = []
+        gpu_memory_usage_mb = []
 
     
     start_time = time.time()
@@ -232,8 +241,8 @@ def benchmark_sample_world(batch_size: int) -> BenchmarkMetrics:
     # CPU Memory & Usage
     memory_usage_mb = process.memory_info().rss / (1024**2)  # in MB
     cpu_usage_percent = process.cpu_percent(interval=None) / psutil.cpu_count()
-    max_memory_usage_mb = memory_usage_mb
-    max_cpu_usage_percent = cpu_usage_percent
+    memory_usage_mb = memory_usage_mb
+    cpu_usage_percent = cpu_usage_percent
 
     # GPU Usage & Memory
     if gpu_available:
@@ -244,32 +253,30 @@ def benchmark_sample_world(batch_size: int) -> BenchmarkMetrics:
 
             gpu_util_percent = util_rates.gpu
             gpu_mem_usage_mb = mem_info.used / (1024**2)
-            max_gpu_usage_percent[i] = gpu_util_percent
-            max_gpu_memory_usage_mb[i] = gpu_mem_usage_mb
+            gpu_usage_percent[i] = gpu_util_percent
+            gpu_memory_usage_mb[i] = gpu_mem_usage_mb
     
     if gpu_available:
         pynvml.nvmlShutdown()
 
-    batched_steps_per_second = NUM_STEPS / total_time
-
-    return BenchmarkMetrics(
+    return SampleWorldBenchmarkMetrics(
         batch_size=batch_size,
-        batched_steps_per_second=batched_steps_per_second,
-        max_memory_usage_mb=max_memory_usage_mb,
-        max_cpu_usage_percent=max_cpu_usage_percent,
-        max_gpu_usage_percent=max_gpu_usage_percent,
-        max_gpu_memory_usage_mb=max_gpu_memory_usage_mb,
+        sample_world_time=total_time,
+        memory_usage_mb=memory_usage_mb,
+        cpu_usage_percent=cpu_usage_percent,
+        gpu_usage_percent=gpu_usage_percent,
+        gpu_memory_usage_mb=gpu_memory_usage_mb,
     )
 
 
 
 def benchmark_step_non_empty_world(batch_size: int) -> BenchmarkMetrics:
-    NUM_STEPS = 100
+    NUM_STEPS = 20
     height = 2
     width = 2
     key = jax.random.key(SEED)
     keys = jax.random.split(key, batch_size)
-    agent_count = 1
+    agent_count = 2
     print(f"Benchmarking non-empty world of size {height}x{width}, with agent count of {agent_count}")
 
     # Maybe switch to use np ops instead of list comprehension
@@ -383,7 +390,7 @@ def benchmark_step_non_empty_world(batch_size: int) -> BenchmarkMetrics:
 
 def benchmark_batch_size(batch_size: int) -> BenchmarkMetrics:
     """Benchmark the performance of our step with varying batch sizes."""
-    NUM_STEPS = 100
+    NUM_STEPS = 20
 
     key = jax.random.PRNGKey(SEED)
     icland_params = icland.sample(key)
