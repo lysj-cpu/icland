@@ -27,7 +27,7 @@ SEED = 42
 
 # # Enable JAX debug flags
 # # jax.config.update("jax_debug_nans", True)  # Check for NaNs
-jax.config.update("jax_log_compiles", True)  # Log compilations
+# jax.config.update("jax_log_compiles", True)  # Log compilations
 # # jax.config.update("jax_debug_infs", True)  # Check for infinities
 
 @dataclass
@@ -54,12 +54,12 @@ class SampleWorldBenchmarkMetrics:
 
 def benchmark_renderer_non_empty_world(batch_size: int) -> BenchmarkMetrics:
     NUM_STEPS = 20
-    height = 2
-    width = 2
+    height = 1
+    width = 1
     key = jax.random.key(SEED)
     keys = jax.random.split(key, batch_size)
-    agent_count = 2
-    print(f"Benchmarking non-empty world of size {height}x{width}, with agent count of {agent_count}")
+    agent_count = 1
+    print(f"Benchmarking non-empty world renderer of size {height}x{width}, with agent count of {agent_count}")
 
     # Maybe switch to use np ops instead of list comprehension
     print(f"Before sample_world...")
@@ -134,7 +134,10 @@ def benchmark_renderer_non_empty_world(batch_size: int) -> BenchmarkMetrics:
             icland_states, width, default_agent_1
         )
         # print("Got camera angle")
-        f = batched_render_frame(camera_poses, camera_dirs, icland_states)        
+        step_start_time = time.time()
+        f = batched_render_frame(camera_poses, camera_dirs, tilemaps)        
+        step_time = time.time() - step_start_time
+        total_time += step_time
 
         # CPU Memory & Usage
         memory_usage_mb = process.memory_info().rss / (1024**2)  # in MB
@@ -196,6 +199,8 @@ def benchmark_sample_world(batch_size: int) -> SampleWorldBenchmarkMetrics:
         gpu_available = False
         gpu_usage_percent = []
         gpu_memory_usage_mb = []
+    
+    process.cpu_percent(interval=None)
 
     start_time = time.time()
     models = batched_sample_world(height, width, 1000, keys, True, 1) 
@@ -231,8 +236,6 @@ def benchmark_sample_world(batch_size: int) -> SampleWorldBenchmarkMetrics:
         gpu_usage_percent=gpu_usage_percent,
         gpu_memory_usage_mb=gpu_memory_usage_mb,
     )
-
-
 
 def benchmark_step_non_empty_world(batch_size: int) -> BenchmarkMetrics:
     NUM_STEPS = 20

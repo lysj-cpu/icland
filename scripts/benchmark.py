@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt  # For plotting
 import psutil
 
 # Import the benchmark function (ensure benchmark_functions is in your PYTHONPATH)
-from benchmark_functions import SampleWorldBenchmarkMetrics, benchmark_batch_size, benchmark_sample_world, benchmark_step_non_empty_world
+from benchmark_functions import SampleWorldBenchmarkMetrics, benchmark_batch_size, benchmark_renderer_non_empty_world, benchmark_sample_world, benchmark_step_non_empty_world
 from pylatex import Document, NoEscape
 
 
@@ -52,8 +52,8 @@ class BenchmarkScenario:
 BENCHMARKING_SCENARIOS: dict[str, BenchmarkScenario] = {
     "batched_step_performance": BenchmarkScenario(
         description="Batched step performance",
-        function=benchmark_sample_world,
-        parameters=[2**i for i in range(0, 13)],
+        function=benchmark_renderer_non_empty_world,
+        parameters=[2**i for i in range(0, 2)],
     )
 }
 
@@ -483,8 +483,8 @@ def create_report(output_pdf: str = "scripts/benchmark_output/report") -> None:
     print(sys_info)
 
     # 2) Run Benchmark Scenarios
-    # bench_results = run_benchmarks()
-    bench_results = run_sample_world_benchmarks()
+    bench_results = run_benchmarks()
+    # bench_results = run_sample_world_benchmarks()
     print("Bench results")
     print(bench_results)
 
@@ -527,7 +527,7 @@ def create_report(output_pdf: str = "scripts/benchmark_output/report") -> None:
 
         # Generate plots for the current scenario.
         # plots_dict = plot_benchmark_results(scenario_name, metrics_list, output_dir)
-        plots_dict = plot_sample_world_benchmark_results(scenario_name, metrics_list, output_dir)
+        plots_dict = plot_benchmark_results(scenario_name, metrics_list, output_dir)
         plot_items = list(plots_dict.items())
 
         # If there is at least one plot, print the first one full-width.
