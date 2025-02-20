@@ -137,6 +137,24 @@ def collect_agent_components_mjx(
 
     return agent_components
 
+def collect_prop_components_mjx(
+    mjx_model: mjx.Model, width: int, height: int, prop_count: int, agent_count: int
+) -> jnp.ndarray:
+    """Collect prop components in a GPU-optimized way using mjx.Model."""
+    
+    def get_components_aux(prop_id: int) -> jnp.ndarray:
+        body_id = prop_id + BODY_OFFSET + agent_count
+        geom_id = (prop_id + agent_count + width * height) * 2 + WALL_OFFSET
+        # TODO: figure out what the actual dof_address should be
+        dof_address = prop_id * 4
+        return jnp.array([body_id, geom_id, dof_address])
+
+    prop_components = jax.vmap(get_components_aux)(jnp.arange(prop_count)).astype(
+        "int32"
+    )
+
+    return prop_components
+
 
 @jax.jit
 def step(
