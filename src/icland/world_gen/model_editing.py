@@ -130,6 +130,7 @@ def edit_model_data(
     tilemap: jax.Array,
     base_model: MjxModelType,
     agent_spawns: jax.Array,  # shape (num_agents, 3)
+    # prop_spawns: jax.Array,
     max_height: int = WORLD_HEIGHT,
 ) -> MjxModelType:
     """Edit the base model data such that the terrain matches that of the tilemap."""

@@ -119,6 +119,29 @@ def collect_agent_components(mj_model: mujoco.MjModel, agent_count: int) -> jnp.
 
     return agent_components
 
+def collect_prop_components(mj_model: mujoco.MjModel, prop_count: int) -> jnp.ndarray:
+    """Collect object IDs for all agents."""
+    agent_components = jnp.empty(
+        (prop_count, AGENT_COMPONENT_IDS_DIM), dtype=jnp.int32
+    )
+
+    for prop_id in range(prop_count):
+        print(f"prop{prop_id}", f"prop{prop_id}_geom")
+        body_id = mujoco.mj_name2id(
+            mj_model, mujoco.mjtObj.mjOBJ_BODY, f"prop{prop_id}"
+        )
+
+        geom_id = mujoco.mj_name2id(
+            mj_model, mujoco.mjtObj.mjOBJ_GEOM, f"prop{prop_id}_geom"
+        )
+
+        dof_address = mj_model.body_dofadr[body_id]
+
+        agent_components = agent_components.at[prop_id].set(
+            [body_id, geom_id, dof_address]
+        )
+
+    return agent_components
 
 def collect_agent_components_mjx(
     mjx_model: mjx.Model, width: int, height: int, agent_count: int
@@ -127,7 +150,7 @@ def collect_agent_components_mjx(
 
     def get_components_aux(agent_id: int) -> jnp.ndarray:
         body_id = agent_id + BODY_OFFSET
-        geom_id = (agent_id + width * height) * 2 + WALL_OFFSET
+        geom_id = (agent_id + width * height) * 2 + WALL_OFFSET * (1 if width != 0 and height != 0 else 0)
         dof_address = agent_id * 4
         return jnp.array([body_id, geom_id, dof_address])
 
@@ -144,9 +167,8 @@ def collect_prop_components_mjx(
     
     def get_components_aux(prop_id: int) -> jnp.ndarray:
         body_id = prop_id + BODY_OFFSET + agent_count
-        geom_id = (prop_id + agent_count + width * height) * 2 + WALL_OFFSET
-        # TODO: figure out what the actual dof_address should be
-        dof_address = prop_id * 4
+        geom_id = agent_count * 2 + (prop_id + agent_count + width * height) + WALL_OFFSET * (width > 0 and height > 0)
+        dof_address = PROP_DOF_OFFSET + prop_id * PROP_DOF_MULTIPLIER
         return jnp.array([body_id, geom_id, dof_address])
 
     prop_components = jax.vmap(get_components_aux)(jnp.arange(prop_count)).astype(
