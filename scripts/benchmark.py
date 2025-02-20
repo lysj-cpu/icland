@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt  # For plotting
 import psutil
 
 # Import the benchmark function (ensure benchmark_functions is in your PYTHONPATH)
-from benchmark_functions import benchmark_batch_size, benchmark_step_non_empty_world
+from benchmark_functions import SampleWorldBenchmarkMetrics, benchmark_batch_size, benchmark_sample_world, benchmark_step_non_empty_world
 from pylatex import Document, NoEscape
 
 
@@ -52,8 +52,8 @@ class BenchmarkScenario:
 BENCHMARKING_SCENARIOS: dict[str, BenchmarkScenario] = {
     "batched_step_performance": BenchmarkScenario(
         description="Batched step performance",
-        function=benchmark_step_non_empty_world,
-        parameters=[2**i for i in range(0, 22)],
+        function=benchmark_sample_world,
+        parameters=[2**i for i in range(0, 2)],
     )
 }
 
@@ -235,6 +235,27 @@ def generate_latex_table(title: str, data: dict[str, Any]) -> str:
     return table
 
 
+def run_sample_world_benchmarks() -> dict[str, list[SampleWorldBenchmarkMetrics]]:
+    results = {}
+    for scenario_name, scenario_data in BENCHMARKING_SCENARIOS.items():
+        benchmark_fn = scenario_data.function
+        parameters = scenario_data.parameters
+        scenario_results = []
+        print(f"Running scenario: {scenario_name}")
+        for param in parameters:
+            print(f"  Benchmarking with batch size = {param} ...")
+            try:
+                metrics = benchmark_fn(param)
+            except RuntimeError as e:
+                if "out of memory" in str(e).lower() or "resource exhausted" in str(e).lower():
+                    print(f"Out of memory at batch size: {param}. Exiting safely.")
+                    break
+                else:
+                    raise  # Re-raise unexpected errors
+            scenario_results.append(metrics)
+        results[scenario_name] = scenario_results
+    return results
+
 def run_benchmarks() -> dict[str, list[BenchmarkMetrics]]:
     """The BenchmarkMetrics list contains the metrics for each batch size in the scenario.
 
@@ -260,6 +281,100 @@ def run_benchmarks() -> dict[str, list[BenchmarkMetrics]]:
             scenario_results.append(metrics)
         results[scenario_name] = scenario_results
     return results
+
+def plot_sample_world_benchmark_results(
+    scenario_name: str, metrics_list: list[SampleWorldBenchmarkMetrics], output_dir: str
+) -> dict[str, str]:
+    """Generate plots for each metric against batch size and save them to output_dir.
+
+    Returns a dictionary mapping plot descriptions to file paths.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    plots = {}
+
+    # Prepare common x-axis data (batch sizes)
+    batch_sizes = [m.batch_size for m in metrics_list]
+
+    # 1. Sample world total time
+    times = [m.sample_world_time for m in metrics_list]
+    plt.figure()
+    plt.plot(batch_sizes, times, marker="o")
+    plt.xlabel("Batch Size")
+    plt.ylabel("Time (s)")
+    plt.title(f"Time to run sample_world vs Batch Size ({scenario_name})")
+    plt.grid(True)
+    plot_path = os.path.join(
+        output_dir, f"{scenario_name}_sample_world_time.png"
+    )
+    plt.savefig(plot_path, bbox_inches="tight")
+    plt.close()
+    plots["sample_world time"] = plot_path
+
+    # 2. Max Memory Usage (MB)
+    mem_usage = [m.memory_usage_mb for m in metrics_list]
+    plt.figure()
+    plt.plot(batch_sizes, mem_usage, marker="o", color="orange")
+    plt.xlabel("Batch Size")
+    plt.ylabel("Memory Usage (MB)")
+    plt.title(f"Memory Usage vs Batch Size ({scenario_name})")
+    plt.grid(True)
+    plot_path = os.path.join(output_dir, f"{scenario_name}_memory_usage_mb.png")
+    plt.savefig(plot_path, bbox_inches="tight")
+    plt.close()
+    plots["Memory Usage (MB)"] = plot_path
+
+    # 3. Max CPU Usage Percent
+    cpu_usage = [m.cpu_usage_percent for m in metrics_list]
+    plt.figure()
+    plt.plot(batch_sizes, cpu_usage, marker="o", color="green")
+    plt.xlabel("Batch Size")
+    plt.ylabel("CPU Usage (%)")
+    plt.title(f"CPU Usage vs Batch Size ({scenario_name})")
+    plt.grid(True)
+    plot_path = os.path.join(output_dir, f"{scenario_name}_cpu_usage_percent.png")
+    plt.savefig(plot_path, bbox_inches="tight")
+    plt.close()
+    plots["CPU Usage (%)"] = plot_path
+
+    # 4. Max GPU Usage Percent (if available)
+    if metrics_list and metrics_list[0].gpu_usage_percent:
+        n_gpus = len(metrics_list[0].gpu_usage_percent)
+        plt.figure()
+        for i in range(n_gpus):
+            gpu_usage = [m.gpu_usage_percent[i] for m in metrics_list]
+            plt.plot(batch_sizes, gpu_usage, marker="o", label=f"GPU {i + 1}")
+        plt.xlabel("Batch Size")
+        plt.ylabel("GPU Usage (%)")
+        plt.title(f"GPU Usage vs Batch Size ({scenario_name})")
+        plt.legend()
+        plt.grid(True)
+        plot_path = os.path.join(
+            output_dir, f"{scenario_name}_gpu_usage_percent.png"
+        )
+        plt.savefig(plot_path, bbox_inches="tight")
+        plt.close()
+        plots["GPU Usage (%)"] = plot_path
+
+    # 5. Max GPU Memory Usage (MB) (if available)
+    if metrics_list and metrics_list[0].gpu_memory_usage_mb:
+        n_gpus = len(metrics_list[0].gpu_memory_usage_mb)
+        plt.figure()
+        for i in range(n_gpus):
+            gpu_mem = [m.gpu_memory_usage_mb[i] for m in metrics_list]
+            plt.plot(batch_sizes, gpu_mem, marker="o", label=f"GPU {i + 1}")
+        plt.xlabel("Batch Size")
+        plt.ylabel("GPU Memory Usage (MB)")
+        plt.title(f"GPU Memory Usage vs Batch Size ({scenario_name})")
+        plt.legend()
+        plt.grid(True)
+        plot_path = os.path.join(
+            output_dir, f"{scenario_name}_gpu_memory_usage_mb.png"
+        )
+        plt.savefig(plot_path, bbox_inches="tight")
+        plt.close()
+        plots["GPU Memory Usage (MB)"] = plot_path
+
+    return plots
 
 
 def plot_benchmark_results(
@@ -368,7 +483,8 @@ def create_report(output_pdf: str = "scripts/benchmark_output/report") -> None:
     print(sys_info)
 
     # 2) Run Benchmark Scenarios
-    bench_results = run_benchmarks()
+    # bench_results = run_benchmarks()
+    bench_results = run_sample_world_benchmarks()
     print("Bench results")
     print(bench_results)
 
@@ -410,7 +526,8 @@ def create_report(output_pdf: str = "scripts/benchmark_output/report") -> None:
         )
 
         # Generate plots for the current scenario.
-        plots_dict = plot_benchmark_results(scenario_name, metrics_list, output_dir)
+        # plots_dict = plot_benchmark_results(scenario_name, metrics_list, output_dir)
+        plots_dict = plot_sample_world_benchmark_results(scenario_name, metrics_list, output_dir)
         plot_items = list(plots_dict.items())
 
         # If there is at least one plot, print the first one full-width.
