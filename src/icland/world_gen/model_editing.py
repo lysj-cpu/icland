@@ -130,7 +130,7 @@ def edit_model_data(
     tilemap: jax.Array,
     base_model: MjxModelType,
     agent_spawns: jax.Array,  # shape (num_agents, 3)
-    # prop_spawns: jax.Array,
+    prop_spawns: jax.Array, # shape (num_props, 3)
     max_height: int = WORLD_HEIGHT,
 ) -> MjxModelType:
     """Edit the base model data such that the terrain matches that of the tilemap."""
@@ -138,15 +138,13 @@ def edit_model_data(
 
     RAMP_OFFSET = 13 / 3
     COL_OFFSET = 2
+    agent_count = agent_spawns.shape[0]
+    prop_count = prop_spawns.shape[0]
     b_geom_xpos = base_model.geom_pos
     b_geom_xquat = base_model.geom_quat
-    b_agent_pos = base_model.body_pos
+    b_pos = base_model.body_pos
+    b_agent_pos, b_prop_pos = b_pos[1:agent_count], b_pos[agent_count:agent_count + prop_count] 
     w, h = tilemap.shape[0], tilemap.shape[1]
-
-    agent_components = icland.collect_agent_components_mjx(
-        base_model, w, h, agent_spawns.shape[0]
-    )
-    jax.debug.print("{}", agent_components)
 
     def rot_offset(i: jax.Array) -> jax.Array:
         return 0.5 + jnp.cos(jnp.pi * i / 2) / 6
@@ -194,15 +192,27 @@ def edit_model_data(
     b_geom_xpos = jax.lax.dynamic_update_slice_in_dim(
         b_geom_xpos, tile_offsets_aligned, WALL_OFFSET, axis=0
     )
+
     b_geom_xquat = jax.lax.dynamic_update_slice_in_dim(
         b_geom_xquat, tile_quats_aligned, WALL_OFFSET, axis=0
     )
+
+    jax.debug.print(b_pos)
+
     b_agent_pos = jax.lax.dynamic_update_slice_in_dim(
-        b_agent_pos, agent_spawns.astype("float32"), BODY_OFFSET, axis=0
+        b_pos, agent_spawns.astype("float32"), BODY_OFFSET, axis=0
     )
 
+    jax.debug.print(b_pos)
+
+    b_prop_pos = jax.lax.dynamic_update_slice_in_dim(
+        b_pos, prop_spawns.astype("float32"), BODY_OFFSET + agent_count, axis=0
+    )
+
+    jax.debug.print(b_pos)
+
     return base_model.replace(
-        geom_pos=b_geom_xpos, geom_quat=b_geom_xquat, body_pos=b_agent_pos
+        geom_pos=b_geom_xpos, geom_quat=b_geom_xquat, body_pos=b_pos
     )
 
 
