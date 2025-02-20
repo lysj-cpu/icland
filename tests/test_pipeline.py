@@ -6,6 +6,7 @@ import mujoco
 import numpy as np
 from mujoco import mjx
 
+from icland.agent import create_agent
 from icland.constants import *
 from icland.presets import TEST_TILEMAP_FLAT
 from icland.types import *
@@ -224,7 +225,7 @@ def pipeline(
     # Save as a .txt file
     # with open(f"model_output_{kn}.txt", "w") as f:
     #     f.write(mjx_model)
-    print(xml_string)
+    # print(xml_string)
 
     # output as .txt file
     return mjx_model
@@ -232,23 +233,26 @@ def pipeline(
 
 if __name__ == "__main__":
     t = TEST_TILEMAP_FLAT
-    for i in range(1, WORLD_HEIGHT + 1):
-        # for j in range(4):
-        spec_1 = __generate_mjcf_spec(t.at[0, 0].set(jnp.array([0, 0, 0, i])))
-        mj_model_1 = spec_1.compile()
-        mjx_model_1 = mjx.put_model(mj_model_1)
-        print(f"r{i}{i + 1}, rotation {0}: {round(mjx_model_1.geom_rbound[0], 6)}")
+    # for i in range(1, WORLD_HEIGHT + 1):
+    #     # for j in range(4):
+    #     spec_1 = __generate_mjcf_spec(t.at[0, 0].set(jnp.array([0, 0, 0, i])))
+    #     mj_model_1 = spec_1.compile()
+    #     mjx_model_1 = mjx.put_model(mj_model_1)
+    #     print(f"r{i}{i + 1}, rotation {0}: {round(mjx_model_1.geom_rbound[0], 6)}")
     # print(f"Indices for rotations for r{i}{i + 1} are", [(i - 1) * 10 + j for j in range(4)])
     # __compare_two_models(TEST_TILEMAP_FLAT.at[:, :].set(jnp.array([0, 0, 0, 1])), t)
 
     # t = TEST_TILEMAP_FLAT
-    # spec_1 = __generate_mjcf_spec(t)
-    # spec_2 = __generate_mjcf_spec(t.at[0, 0].set(jnp.array([0, 0, 0, 6])))
+    spec_1 = __generate_mjcf_spec(t)
+    spec_2 = __generate_mjcf_spec(t)
     # spec_2 = create_agent(0, jnp.array([1, 1, 3.5]), spec_2)
-    # spec_1 = create_agent(0, jnp.array([8, 8, 3.5]), spec_1)
+    spec_1 = create_agent(0, jnp.array([8, 8, 3.5]), spec_1)
+    spec_1 = create_agent(1, jnp.array([8, 9, 3.5]), spec_1)
+    spec_2 = create_agent(0, jnp.array([0, 0, 0]), spec_2)
+    spec_2 = create_agent(1, jnp.array([0, 0, 0]), spec_2)
 
-    # mj_model_1 = spec_1.compile()
-    # mj_model_2 = spec_2.compile()
-    # mjx_model_1 = mjx.put_model(mj_model_1)
-    # mjx_model_2 = mjx.put_model(mj_model_2)
-    # compare_dataclass_instances(mjx_model_1, mjx_model_2)
+    mj_model_1 = spec_1.compile()
+    mj_model_2 = spec_2.compile()
+    mjx_model_1 = mjx.put_model(mj_model_1)
+    mjx_model_2 = mjx.put_model(mj_model_2)
+    compare_dataclass_instances(mjx_model_1, mjx_model_2)

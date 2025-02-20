@@ -5,8 +5,14 @@ import jax.numpy as jnp
 import mujoco
 import numpy as np
 
+import icland
 from icland.agent import create_agent
-from icland.constants import AGENT_COMPONENT_IDS_DIM, WORLD_HEIGHT
+from icland.constants import (
+    AGENT_COMPONENT_IDS_DIM,
+    BODY_OFFSET,
+    WALL_OFFSET,
+    WORLD_HEIGHT,
+)
 from icland.presets import TEST_TILEMAP_BUMP, TEST_TILEMAP_FLAT, TEST_TILEMAP_WORLD42
 from icland.types import MjxModelType
 
@@ -121,18 +127,25 @@ def generate_base_model(
 
 @jax.jit
 def edit_model_data(
-    tilemap: jax.Array, base_model: MjxModelType, max_height: int = WORLD_HEIGHT
+    tilemap: jax.Array,
+    base_model: MjxModelType,
+    agent_spawns: jax.Array,  # shape (num_agents, 3)
+    max_height: int = WORLD_HEIGHT,
 ) -> MjxModelType:
     """Edit the base model data such that the terrain matches that of the tilemap."""
     # Pre: the width and height of the tilemap MUST MATCH that of the base_model
 
     RAMP_OFFSET = 13 / 3
     COL_OFFSET = 2
-    WALL_OFFSET = 5
     b_geom_xpos = base_model.geom_pos
     b_geom_xquat = base_model.geom_quat
-    b_agent_pos = base_model.agent_pos
+    b_agent_pos = base_model.body_pos
     w, h = tilemap.shape[0], tilemap.shape[1]
+
+    agent_components = icland.collect_agent_components_mjx(
+        base_model, w, h, agent_spawns.shape[0]
+    )
+    jax.debug.print("{}", agent_components)
 
     def rot_offset(i: jax.Array) -> jax.Array:
         return 0.5 + jnp.cos(jnp.pi * i / 2) / 6
@@ -176,7 +189,6 @@ def edit_model_data(
     tile_quats_aligned = jnp.stack([t_cquat, t_rquat], axis=1).reshape(
         -1, t_cquat.shape[1]
     )
-    agent_positions = jnp.array()
 
     b_geom_xpos = jax.lax.dynamic_update_slice_in_dim(
         b_geom_xpos, tile_offsets_aligned, WALL_OFFSET, axis=0
@@ -185,10 +197,12 @@ def edit_model_data(
         b_geom_xquat, tile_quats_aligned, WALL_OFFSET, axis=0
     )
     b_agent_pos = jax.lax.dynamic_update_slice_in_dim(
-        b_agent_pos, agent_positions, 0, axis=0
+        b_agent_pos, agent_spawns.astype("float32"), BODY_OFFSET, axis=0
     )
 
-    return base_model.replace(geom_pos=b_geom_xpos, geom_quat=b_geom_xquat)
+    return base_model.replace(
+        geom_pos=b_geom_xpos, geom_quat=b_geom_xquat, body_pos=b_agent_pos
+    )
 
 
 def _edit_mj_model_data(
