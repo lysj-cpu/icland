@@ -289,7 +289,7 @@ def sample_spawn_points(
         row = random_index // spawn_map.shape[0]
         col = random_index % spawn_map.shape[0]
 
-        return jnp.array([row, col, tilemap[row, col, 3]])
+        return jnp.array([row + 0.5, col + 0.5, tilemap[row, col, 3] + 1])
 
     keys = jax.random.split(key, num_objects)
 

@@ -106,10 +106,10 @@ class ICLandParams(PyTreeNode):  # type: ignore[misc]
             >>> import jax
             >>> def example_reward_function(state: ICLandState) -> jax.Array:
             ...     return jax.numpy.array(0)
-            >>> ICLandParams(jnp.array([[[0, 0, 0, 1]]]), example_reward_function, jnp.array([[0, 0, 0]]), 6)
-            ICLandParams(world=[[[0, 0, 0, 1]]], reward_function=example_reward_function(state: icland.types.ICLandState) -> jax.Array, agent_spawns=[[0, 0, 0]], world_level=6)
-            >>> ICLandParams(jnp.array([[[0, 0, 0, 1]]]), lambda state: jax.numpy.array(0), jnp.array([[0, 0, 0]]), 6)
-            ICLandParams(world=[[[0, 0, 0, 1]]], reward_function=lambda function(state), agent_spawns=[[0, 0, 0]], world_level=6)
+            >>> ICLandParams(jax.numpy.array([[[0, 0, 0, 1]]]), example_reward_function, jax.numpy.array([[0, 0, 0]]), 6)
+            ICLandParams(world=ArrayImpl, reward_function=example_reward_function(state: icland.types.ICLandState) -> jax.Array, agent_spawns=[[0 0 0]], world_level=6)
+            >>> ICLandParams(jax.numpy.array([[[0, 0, 0, 1]]]), lambda state: jax.numpy.array(0), jax.numpy.array([[0, 0, 0]]), 6)
+            ICLandParams(world=ArrayImpl, reward_function=lambda function(state), agent_spawns=[[0 0 0]], world_level=6)
         """
         if (
             self.reward_function
@@ -151,6 +151,6 @@ class ICLandConfig(PyTreeNode):  # type: ignore[misc]
             >>> from icland.types import ICLandConfig
             >>> import jax
             >>> ICLandConfig(10, 10, 1, {}, 6)
-            ICLandConfig(world_width=10, world_height=10, max_agent_count=5, prop_counts={}, max_world_level=6)
+            ICLandConfig(width=10, height=10, max_agent_count=1, max_world_level=6)
         """
         return f"ICLandConfig(width={self.world_width}, height={self.world_height}, max_agent_count={self.max_agent_count}, max_world_level={self.max_world_level})"

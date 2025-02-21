@@ -13,7 +13,7 @@ import psutil
 import pynvml
 
 import icland
-from icland.constants import DEFAULT_CONFIG
+from icland.presets import DEFAULT_CONFIG
 
 # --------------------------------------------------------------------------------------
 # SCENARIOS: a dictionary for all your benchmark scenarios.

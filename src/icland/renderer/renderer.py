@@ -127,7 +127,7 @@ def scene_sdf_from_tilemap(  # pragma: no cover
                 __process_column,
             ],
             p,
-            x,
+            w - x - 1,
             y,
             tile[1],
             tile_width,
@@ -265,11 +265,11 @@ def __scene_sdf_with_objs(
     # Scene
     tilemap: jax.Array,
     # Props (list of ints to represent which prop it is)
-    props: jax.Array,
+    props: jax.Array,  # shape: (n_props, )
     # Players positions and rotation
     # TODO: Change to adapt with mjx data
-    player_pos: jax.Array,  # shape: (n_players, 3)
-    player_col: jax.Array,  # shape: (n_players, 3)
+    agent_pos: jax.Array,  # shape: (agent_count, 3)
+    agent_col: jax.Array,  # shape: (agent_count, 3)
     # Prop positions and rotation
     prop_pos: jax.Array,  # shape: (n_props, 3)
     prop_rot: jax.Array,  # shape: (n_props, 4)
@@ -281,21 +281,21 @@ def __scene_sdf_with_objs(
     floor_height: jnp.float32 = 0.0,
 ) -> tuple[jax.Array, jax.Array]:
     """SDF for the agents and props."""
-    # Pre: the lengths of player_pos and player_col are the same.
+    # Pre: the lengths of agent_pos and agent_col are the same.
     # Pre: the lengths of prop_pos, prop_rot and prop_col are the same.
 
     # Add distances computed by SDFs here
     tile_dist, cx, cy = scene_sdf_from_tilemap(tilemap, p, floor_height - 1)
     floor_dist = p[1] - floor_height
 
-    def process_player_sdf(i: jnp.int32) -> tuple[jnp.float32, jax.Array]:
-        curr_pos = player_pos[i]
-        curr_col = player_col[i]
+    def process_agent_sdf(i: jnp.int32) -> tuple[jnp.float32, jax.Array]:
+        curr_pos = agent_pos[i]
+        curr_col = agent_col[i]
 
         transform = jnp.array(
             [
                 [1, 0, 0, -curr_pos[0]],
-                [0, 1, 0, -curr_pos[1] - 0.2],
+                [0, 1, 0, -curr_pos[1] + 0.6],
                 [0, 0, 1, -curr_pos[2]],
                 [0, 0, 0, 1],
             ]
@@ -345,32 +345,32 @@ def __scene_sdf_with_objs(
         ), curr_col
 
     # Prop distances: Tuple[Array of floats, Array of colors]
-    prop_dists = jax.vmap(process_prop_sdf)(jnp.arange(prop_pos.shape[0]))
+    prop_dists = jax.vmap(process_prop_sdf)(jnp.arange(props.shape[0]))
 
     # Player distances
-    player_dists = jax.vmap(process_player_sdf)(jnp.arange(player_pos.shape[0]))
+    agent_dists = jax.vmap(process_agent_sdf)(jnp.arange(agent_pos.shape[0]))
 
     # Get minimum distance and color
     min_prop_dist, min_prop_col = (
         jnp.min(prop_dists[0]),
         prop_col[jnp.argmin(prop_dists[0])],
     )
-    min_player_dist, min_player_col = (
-        jnp.min(player_dists[0]),
-        player_col[jnp.argmin(player_dists[0])],
+    min_agent_dist, min_agent_col = (
+        jnp.min(agent_dists[0]),
+        agent_col[jnp.argmin(agent_dists[0])],
     )
 
     # Get the absolute minimum distance and color
-    candidates = jnp.array([tile_dist, floor_dist, min_prop_dist, min_player_dist])
+    candidates = jnp.array([tile_dist, floor_dist, min_prop_dist, min_agent_dist])
     min_dist = jnp.min(candidates)
 
     x, _, z = jnp.tanh(jnp.sin(p * jnp.pi) * 20.0)
     floor_color = (0.5 + (x * z) * 0.1) * jnp.ones(3)
     terrain_color = terrain_cmap[cx, cy]
 
-    min_dist_col = jnp.array(
-        [terrain_color, floor_color, min_prop_col, min_player_col]
-    )[jnp.argmin(candidates)]
+    min_dist_col = jnp.array([terrain_color, floor_color, min_prop_col, min_agent_col])[
+        jnp.argmin(candidates)
+    ]
 
     return min_dist, min_dist_col
 
@@ -393,8 +393,8 @@ def __shade_f(
 
 
 def can_see_object(
-    player_pos: jax.Array,
-    player_dir: jax.Array,
+    agent_pos: jax.Array,
+    agent_dir: jax.Array,
     obj_pos: jax.Array,
     obj_sdf: Callable[[Any], Any],
     terrain_sdf: Callable[[Any], Any],
@@ -405,8 +405,8 @@ def can_see_object(
     # All the positions and directions are in world coords.
 
     # Find ray from player direction towards object.
-    ray_length = jnp.linalg.norm(obj_pos - player_pos)
-    direction = player_dir / jnp.linalg.norm(player_dir)
+    ray_length = jnp.linalg.norm(obj_pos - agent_pos)
+    direction = agent_dir / jnp.linalg.norm(agent_dir)
 
     state_init = (0.0, 0, 0)
 
@@ -420,7 +420,7 @@ def can_see_object(
         state: tuple[jnp.float32, jnp.int32, jnp.int32],
     ) -> tuple[jnp.float32, jnp.int32, jnp.int32]:
         t, flag, step = state
-        pos = player_pos + t * direction
+        pos = agent_pos + t * direction
 
         d_obj = obj_sdf(pos - obj_pos)  # Relative to obj pos
         d_ter = terrain_sdf(pos)
@@ -442,12 +442,13 @@ def can_see_object(
 
 def generate_colormap(key: jax.Array, width: jnp.int32, height: jnp.int32) -> jax.Array:
     """Generates a colormap array with random colors from a set."""
+    # rgb = 243/255, 180/255, 139/255
     colors = jnp.array(
         [
-            [1.0, 0.5, 0.0],  # Orange
-            [0.5, 1.0, 0.5],  # Light Green
-            [0.0, 0.0, 0.5],  # Light Blue
-            [0.75, 0.5, 0.75],  # Light Purple
+            [0.5, 0.5, 0.5],  # Dark gray
+            [0.6, 0.6, 0.6],  # Lighter gray
+            [0.7, 0.7, 0.7],  # Even lighter gray
+            [0.8, 0.8, 0.8],  # Light gray
         ]
     )  # Shape (4, 3) - 4 colors, 3 channels (RGB)
 
@@ -489,18 +490,28 @@ def render_frame_with_objects(
     tilemap: jax.Array,
     terrain_cmap: jax.Array,
     players: PlayerInfo,
-    props: PropInfo,
+    props: PropInfo = PropInfo(
+        prop_type=jnp.array([0]),
+        pos=jnp.empty((1, 3)),
+        rot=jnp.array([[1, 0, 0, 0]]),
+        col=jnp.empty((1, 3)),
+    ),
     light_dir: jax.Array = __normalize(jnp.array([5.0, 10.0, 5.0])),
     view_width: jnp.int32 = DEFAULT_VIEWSIZE[0],
     view_height: jnp.int32 = DEFAULT_VIEWSIZE[1],
+    camera_height: jnp.float32 = 0.4,
+    camera_offset: jnp.float32 = 0.2,
 ) -> jax.Array:
     """Renders one frame given camera position, direction, and world terrain."""
-    player_pos = players.pos
-    player_col = players.col
+    agent_pos = players.pos
+    agent_col = players.col
     prop_pos = props.pos
     prop_rot = props.rot
     prop_col = props.col
     prop_types = props.prop_type
+
+    cam_pos = cam_pos.at[1].subtract(0.4 - camera_height)
+    cam_pos = cam_pos + camera_offset * cam_dir
 
     # Ray casting
     ray_dir = __camera_rays(cam_pos, cam_dir, view_width, view_height, fx=0.6)
@@ -508,8 +519,8 @@ def render_frame_with_objects(
         __scene_sdf_with_objs,
         tilemap,
         prop_types,
-        player_pos,
-        player_col,
+        agent_pos,
+        agent_col,
         prop_pos,
         prop_rot,
         prop_col,
@@ -573,8 +584,6 @@ def get_agent_camera_from_mjx(
     icland_state: ICLandState,
     world_width: jnp.int32,
     body_id: jnp.int32,
-    camera_height: jnp.float32 = 0.2,
-    camera_offset: jnp.float32 = 0.06,
 ) -> tuple[jax.Array, jax.Array]:
     """Get the camera position and direction from the MuJoCo data."""
     data = icland_state.pipeline_state.mjx_data
@@ -589,10 +598,9 @@ def get_agent_camera_from_mjx(
     )
 
     # Direct matrix multiplication using precomputed transform_axes
-    yaw = data.qpos[3]
+    yaw = data.qpos[body_id * 4 + 3]  # Get angle from dof address
     forward_dir = jnp.array([-jnp.cos(yaw), 0.0, jnp.sin(yaw)])
-    height_offset = jnp.array([0, camera_height, 0])
-    camera_pos = agent_pos + height_offset + forward_dir * camera_offset
+    camera_pos = agent_pos
 
     return camera_pos, forward_dir
 
@@ -849,6 +857,18 @@ if __name__ == "__main__":  # pragma: no cover
     frames: list[Any] = []
     cmap = generate_colormap(jax.random.PRNGKey(0), 10, 10)
     print(cmap.shape)
+
+    players = PlayerInfo(
+        pos=jnp.array([[8.5, 3, 1]]),
+        col=jnp.array([[1, 0, 0]]),
+    )
+    props = PropInfo(
+        prop_type=jnp.array([1]),
+        pos=jnp.array([[4, 3, 1]]),
+        rot=jnp.array([[1, 0, 0, 0]]),
+        col=jnp.array([[1.0, 1.0, 0.0]]),
+    )
+
     for i in range(72):
         # f = render_frame(
         # cam_pos=jnp.array([5.0, 10.0, -10.0 + (i * 10 / 72)]),
@@ -863,6 +883,8 @@ if __name__ == "__main__":  # pragma: no cover
             cam_dir=jnp.array([0.0, -0.5, 1.0]),
             tilemap=tilemap,
             terrain_cmap=cmap,
+            players=players,
+            props=props,
             view_width=96,
             view_height=72,
         )

@@ -184,7 +184,7 @@ def render_video_from_world(
     icland_params = ICLandParams(
         world=tilemap,
         reward_function=None,
-        agent_spawns=jnp.array([[1.5, 1, 4]]),
+        agent_spawns=spawnpoints,
         world_level=6,
     )
 
@@ -224,115 +224,115 @@ def render_video_from_world(
 
 
 def __combine_frames(
-    agent_frames: dict[int, list[Any]],
-) -> np.ndarray[Any, np.dtype[np.float32]]:
-    """Arrange agent frames into a grid."""
-    agent_count = len(agent_frames)
-    frames = [np.array(agent_frames[aid]) for aid in range(agent_count)]
+    frames_list: list[np.ndarray[Any, np.dtype[np.float32]]],
+    grid_shape: tuple[int, int] | None = None,
+    padding: int = 0,
+    pad_value: int = 0,
+) -> np.ndarray[Any, np.dtype[np.uint8]]:
+    frames = np.array(frames_list)  # Ensure frames is an array
+    n, h, w, c = frames.shape
 
-    # Get the dimensions of the frames
-    h, w, c = frames[0][0].shape
+    # If no grid shape is given, choose a near-square grid.
+    if grid_shape is None:
+        cols = int(np.ceil(np.sqrt(n)))
+        rows = int(np.ceil(n / cols))
+    else:
+        rows, cols = grid_shape
 
-    stacked_frames = np.array(frames)  # Shape: (agent_count, timesteps, h, w, c)
+    # Compute the dimensions of the output grid image.
+    grid_h = rows * h + (rows + 1) * padding
+    grid_w = cols * w + (cols + 1) * padding
 
-    # Calculate grid size
-    cols = int(np.ceil(np.sqrt(agent_count)))
-    rows = int(np.ceil(agent_count / cols))
+    # Initialize the grid with the pad_value.
+    grid = np.full((grid_h, grid_w, c), pad_value, dtype=frames.dtype)
 
-    # Pad with blac frames if needed to fill the grid
-    pad_frames = np.zeros((rows * cols - agent_count, h, w, c), dtype=np.uint8)
-    all_frames = np.vstack([stacked_frames, pad_frames])
+    # Place each frame in the grid.
+    for idx, frame in enumerate(frames):
+        row = idx // cols
+        col = idx % cols
+        top = padding + row * (h + padding)
+        left = padding + col * (w + padding)
+        grid[top : top + h, left : left + w, :] = frame
 
-    # Reshape int (rows, cols, height, width, channels)
-    grid = all_frames.reshape(rows, cols, h, w, c)
-
-    # Merge rows horizontally, then merge all rows vertically
-    row_frames = [np.hstack(row) for row in grid]
-    result = np.vstack(row_frames)
-
-    return result
+    return (grid * 255).astype(np.uint8)
 
 
 def render_video_multi_agent(
     key: jax.Array,
-    policy: jax.Array,
     duration: int,
-    agent_count: int,
+    policies: list[jax.Array],
     video_name: str,
     height: int = 10,
     width: int = 10,
 ) -> None:
     """Renders separate first person view videos for multiple agents."""
-    print(f"Sampling world with key {key[1]}")
-    model = sample_world(width, height, 1000, key, True, 1)
-    print(f"Exporting tilemap")
-    tilemap = export(model, TILECODES, width, height)
+    agent_count = len(policies)
 
-    spawnpoints = sample_spawn_points(key, tilemap, num_objects=agent_count)
-    spawnpoints = spawnpoints.at[:, 2].add(1)
-    print(f"Init mj model...")
-    mjx_model, mj_model = generate_base_model(
-        ICLandConfig(width, height, agent_count, {}, 6)
-    )
-    icland_params = ICLandParams(
-        world=tilemap,
-        reward_function=None,
-        agent_spawns=jnp.array([[1 + i, 1, 4] for i in range(agent_count)]),
-        world_level=6,
-    )
+    # Initialize global config
+    config = ICLandConfig(width, height, agent_count, {}, 6)
+    mjx_model, _ = generate_base_model(config)
+    print(f"Sampling world with key {key[1]}...")
 
+    # Use ICLand API to sample and initialize world
+    icland_params = icland.sample(key, config)
+    # icland_params = icland_params.replace(
+    #     agent_spawns=jnp.array([[1 + i, 1, 4] for i in range(agent_count)])
+    # )
     icland_state = icland.init(key, icland_params, mjx_model)
-
-    icland_state = icland.step(key, icland_state, icland_params, policy)
-    print(f"Init mjX model and data...")
+    icland_state = icland.step(key, icland_state, icland_params, jnp.array(policies))
+    tilemap = icland_state.pipeline_state.world
+    print(f"Init mjx model and data...")
     mjx_data = icland_state.pipeline_state.mjx_data
 
-    # Store frames for each agent separately
-    agent_frames: dict[int, list[Any]] = {
-        agent_id: [] for agent_id in range(agent_count)
-    }
+    # Store frames for each agent
+    agent_frames: list[Any] = []
 
-    print(f"Starting simulation for {agent_count}: {video_name}")
+    print(f"Starting simulation for {agent_count} agents: {video_name}")
     last_printed_time = -0.1
-    world_width = tilemap.shape[1]
+    world_width = tilemap.shape[0]
 
     # JIT-compiled
     get_camera_info = jax.jit(get_agent_camera_from_mjx)
 
-    @jax.jit
-    def step_sim(
-        icland_state: ICLandState, key: jax.Array
-    ) -> tuple[ICLandState, MjxStateType]:
-        icland_state = icland.step(key, icland_state, icland_params, policy)
-        mjx_data = icland_state.pipeline_state.mjx_data
-        return icland_state, mjx_data
-
-    print("Rendering multiple agents...")
-
-    # List to store combined frames for each timestep
-    all_combined_frames: list[Any] = []
+    all_colors = jnp.array(
+        [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 1, 1], [1, 0, 1], [1, 1, 0]]
+    )
+    colors = all_colors[
+        jax.random.randint(
+            jax.random.PRNGKey(0), (agent_count,), 0, all_colors.shape[0]
+        )
+    ]
+    FPS = 60
 
     while mjx_data.time < duration:
         if int(mjx_data.time * 10) != int(last_printed_time * 10):
             print(f"Time: {mjx_data.time:.1f}")
             last_printed_time = mjx_data.time
 
-        icland_state, mjx_data = step_sim(icland_state, key)
+        icland_state = icland.step(
+            key, icland_state, icland_params, jnp.array(policies)
+        )
+        mjx_data = icland_state.pipeline_state.mjx_data
 
-        if len(next(iter(agent_frames.values()))) < mjx_data.time * 30:
+        if len(agent_frames) < mjx_data.time * FPS:
             camera_pos, camera_dir = jax.vmap(get_camera_info, in_axes=(None, None, 0))(
                 icland_state, world_width, jnp.arange(agent_count)
             )
             players = jax.vmap(
                 lambda x: PlayerInfo(
-                    pos=mjx_data.xpos[icland_state.pipeline_state.component_ids[x, 0]][
-                        :3
-                    ],
-                    col=jnp.array([1, 0, 0]),
+                    pos=camera_pos[x].at[1].add(0.2),
+                    col=colors[x],
                 )
             )(jnp.arange(agent_count))
-            props = PropInfo(jnp.array([]), jnp.array([]), jnp.array([]), jnp.array([]))
 
+            props = PropInfo(
+                prop_type=jnp.array([0]),
+                pos=jnp.empty((1, 3)),
+                rot=jnp.array([[1, 0, 0, 0]]),
+                col=jnp.empty((1, 3)),
+            )
+
+            temp_agent_frames: list[Any] = []
             for aid in range(agent_count):
                 f = render_frame_with_objects(
                     camera_pos[aid],
@@ -341,23 +341,19 @@ def render_video_multi_agent(
                     generate_colormap(key, width, height),
                     players,
                     props,
-                    view_width=96,
-                    view_height=72,
+                    view_width=360,
+                    view_height=240,
                 )
                 # print("Rendered frame")
-                agent_frames[aid].append(f)
+                temp_agent_frames.append(f)
 
             # Combine frames for this timestep and append to all_combined_frames
-            combined_frame = __combine_frames(agent_frames)
-            all_combined_frames.append(combined_frame)
-
-            # print("agent pos:", mjx_data.xpos[1])
-            # print("Got camera angle")
-
-    all_combined_frames = [frame for frame in all_combined_frames]
+            combined_frame = __combine_frames(temp_agent_frames)
+            agent_frames.append(combined_frame)
+        # print("Got camera angle")
 
     # Save the combined video
-    imageio.mimsave(video_name, all_combined_frames, fps=30, quality=8)
+    imageio.mimsave(video_name, agent_frames, fps=FPS, quality=8)
 
 
 def render_video(
@@ -514,12 +510,15 @@ def render_video_from_world_with_policies(
 if __name__ == "__main__":
     keys = [
         jax.random.PRNGKey(42),
-        # jax.random.PRNGKey(420),
-        # jax.random.PRNGKey(2004),
+        jax.random.PRNGKey(420),
+        jax.random.PRNGKey(2004),
     ]
     for k in keys:
         render_video_multi_agent(
-            k, RIGHT_POLICY, 3, 4, f"tests/video_output/world_convex_ma_{k[1]}_mjx.mp4"
+            k,
+            4,
+            [FORWARD_POLICY, CLOCKWISE_POLICY, BACKWARD_POLICY, ANTI_CLOCKWISE_POLICY],
+            f"tests/video_output/world_convex_ma_{k[1]}_mjx.mp4",
         )
     # for i, preset in enumerate(SIMULATION_PRESETS):
     #     print(f"Running preset {i + 1}/{len(SIMULATION_PRESETS)}: {preset['name']}")

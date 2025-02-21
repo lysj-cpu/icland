@@ -7,7 +7,8 @@ from mujoco import mjx
 
 from .agent import collect_body_scene_info, step_agent
 from .constants import *
-from .game import generate_game
+
+# from .game import generate_game
 from .types import *
 from .world_gen.converter import sample_spawn_points
 from .world_gen.JITModel import export, sample_world
@@ -27,11 +28,13 @@ def sample(key: jax.Array, config: ICLandConfig) -> ICLandParams:
 
     Examples:
         >>> from icland import sample
+        >>> from icland.world_gen.model_editing import generate_base_model
         >>> import jax
         >>> key = jax.random.key(42)
-        >>> config = ICLandConfig(1, 1, 1, {})
+        >>> config = ICLandConfig(1, 1, 1, {}, 6)
+        >>> base_model, _ = generate_base_model(config)
         >>> sample(key, config)
-        ICLandParams(world=[[[0, 0, 0, 1]]], reward_function=reward_function(info: icland.types.ICLandInfo), agent_spawns=[[0, 0, 0]], world_level=6)
+        ICLandParams(world=ArrayImpl, reward_function=lambda function, agent_spawns=[[0.5 0.5 4. ]], world_level=6)
     """
     # Sample the number of agents in the environment
     # TODO(Iajedi): communicate with harens, add global config (max agent count, world width/height, etc.)
@@ -39,7 +42,7 @@ def sample(key: jax.Array, config: ICLandConfig) -> ICLandParams:
 
     # Sample the world based on config, using the WFC model (for now)
     MAX_STEPS = 1000
-    wfc_model, _ = sample_world(
+    wfc_model = sample_world(
         config.world_width, config.world_height, MAX_STEPS, key, True, 1
     )
     world_tilemap = export(
@@ -47,7 +50,9 @@ def sample(key: jax.Array, config: ICLandConfig) -> ICLandParams:
     )
 
     # Generate the reward function
-    reward_function = generate_game(key, agent_count)
+    # TODO: Adapt for JIT-ted manner
+    # reward_function = generate_game(key, agent_count)
+    reward_function = None
 
     # Generate the spawn points for each object
     # TODO: Add prop spawns as well
@@ -72,11 +77,14 @@ def init(key: jax.Array, params: ICLandParams, base_model: MjxModelType) -> ICLa
 
     Examples:
         >>> from icland import sample, init
+        >>> from icland.presets import DEFAULT_CONFIG
+        >>> from icland.world_gen.model_editing import generate_base_model
         >>> import jax
+        >>> base_model, _ = generate_base_model(DEFAULT_CONFIG)
         >>> key = jax.random.key(42)
-        >>> params = sample(key)
-        >>> init(key, params)
-        ICLandState(pipeline_state=PipelineState(mjx_model=Model, mjx_data=Data, component_ids=[[1 1 0]]), observation=[0. 0. 0. 0.], data=ICLandInfo(...))
+        >>> params = sample(key, DEFAULT_CONFIG)
+        >>> init(key, params, base_model)
+        ICLandState(pipeline_state=PipelineState(mjx_model=Model, mjx_data=Data, component_ids=[[  1 205   0]], world=World(width: 10, height: 10)), observation=[0. 0. 0. 0.], data=ICLandInfo(agent_positions=Array([[0., 0., 0.]], dtype=float32), agent_velocities=Array([[0., 0., 0., 0.]], dtype=float32), agent_rotations=Array([0.], dtype=float32)))
     """
     # Unpack params
     world_tilemap = params.world
@@ -210,11 +218,14 @@ def step(
         >>> import jax
         >>> import jax.numpy as jnp
         >>> forward_policy = jnp.array([1, 0, 0])
+        >>> from icland.presets import DEFAULT_CONFIG
+        >>> from icland.world_gen.model_editing import generate_base_model
+        >>> base_model, _ = generate_base_model(DEFAULT_CONFIG)
         >>> key = jax.random.key(42)
-        >>> params = sample(key)
-        >>> state = init(key, params)
-        >>> step(key, state, params, forward_policy)
-        ICLandState(pipeline_state=PipelineState(mjx_model=Model, mjx_data=Data, component_ids=[[1 1 0]]), observation=[ 4.0000002e-04  0.0000000e+00 -3.9240003e-05  0.0000000e+00], data=ICLandInfo(...))
+        >>> params = sample(key, DEFAULT_CONFIG)
+        >>> state = init(key, params, base_model)
+        >>> step(key, state, params, forward_policy) # doctest:+ELLIPSIS
+        ICLandState(pipeline_state=PipelineState(mjx_model=Model, mjx_data=Data, component_ids=[[  1 205   0]], world=World(width: 10, height: 10)), observation=[...], data=ICLandInfo(agent_positions=Array([[0., 0., 0.]], dtype=float32), agent_velocities=Array([[0., 0., 0., 0.]], dtype=float32), agent_rotations=Array([0.], dtype=float32)))
     """
     # Unpack state
     pipeline_state = state.pipeline_state
