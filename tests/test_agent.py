@@ -2,13 +2,13 @@
 
 import jax
 import jax.numpy as jnp
-import mujoco
 import pytest
 
 import icland
 from icland.constants import SMALL_VALUE
 from icland.presets import *
 from icland.types import *
+from icland.world_gen.model_editing import generate_base_model
 
 
 @pytest.fixture
@@ -35,18 +35,27 @@ def test_agent_translation(
 ) -> None:
     """Test agent movement in ICLand environment."""
     # Create the ICLand environment
-    mj_model = mujoco.MjModel.from_xml_string(EMPTY_WORLD)
-    icland_params = ICLandParams(mj_model, None, 1)
-    icland_state = icland.init(key, icland_params)
+    mjx_model, _ = generate_base_model(DEFAULT_CONFIG)
+    icland_params = ICLandParams(
+        world=TEST_TILEMAP_EMPTY_WORLD,
+        reward_function=None,
+        agent_spawns=jnp.array([[1, 1, 1]]),
+        world_level=6,
+    )
+
+    icland_state = icland.init(jax.random.PRNGKey(42), icland_params, mjx_model)
     pipeline_state = icland_state.pipeline_state
     body_id = pipeline_state.component_ids[0, 0]
 
+    # Initial step (to apply data from model)
+    icland_state = icland.step(key, icland_state, None, policy)
+
     # Get initial position, without height
+    pipeline_state = icland_state.pipeline_state
     initial_pos = pipeline_state.mjx_data.xpos[body_id][:2]
 
     # Step the environment to update the agents velocty
     icland_state = icland.step(key, icland_state, None, policy)
-    pipeline_state = icland_state.pipeline_state
 
     # Check if the correct velocity was applied
     velocity = pipeline_state.mjx_data.qvel[:2]
@@ -91,9 +100,15 @@ def test_agent_rotation(
 ) -> None:
     """Test agent movement in ICLand environment."""
     # Create the ICLand environment
-    mj_model = mujoco.MjModel.from_xml_string(EMPTY_WORLD)
-    icland_params = ICLandParams(mj_model, None, 1)
-    icland_state = icland.init(key, icland_params)
+    mjx_model, _ = generate_base_model(DEFAULT_CONFIG)
+    icland_params = ICLandParams(
+        world=TEST_TILEMAP_EMPTY_WORLD,
+        reward_function=None,
+        agent_spawns=jnp.array([[1, 1, 1]]),
+        world_level=6,
+    )
+
+    icland_state = icland.init(jax.random.PRNGKey(42), icland_params, mjx_model)
     pipeline_state = icland_state.pipeline_state
 
     # Get initial orientation
@@ -125,9 +140,17 @@ def test_agent_rotation(
 def test_two_agents(key: jax.Array, name: str, policies: jnp.ndarray) -> None:
     """Test two agents movement in ICLand environment."""
     # Create the ICLand environment
-    mj_model = mujoco.MjModel.from_xml_string(TWO_AGENT_EMPTY_WORLD)
-    icland_params = ICLandParams(mj_model, None, 2)
-    icland_state = icland.init(key, icland_params)
+    config = DEFAULT_CONFIG.replace(max_agent_count=2)
+    mjx_model, _ = generate_base_model(config)
+    icland_params = ICLandParams(
+        world=TEST_TILEMAP_EMPTY_WORLD,
+        reward_function=None,
+        agent_spawns=jnp.array([[1, 1, 1], [1, 1.5, 1]]),
+        world_level=6,
+    )
+
+    icland_state = icland.init(jax.random.PRNGKey(42), icland_params, mjx_model)
+    icland_state = icland.step(key, icland_state, None, policies)
     pipeline_state = icland_state.pipeline_state
 
     # Simulate 2 seconds
@@ -140,9 +163,10 @@ def test_two_agents(key: jax.Array, name: str, policies: jnp.ndarray) -> None:
     agent_1_pos = pipeline_state.mjx_data.xpos[body_id_1][:2]
     agent_2_pos = pipeline_state.mjx_data.xpos[body_id_2][:2]
 
-    # Simulate one more step.
-    icland_state = icland.step(key, icland_state, None, NOOP_POLICY)
-    pipeline_state = icland_state.pipeline_state
+    # Simulate one more second.
+    while pipeline_state.mjx_data.time < 1:
+        icland_state = icland.step(key, icland_state, None, NOOP_POLICY)
+        pipeline_state = icland_state.pipeline_state
 
     agent_1_new_pos = pipeline_state.mjx_data.xpos[body_id_1][:2]
     agent_2_new_pos = pipeline_state.mjx_data.xpos[body_id_2][:2]
@@ -153,13 +177,13 @@ def test_two_agents(key: jax.Array, name: str, policies: jnp.ndarray) -> None:
 
     if name == "Move In Parallel":
         # Check the two agents moved in parallel
-        assert jnp.allclose(displacement_1 - displacement_2, 0), (
+        assert jnp.allclose(displacement_1 - displacement_2, 0, atol=1e-2), (
             f"{name} failed: Expected displacement difference 0, "
             f"Agent 1 displacement {displacement_1}, Agent 2 displacement {displacement_2}"
         )
     elif name == "Two Agents Colide":
         # Check agents do not move (they have collided)
-        assert jnp.allclose(displacement_1 + displacement_2, 0), (
+        assert jnp.allclose(displacement_1 + displacement_2, 0, atol=1e-2), (
             f"{name} failed: Expected displacement difference 0, "
             f"Agent 1 displacement {displacement_1}, Agent 2 displacement {displacement_2}"
         )

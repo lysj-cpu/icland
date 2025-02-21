@@ -27,6 +27,8 @@ Frames:
 
 import jax.numpy as jnp
 
+from icland.types import ICLandConfig
+
 # ========================
 # Policy Definitions
 # ========================
@@ -39,6 +41,11 @@ RIGHT_POLICY = jnp.array([0, -1, 0])
 ANTI_CLOCKWISE_POLICY = jnp.array([0, 0, -1])
 CLOCKWISE_POLICY = jnp.array([0, 0, 1])
 
+# ========================
+# Default ICLandConfig
+# ========================
+
+DEFAULT_CONFIG = ICLandConfig(10, 10, 1, {}, 6)
 
 # ========================
 # World Definitions
@@ -336,6 +343,9 @@ RAMP_60 = """
 </mujoco>
 """
 
+TEST_TILEMAP_EMPTY_WORLD = jnp.array(
+    [[[0, 0, 0, 0] for _ in range(10)] for _ in range(10)]
+)
 TEST_TILEMAP_FLAT = jnp.array([[[0, 0, 0, 3] for _ in range(10)] for _ in range(10)])
 TEST_TILEMAP_BUMP = TEST_TILEMAP_FLAT.at[:, 5].set(jnp.array([0, 0, 0, 5]))
 TEST_TILEMAP_WORLD42 = jnp.array(

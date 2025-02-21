@@ -28,7 +28,7 @@ def __generate_mjcf_spec(
     w, h = tile_map.shape[0], tile_map.shape[1]
     # Add assets
     # Columns: 1 to 6
-    for i in range(1, WORLD_HEIGHT + 1):
+    for i in range(1, WORLD_LEVEL + 1):
         spec.add_mesh(
             name=f"c{i}",  # ci for column level i
             uservert=[
@@ -60,7 +60,7 @@ def __generate_mjcf_spec(
         )
 
     # Ramps: 1-2 to 5-6
-    for i in range(1, WORLD_HEIGHT):
+    for i in range(1, WORLD_LEVEL):
         spec.add_mesh(
             name=f"r{i + 1}",  # ri for ramp to i
             uservert=[
@@ -233,7 +233,7 @@ def pipeline(
 
 if __name__ == "__main__":
     t = TEST_TILEMAP_FLAT
-    # for i in range(1, WORLD_HEIGHT + 1):
+    # for i in range(1, WORLD_LEVEL + 1):
     #     # for j in range(4):
     #     spec_1 = __generate_mjcf_spec(t.at[0, 0].set(jnp.array([0, 0, 0, i])))
     #     mj_model_1 = spec_1.compile()

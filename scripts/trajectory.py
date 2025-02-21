@@ -58,7 +58,7 @@ def plot_trajectories_multi_policies(
     mj_model = mujoco.MjModel.from_xml_string(xml_str)
     icland_params = ICLandParams(model=mj_model, reward_function=None, agent_count=1)
 
-    icland_state = icland.init(key, icland_params)
+    icland_state = icland.init(key, icland_params, mj_model)
     mjx_data = icland_state.pipeline_state.mjx_data
     trajectory: list[Any] = []
 

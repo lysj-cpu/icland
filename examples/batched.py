@@ -4,6 +4,8 @@ import jax
 import jax.numpy as jnp
 
 import icland
+from icland.types import *
+from icland.world_gen.model_editing import generate_base_model
 
 SEED = 42
 BATCH_SIZE = 8
@@ -11,11 +13,14 @@ BATCH_SIZE = 8
 # Benchmark parameters
 key = jax.random.PRNGKey(SEED)
 
+# Set global configuration
+config = ICLandConfig(2, 2, 1, {}, 6)
 # Sample initial conditions
-icland_params = icland.sample(key)
+icland_params = icland.sample(key, config)
 
 # Initialize the environment
-init_state = icland.init(key, icland_params)
+mjx_model, _ = generate_base_model(config)
+init_state = icland.init(key, icland_params, mjx_model)
 
 # Batched step function
 batched_step = jax.vmap(icland.step, in_axes=(0, 0, icland_params, 0))

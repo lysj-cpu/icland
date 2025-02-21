@@ -5,13 +5,17 @@ import jax.numpy as jnp
 import mujoco
 from mujoco import mjx
 
-from .agent import collect_body_scene_info, create_agent, step_agent
+from .agent import collect_body_scene_info, step_agent
 from .constants import *
 from .game import generate_game
 from .types import *
+from .world_gen.converter import sample_spawn_points
+from .world_gen.JITModel import export, sample_world
+from .world_gen.model_editing import edit_model_data
+from .world_gen.tile_data import TILECODES
 
 
-def sample(key: jax.Array) -> ICLandParams:
+def sample(key: jax.Array, config: ICLandConfig) -> ICLandParams:
     """Sample a new set of environment parameters using 'key'.
 
     Returns:
@@ -25,41 +29,38 @@ def sample(key: jax.Array) -> ICLandParams:
         >>> from icland import sample
         >>> import jax
         >>> key = jax.random.key(42)
-        >>> sample(key)
-        ICLandParams(model=MjModel, reward_function=reward_function(info: icland.types.ICLandInfo) -> jax.Array, agent_count=1)
+        >>> config = ICLandConfig(1, 1, 1, {})
+        >>> sample(key, config)
+        ICLandParams(world=[[[0, 0, 0, 1]]], reward_function=reward_function(info: icland.types.ICLandInfo), agent_spawns=[[0, 0, 0]], world_level=6)
     """
     # Sample the number of agents in the environment
-    agent_count = int(
-        jax.random.randint(key, (), WORL_MIN_AGENT_COUNT, WORLD_MAX_AGENT_COUNT)
+    # TODO(Iajedi): communicate with harens, add global config (max agent count, world width/height, etc.)
+    agent_count = config.max_agent_count
+
+    # Sample the world based on config, using the WFC model (for now)
+    MAX_STEPS = 1000
+    wfc_model, _ = sample_world(
+        config.world_width, config.world_height, MAX_STEPS, key, True, 1
     )
-
-    # Create the Mujoco model
-    specification = mujoco.MjSpec()
-
-    # Add the ground plane
-    specification.worldbody.add_geom(
-        name="ground",
-        type=mujoco.mjtGeom.mjGEOM_PLANE,
-        size=[0, 0, 0.01],
-        rgba=[1, 1, 1, 1],
+    world_tilemap = export(
+        wfc_model, TILECODES, config.world_width, config.world_height
     )
-
-    # Add the agents
-    for agent_id in range(agent_count):
-        specification = create_agent(
-            agent_id, jnp.array([agent_id, 0, 0.5]), specification
-        )
-
-    # Compile the Mujoco model
-    mj_model: mujoco.MjModel = specification.compile()
 
     # Generate the reward function
     reward_function = generate_game(key, agent_count)
 
-    return ICLandParams(mj_model, reward_function, agent_count)
+    # Generate the spawn points for each object
+    # TODO: Add prop spawns as well
+    key, subkey = jax.random.split(key)
+    num_objects = config.max_agent_count
+    spawnpoints = sample_spawn_points(subkey, world_tilemap, num_objects)
+
+    return ICLandParams(
+        world_tilemap, reward_function, spawnpoints, config.max_world_level
+    )
 
 
-def init(key: jax.Array, params: ICLandParams) -> ICLandState:
+def init(key: jax.Array, params: ICLandParams, base_model: MjxModelType) -> ICLandState:
     """Initialize the environment state from params.
 
     Returns:
@@ -78,16 +79,23 @@ def init(key: jax.Array, params: ICLandParams) -> ICLandState:
         ICLandState(pipeline_state=PipelineState(mjx_model=Model, mjx_data=Data, component_ids=[[1 1 0]]), observation=[0. 0. 0. 0.], data=ICLandInfo(...))
     """
     # Unpack params
-    mj_model = params.model
-    agent_count = params.agent_count
-    mj_data: mujoco.MjData = mujoco.MjData(mj_model)
+    world_tilemap = params.world
+    agent_count = params.agent_spawns.shape[0]
 
     # Put Mujoco model and data into JAX-compatible format
-    mjx_model = mjx.put_model(mj_model)
-    mjx_data = mjx.put_data(mj_model, mj_data)
+    mjx_model = edit_model_data(
+        world_tilemap,
+        base_model,
+        params.agent_spawns,
+        jnp.array([]),
+        params.world_level,
+    )
+    mjx_data = mjx.make_data(mjx_model)
 
-    agent_components = collect_agent_components(mj_model, agent_count)
-    pipeline_state = PipelineState(mjx_model, mjx_data, agent_components)
+    agent_components = collect_agent_components_mjx(
+        mjx_model, world_tilemap.shape[0], world_tilemap.shape[1], agent_count
+    )
+    pipeline_state = PipelineState(mjx_model, mjx_data, agent_components, world_tilemap)
 
     return ICLandState(
         pipeline_state,
@@ -96,7 +104,7 @@ def init(key: jax.Array, params: ICLandParams) -> ICLandState:
     )
 
 
-def collect_agent_components(mj_model: mujoco.MjModel, agent_count: int) -> jnp.ndarray:
+def collect_agent_components(mj_model: mujoco.MjModel, agent_count: int) -> jax.Array:
     """Collect object IDs for all agents."""
     agent_components = jnp.empty(
         (agent_count, AGENT_COMPONENT_IDS_DIM), dtype=jnp.int32
@@ -119,11 +127,10 @@ def collect_agent_components(mj_model: mujoco.MjModel, agent_count: int) -> jnp.
 
     return agent_components
 
-def collect_prop_components(mj_model: mujoco.MjModel, prop_count: int) -> jnp.ndarray:
+
+def collect_prop_components(mj_model: mujoco.MjModel, prop_count: int) -> jax.Array:
     """Collect object IDs for all agents."""
-    agent_components = jnp.empty(
-        (prop_count, AGENT_COMPONENT_IDS_DIM), dtype=jnp.int32
-    )
+    agent_components = jnp.empty((prop_count, AGENT_COMPONENT_IDS_DIM), dtype=jnp.int32)
 
     for prop_id in range(prop_count):
         print(f"prop{prop_id}", f"prop{prop_id}_geom")
@@ -143,14 +150,15 @@ def collect_prop_components(mj_model: mujoco.MjModel, prop_count: int) -> jnp.nd
 
     return agent_components
 
+
 def collect_agent_components_mjx(
     mjx_model: mjx.Model, width: int, height: int, agent_count: int
-) -> jnp.ndarray:
+) -> jax.Array:
     """Collect object IDs for all agents in a GPU-optimized way using mjx.Model."""
 
-    def get_components_aux(agent_id: int) -> jnp.ndarray:
+    def get_components_aux(agent_id: jax.Array) -> jax.Array:
         body_id = agent_id + BODY_OFFSET
-        geom_id = (agent_id + width * height) * 2 + WALL_OFFSET * (1 if width != 0 and height != 0 else 0)
+        geom_id = (agent_id + width * height) * 2 + WALL_OFFSET
         dof_address = agent_id * 4
         return jnp.array([body_id, geom_id, dof_address])
 
@@ -160,14 +168,17 @@ def collect_agent_components_mjx(
 
     return agent_components
 
+
 def collect_prop_components_mjx(
     mjx_model: mjx.Model, width: int, height: int, prop_count: int, agent_count: int
-) -> jnp.ndarray:
+) -> jax.Array:
     """Collect prop components in a GPU-optimized way using mjx.Model."""
-    
-    def get_components_aux(prop_id: int) -> jnp.ndarray:
+
+    def get_components_aux(prop_id: jax.Array) -> jax.Array:
         body_id = prop_id + BODY_OFFSET + agent_count
-        geom_id = agent_count * 2 + (prop_id + agent_count + width * height) + WALL_OFFSET * (width > 0 and height > 0)
+        geom_id = (
+            agent_count * 2 + (prop_id + agent_count + width * height) + WALL_OFFSET
+        )
         dof_address = PROP_DOF_OFFSET + prop_id * PROP_DOF_MULTIPLIER
         return jnp.array([body_id, geom_id, dof_address])
 
@@ -219,7 +230,7 @@ def step(
     # Define a function to step a single agent
     def step_single_agent(
         carry: tuple[MjxStateType, jax.Array],
-        agent_components: tuple[jnp.ndarray, jnp.ndarray],
+        agent_components: tuple[jax.Array, jax.Array],
     ) -> tuple[tuple[MjxStateType, jax.Array], None]:
         mjx_data, action = carry
 
@@ -243,7 +254,9 @@ def step(
 
     # Step the environment after applying all agent actions
     updated_data = mjx.step(mjx_model, updated_data)
-    new_pipeline_state = PipelineState(mjx_model, updated_data, agent_components)
+    new_pipeline_state = PipelineState(
+        mjx_model, updated_data, agent_components, pipeline_state.world
+    )
     data: ICLandInfo = collect_body_scene_info(agent_components, mjx_data)
     observation = updated_data.qpos
 

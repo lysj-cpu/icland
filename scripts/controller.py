@@ -37,16 +37,17 @@ import icland
 # Import your policies and worlds from your assets.
 from icland.presets import *
 from icland.types import *
+from icland.world_gen.model_editing import generate_base_model
 
 
-def interactive_simulation() -> None:
+def interactive_simulation(config: ICLandConfig) -> None:
     """Runs an interactive simulation where you can change the agent's policy via keyboard input."""
-    # Create the MuJoCo model from the XML string.
-    icland_params = icland.sample(jax.random.PRNGKey(42))
-    mj_model = icland_params.model
+    # Create the MuJoCo model from the .
+    icland_params = icland.sample(jax.random.PRNGKey(42), DEFAULT_CONFIG)
+    mjx_model, mj_model = generate_base_model(DEFAULT_CONFIG)
 
     jax_key = jax.random.PRNGKey(42)
-    icland_state = icland.init(jax_key, icland_params)
+    icland_state = icland.init(jax_key, icland_params, mjx_model)
 
     # Set up the camera.
     cam = mujoco.MjvCamera()
@@ -142,4 +143,4 @@ def interactive_simulation() -> None:
 
 
 if __name__ == "__main__":
-    interactive_simulation()
+    interactive_simulation(ICLandConfig(3, 3, 1, {}, 6))

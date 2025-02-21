@@ -9,6 +9,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from jax.scipy.spatial.transform import Rotation
+from mujoco.mjx._src.dataclasses import PyTreeNode
 
 from icland.renderer.sdfs import box_sdf, capsule_sdf, cube_sdf, ramp_sdf, sphere_sdf
 from icland.types import ICLandState
@@ -465,30 +466,48 @@ def generate_colormap(key: jax.Array, width: jnp.int32, height: jnp.int32) -> ja
     return colormap
 
 
+class PlayerInfo(PyTreeNode):  # type: ignore[misc]
+    """Player info."""
+
+    pos: jax.Array
+    col: jax.Array
+
+
+class PropInfo(PyTreeNode):  # type: ignore[misc]
+    """Prop info."""
+
+    prop_type: jax.Array
+    pos: jax.Array
+    rot: jax.Array
+    col: jax.Array
+
+
 @partial(jax.jit, static_argnames=["view_width", "view_height"])
 def render_frame_with_objects(
     cam_pos: jax.Array,
     cam_dir: jax.Array,
     tilemap: jax.Array,
     terrain_cmap: jax.Array,
-    props: jax.Array = jnp.array([1]),
+    players: PlayerInfo,
+    props: PropInfo,
     light_dir: jax.Array = __normalize(jnp.array([5.0, 10.0, 5.0])),
     view_width: jnp.int32 = DEFAULT_VIEWSIZE[0],
     view_height: jnp.int32 = DEFAULT_VIEWSIZE[1],
 ) -> jax.Array:
     """Renders one frame given camera position, direction, and world terrain."""
-    player_pos = jnp.array([[8.5, 3, 1]])
-    player_col = jnp.array([[1.0, 0.0, 0.0]])
-    prop_pos = jnp.array([[4, 3, 1]])
-    prop_rot = jnp.array([[1, 0, 0, 0]])
-    prop_col = jnp.array([[1.0, 1.0, 0.0]])
+    player_pos = players.pos
+    player_col = players.col
+    prop_pos = props.pos
+    prop_rot = props.rot
+    prop_col = props.col
+    prop_types = props.prop_type
 
     # Ray casting
     ray_dir = __camera_rays(cam_pos, cam_dir, view_width, view_height, fx=0.6)
     sdf = partial(
         __scene_sdf_with_objs,
         tilemap,
-        props,
+        prop_types,
         player_pos,
         player_col,
         prop_pos,
