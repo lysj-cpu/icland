@@ -52,8 +52,8 @@ class BenchmarkScenario:
 BENCHMARKING_SCENARIOS: dict[str, BenchmarkScenario] = {
     "batched_step_performance": BenchmarkScenario(
         description="Batched step performance",
-        function=benchmark_renderer_non_empty_world,
-        parameters=[2**i for i in range(0, 2)],
+        function=benchmark_step_non_empty_world,
+        parameters=[2**i for i in range(0, 9)],
     )
 }
 

@@ -82,13 +82,13 @@ def benchmark_renderer_non_empty_world(batch_size: int) -> BenchmarkMetrics:
     # Batched mjx data
     batch_data = jax.vmap(mujoco.mjx.make_data)(batch)
     
-    icland_params = ICLandParams(
-        model=mj_model, 
-        reward_function=None, 
-        agent_count=agent_count
-    )
+    # icland_params = ICLandParams(
+    #     model=mj_model, 
+    #     reward_function=None, 
+    #     agent_count=agent_count
+    # )
 
-    actions = jnp.tile(jnp.array([1, 0, 0]), (batch_size, 1))
+    # actions = jnp.tile(jnp.array([1, 0, 0]), (batch_size, 1))
 
     def create_icland_state(mjx_model, mjx_data):
         return ICLandState(
@@ -100,7 +100,7 @@ def benchmark_renderer_non_empty_world(batch_size: int) -> BenchmarkMetrics:
     # Emulate our own step and run once
     icland_states = jax.vmap(create_icland_state, in_axes=(0, 0))(batch, batch_data)   # batched_step = jax.vmap(icland.step, in_axes=(None, 0, None, 0))
 
-    batched_step = jax.vmap(icland.step, in_axes=(None, 0, None, 0))
+    # batched_step = jax.vmap(icland.step, in_axes=(None, 0, None, 0))
     batched_get_camera_info = jax.vmap(get_agent_camera_from_mjx, in_axes=(0, None, None))
     batched_render_frame = jax.vmap(render_frame, in_axes=(0, 0, 0))
     print(f"Starting simulation...")
@@ -124,20 +124,26 @@ def benchmark_renderer_non_empty_world(batch_size: int) -> BenchmarkMetrics:
 
     default_agent_1 = 0
 
+    camera_poses, camera_dirs = batched_get_camera_info(
+        icland_states, width, default_agent_1
+    )
+
     # Timed run
     total_time = 0
     for i in range(NUM_STEPS):
         # The elements in each of the four arrays are the same, except for those in keys
-        icland_states = batched_step(keys, icland_states, icland_params, actions)
+        # icland_states = batched_step(keys, icland_states, icland_params, actions)
 
-        camera_poses, camera_dirs = batched_get_camera_info(
-            icland_states, width, default_agent_1
-        )
+        # camera_poses, camera_dirs = batched_get_camera_info(
+        #     icland_states, width, default_agent_1
+        # )
+
         # print("Got camera angle")
         step_start_time = time.time()
         f = batched_render_frame(camera_poses, camera_dirs, tilemaps)        
         step_time = time.time() - step_start_time
         total_time += step_time
+        print(f'End of batched render frame step {i}. Time taken: {step_time}')
 
         # CPU Memory & Usage
         memory_usage_mb = process.memory_info().rss / (1024**2)  # in MB
@@ -243,7 +249,7 @@ def benchmark_step_non_empty_world(batch_size: int) -> BenchmarkMetrics:
     width = 2
     key = jax.random.key(SEED)
     keys = jax.random.split(key, batch_size)
-    agent_count = 2
+    agent_count = 4
     print(f"Benchmarking non-empty world of size {height}x{width}, with agent count of {agent_count}")
 
     # Maybe switch to use np ops instead of list comprehension
