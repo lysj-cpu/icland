@@ -65,7 +65,7 @@ def test_get_agent_camera_from_mjx() -> None:
     world_width = 10
 
     agent_pos = icland_state.pipeline_state.mjx_data.xpos[
-        icland_state.pipeline_state.component_ids[0, 0]
+        icland_state.pipeline_state.component_ids[0, 0].astype(int)
     ][:3]
     print(agent_pos)
     height_offset = 0.2

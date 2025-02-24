@@ -3,12 +3,14 @@
 It includes types for model parameters, state, and action sets used in the project.
 """
 
+import dataclasses
 import inspect
 from collections.abc import Callable
 from typing import Any, TypeAlias
 
 import jax
 import mujoco
+from jaxtyping import Array, Float
 from mujoco.mjx._src.dataclasses import PyTreeNode
 
 """Type variables from external modules."""
@@ -41,6 +43,20 @@ class PipelineState(PyTreeNode):  # type: ignore[misc]
         return f"PipelineState(mjx_model={type(self.mjx_model).__name__}, mjx_data={type(self.mjx_data).__name__}, component_ids={self.component_ids}, world=World(width: {self.world.shape[0]}, height: {self.world.shape[1]}))"
 
 
+class Agent(PyTreeNode):  # type: ignore[misc]
+    """Information about an agent in the ICLand environment."""
+
+    position: Float[Array, "3"]
+    velocity: Float[Array, "4"]
+    rotation: Float[Array, "1"] | Float[Array, ""]
+
+
+class Prop(PyTreeNode):  # type: ignore[misc]
+    """Information about a prop in the ICLand environment."""
+
+    centre_of_mass: Float[Array, "3"]
+
+
 class ICLandInfo(PyTreeNode):  # type: ignore[misc]
     """Information about the ICLand environment.
 
@@ -50,9 +66,9 @@ class ICLandInfo(PyTreeNode):  # type: ignore[misc]
         agent_rotations: Quat of agent rotations, indexed by agent's body ID.
     """
 
-    agent_positions: jax.Array
-    agent_velocities: jax.Array
-    agent_rotations: jax.Array
+    agents: list[Agent]
+    # TODO: Initialise values of props
+    props: list[Prop] = dataclasses.field(default_factory=list)
 
     # TODO: Add prop data
 

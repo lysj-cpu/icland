@@ -9,44 +9,43 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from jax.scipy.spatial.transform import Rotation
+from jaxtyping import Array, Bool, Float, Int
 from mujoco.mjx._src.dataclasses import PyTreeNode
 
 from icland.renderer.sdfs import box_sdf, capsule_sdf, cube_sdf, ramp_sdf, sphere_sdf
 from icland.types import ICLandState
 
 # Constants
-DEFAULT_VIEWSIZE: tuple[jnp.int32, jnp.int32] = (92, 76)
+DEFAULT_VIEWSIZE: tuple[int, int] = (92, 76)
 DEFAULT_COLOR: jax.Array = jnp.array([0.2588, 0.5294, 0.9607])
 WORLD_UP: jax.Array = jnp.array([0.0, 1.0, 0.0], dtype=jnp.float32)
-NUM_CHANNELS: jnp.int32 = 3
+NUM_CHANNELS: int = 3
 
 
 @partial(jax.jit, static_argnames=["axis", "keepdims"])
 def __norm(
     v: jax.Array,
-    axis: jnp.int32 = -1,
-    keepdims: jnp.bool = False,
-    eps: jnp.float32 = 0.0,
+    axis: int = -1,
+    keepdims: bool = False,
+    eps: float = 0.0,
 ) -> jax.Array:
     return jnp.sqrt((v * v).sum(axis, keepdims=keepdims).clip(min=eps))
 
 
 @jax.jit
-def __normalize(
-    v: jax.Array, axis: jnp.int32 = -1, eps: jnp.float32 = 1e-20
-) -> jax.Array:
+def __normalize(v: jax.Array, axis: int = -1, eps: float = 1e-20) -> jax.Array:
     return v / __norm(v, axis, keepdims=True, eps=eps)  # type: ignore
 
 
 @jax.jit
 def __process_column(
     p: jax.Array,
-    x: jnp.float32,
-    y: jnp.float32,
-    rot: jnp.int32,
-    w: jnp.float32,
-    h: jnp.float32,
-) -> jnp.float32:
+    x: Int[Array, ""],
+    y: Int[Array, ""],
+    rot: Int[Array, ""],
+    w: Int[Array, ""],
+    h: Int[Array, ""],
+) -> Float[Array, ""]:
     angle = -jnp.pi * rot / 2
     cos_t = jnp.cos(angle)
     sin_t = jnp.sin(angle)
@@ -69,12 +68,12 @@ def __process_column(
 @jax.jit
 def __process_ramp(
     p: jax.Array,
-    x: jnp.float32,
-    y: jnp.float32,
-    rot: jnp.int32,
-    h: jnp.float32,
-    w: jnp.float32,
-) -> jnp.float32:
+    x: Int[Array, ""],
+    y: Int[Array, ""],
+    rot: Int[Array, ""],
+    h: Int[Array, ""],
+    w: Int[Array, ""],
+) -> Float[Array, ""]:
     angle = -jnp.pi * rot / 2
     cos_t = jnp.cos(angle)
     sin_t = jnp.sin(angle)
@@ -109,16 +108,16 @@ def __process_ramp(
 
 @jax.jit
 def scene_sdf_from_tilemap(  # pragma: no cover
-    tilemap: jax.Array, p: jax.Array, floor_height: jnp.float32 = 0.0
-) -> tuple[jax.Array, jnp.int32, jnp.int32]:
+    tilemap: jax.Array, p: jax.Array, floor_height: float = 0.0
+) -> tuple[jax.Array, Int[Array, ""], Int[Array, ""]]:
     """Generates the signed distance function from the terrain."""
     w, h = tilemap.shape[0], tilemap.shape[1]
     dists = jnp.arange(w * h, dtype=jnp.int32)
     tile_width = 1
 
     def process_tile(
-        p: jax.Array, x: jnp.int32, y: jnp.int32, tile: jax.Array
-    ) -> jnp.float32:
+        p: jax.Array, x: Int[Array, ""], y: Int[Array, ""], tile: jax.Array
+    ) -> Float[Array, ""]:
         return jax.lax.switch(
             tile[0],
             [
@@ -153,9 +152,9 @@ def __raycast(
     sdf: Callable[[jax.Array], jax.Array],
     p0: jax.Array,
     rdir: jax.Array,
-    step_n: jnp.int32 = 50,
+    step_n: int = 50,
 ) -> Any:  # typing: ignore
-    def f(_: jnp.int32, p: jax.Array) -> Any:  # typing: ignore
+    def f(_: Int[Array, ""], p: jax.Array) -> Any:  # typing: ignore
         res = p + sdf(p) * rdir
         return res
 
@@ -167,9 +166,9 @@ def __camera_rays(
     cam_pos: jax.Array,
     forward: jax.Array,
     # view_size: tuple[jnp.int32, jnp.int32],
-    w: jnp.int32,
-    h: jnp.int32,
-    fx: jnp.float32 = 0.6,  # Changed type hint to float
+    w: int,
+    h: int,
+    fx: float = 0.6,  # Changed type hint to float
 ) -> jax.Array:
     """Finds camera rays."""
 
@@ -223,10 +222,10 @@ def __cast_shadow(
     sdf: Callable[[jax.Array], jax.Array],
     light_dir: jax.Array,
     p0: jax.Array,
-    step_n: jnp.int32 = 50,
-    hardness: jnp.float32 = 8.0,
+    step_n: int = 50,
+    hardness: float = 8.0,
 ) -> Any:
-    def f(_: Any, carry: jnp.float32) -> Any:
+    def f(_: Any, carry: tuple[jax.Array, jax.Array]) -> Any:
         t, shadow = carry
         h = sdf(p0 + light_dir * t)
         return t + h, jnp.clip(hardness * h / t, 0.0, shadow)
@@ -240,17 +239,17 @@ def __scene_sdf_from_tilemap_color(
     p: jax.Array,
     terrain_color: jax.Array = DEFAULT_COLOR,
     with_color: bool = False,
-    floor_height: jnp.float32 = 0.0,
-) -> tuple[jnp.float32, jax.Array]:
+    floor_height: float = 0.0,
+) -> tuple[jax.Array, jax.Array]:
     """SDF for the world terrain."""
     tile_dist, _, _ = scene_sdf_from_tilemap(tilemap, p, floor_height - 1)
     floor_dist = p[1] - floor_height
     min_dist = jnp.minimum(tile_dist, floor_dist)
 
-    def process_without_color(_: Any) -> tuple[jnp.float32, jax.Array]:
+    def process_without_color(_: Any) -> tuple[Float[Array, ""], jax.Array]:
         return min_dist, jnp.zeros((3,))
 
-    def process_with_color(_: Any) -> tuple[jnp.float32, jax.Array]:
+    def process_with_color(_: Any) -> tuple[Float[Array, ""], jax.Array]:
         x, _, z = jnp.tanh(jnp.sin(p * jnp.pi) * 20.0)
         floor_color = (0.5 + (x * z) * 0.1) * jnp.ones(3)
         color = jnp.choose(
@@ -278,7 +277,7 @@ def __scene_sdf_with_objs(
     # Ray point
     p: jax.Array,
     # Extra kwargs
-    floor_height: jnp.float32 = 0.0,
+    floor_height: float = 0.0,
 ) -> tuple[jax.Array, jax.Array]:
     """SDF for the agents and props."""
     # Pre: the lengths of agent_pos and agent_col are the same.
@@ -288,7 +287,7 @@ def __scene_sdf_with_objs(
     tile_dist, cx, cy = scene_sdf_from_tilemap(tilemap, p, floor_height - 1)
     floor_dist = p[1] - floor_height
 
-    def process_agent_sdf(i: jnp.int32) -> tuple[jnp.float32, jax.Array]:
+    def process_agent_sdf(i: Int[Array, ""]) -> tuple[Float[Array, ""], jax.Array]:
         curr_pos = agent_pos[i]
         curr_col = agent_col[i]
 
@@ -305,7 +304,7 @@ def __scene_sdf_with_objs(
             jnp.matmul(transform, jnp.append(p, 1))[:3], 0.4, 0.06
         ), curr_col
 
-    def process_prop_sdf(i: jnp.int32) -> tuple[jnp.float32, jax.Array]:
+    def process_prop_sdf(i: Int[Array, ""]) -> tuple[jax.Array, jax.Array]:
         curr_pos = prop_pos[i]
         curr_rot = prop_rot[i]
         curr_col = prop_col[i]
@@ -398,9 +397,9 @@ def can_see_object(
     obj_pos: jax.Array,
     obj_sdf: Callable[[Any], Any],
     terrain_sdf: Callable[[Any], Any],
-    eps: jnp.float32 = 1e-03,
-    step_n: jnp.int32 = 100,
-) -> jnp.bool:
+    eps: float = 1e-03,
+    step_n: int = 100,
+) -> Bool[Array, ""]:
     """Determines whether the specified player can see the object."""
     # All the positions and directions are in world coords.
 
@@ -408,17 +407,17 @@ def can_see_object(
     ray_length = jnp.linalg.norm(obj_pos - agent_pos)
     direction = agent_dir / jnp.linalg.norm(agent_dir)
 
-    state_init = (0.0, 0, 0)
+    state_init = (jnp.array(0.0), jnp.array(0), jnp.array(0))
 
-    def cond_fn(state: tuple[jnp.float32, jnp.int32, jnp.int32]) -> jnp.bool:
+    def cond_fn(state: tuple[jax.Array, jax.Array, jax.Array]) -> jax.Array:
         t, flag, step = state
         return jnp.logical_and(
             t < ray_length + eps, jnp.logical_and(flag == 0, step < step_n)
         )
 
     def body_fn(
-        state: tuple[jnp.float32, jnp.int32, jnp.int32],
-    ) -> tuple[jnp.float32, jnp.int32, jnp.int32]:
+        state: tuple[jax.Array, jax.Array, jax.Array],
+    ) -> tuple[jax.Array, jax.Array, jax.Array]:
         t, flag, step = state
         pos = agent_pos + t * direction
 
@@ -440,7 +439,7 @@ def can_see_object(
     return visible
 
 
-def generate_colormap(key: jax.Array, width: jnp.int32, height: jnp.int32) -> jax.Array:
+def generate_colormap(key: jax.Array, width: int, height: int) -> jax.Array:
     """Generates a colormap array with random colors from a set."""
     # rgb = 243/255, 180/255, 139/255
     colors = jnp.array(
@@ -497,10 +496,10 @@ def render_frame_with_objects(
         col=jnp.empty((1, 3)),
     ),
     light_dir: jax.Array = __normalize(jnp.array([5.0, 10.0, 5.0])),
-    view_width: jnp.int32 = DEFAULT_VIEWSIZE[0],
-    view_height: jnp.int32 = DEFAULT_VIEWSIZE[1],
-    camera_height: jnp.float32 = 0.4,
-    camera_offset: jnp.float32 = 0.2,
+    view_width: int = DEFAULT_VIEWSIZE[0],
+    view_height: int = DEFAULT_VIEWSIZE[1],
+    camera_height: float = 0.4,
+    camera_offset: float = 0.2,
 ) -> jax.Array:
     """Renders one frame given camera position, direction, and world terrain."""
     agent_pos = players.pos
@@ -539,7 +538,7 @@ def render_frame_with_objects(
     frame = jax.vmap(f)(surf_color, shadow, raw_normal, ray_dir)
     frame = frame ** (1.0 / 2.2)  # gamma correction
 
-    return frame.reshape((view_height, view_width, NUM_CHANNELS))  # type: ignore
+    return frame.reshape((view_height, view_width, NUM_CHANNELS))
 
 
 @partial(jax.jit, static_argnames=["view_width", "view_height"])
@@ -549,8 +548,8 @@ def render_frame(
     tilemap: jax.Array,
     terrain_color: jax.Array = DEFAULT_COLOR,
     light_dir: jax.Array = __normalize(jnp.array([5.0, 10.0, 5.0])),
-    view_width: jnp.int32 = DEFAULT_VIEWSIZE[0],
-    view_height: jnp.int32 = DEFAULT_VIEWSIZE[1],
+    view_width: int = DEFAULT_VIEWSIZE[0],
+    view_height: int = DEFAULT_VIEWSIZE[1],
     # view_size: tuple[jnp.int32, jnp.int32] = DEFAULT_VIEWSIZE,
 ) -> jax.Array:
     """Renders one frame given camera position, direction, and world terrain."""
@@ -576,18 +575,20 @@ def render_frame(
     frame = jax.vmap(f)(surf_color, shadow, raw_normal, ray_dir)
     frame = frame ** (1.0 / 2.2)  # gamma correction
 
-    return frame.reshape((view_height, view_width, NUM_CHANNELS))  # type: ignore
+    return frame.reshape((view_height, view_width, NUM_CHANNELS))
 
 
 @jax.jit
 def get_agent_camera_from_mjx(
     icland_state: ICLandState,
-    world_width: jnp.int32,
-    body_id: jnp.int32,
+    world_width: int,
+    body_id: int,
 ) -> tuple[jax.Array, jax.Array]:
     """Get the camera position and direction from the MuJoCo data."""
     data = icland_state.pipeline_state.mjx_data
-    agent_id = icland_state.pipeline_state.component_ids[body_id, 0]
+    agent_id = icland_state.pipeline_state.component_ids[body_id, 0].astype(int)
+    pitch = icland_state.pipeline_state.component_ids[body_id, 3] * 0.5
+    dof_address = icland_state.pipeline_state.component_ids[body_id, 2].astype(int)
 
     agent_pos = jnp.array(
         [
@@ -597,9 +598,15 @@ def get_agent_camera_from_mjx(
         ]
     )
 
-    # Direct matrix multiplication using precomputed transform_axes
-    yaw = data.qpos[body_id * 4 + 3]  # Get angle from dof address
-    forward_dir = jnp.array([-jnp.cos(yaw), 0.0, jnp.sin(yaw)])
+    # Get yaw from the MuJoCo data
+    yaw = data.qpos[dof_address + body_id * 4 + 3]  # Get angle from dof address
+
+    # Compute forward direction using both yaw and pitch.
+    # When pitch=0, this reduces to [-cos(yaw), 0, sin(yaw)] as before.
+    forward_dir = jnp.array(
+        [-jnp.cos(pitch) * jnp.cos(yaw), jnp.sin(pitch), jnp.cos(pitch) * jnp.sin(yaw)]
+    )
+
     camera_pos = agent_pos
 
     return camera_pos, forward_dir

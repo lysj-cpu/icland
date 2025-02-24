@@ -31,7 +31,7 @@ def test_agent_translation(
     key: jax.Array,
     name: str,
     policy: jnp.ndarray,
-    expected_direction: jnp.ndarray,
+    expected_direction: jax.Array,
 ) -> None:
     """Test agent movement in ICLand environment."""
     # Create the ICLand environment
@@ -45,7 +45,7 @@ def test_agent_translation(
 
     icland_state = icland.init(jax.random.PRNGKey(42), icland_params, mjx_model)
     pipeline_state = icland_state.pipeline_state
-    body_id = pipeline_state.component_ids[0, 0]
+    body_id = pipeline_state.component_ids[0, 0].astype(int)
 
     # Initial step (to apply data from model)
     icland_state = icland.step(key, icland_state, None, policy)
@@ -159,7 +159,7 @@ def test_two_agents(key: jax.Array, name: str, policies: jnp.ndarray) -> None:
         pipeline_state = icland_state.pipeline_state
 
     # Get the positions of the two agents
-    body_id_1, body_id_2 = pipeline_state.component_ids[:, 0]
+    body_id_1, body_id_2 = pipeline_state.component_ids[:, 0].astype(int)
     agent_1_pos = pipeline_state.mjx_data.xpos[body_id_1][:2]
     agent_2_pos = pipeline_state.mjx_data.xpos[body_id_2][:2]
 

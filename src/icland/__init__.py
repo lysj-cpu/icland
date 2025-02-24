@@ -1,11 +1,19 @@
 """Recreating Google DeepMind's XLand RL environment in JAX."""
 
+# Enforce runtime type-checking.
+# See: https://beartype.readthedocs.io/en/latest/api_claw/
+# Allow lossy conversion of integers to floating-point numbers
+# https://beartype.readthedocs.io/en/latest/api_decor/#beartype.BeartypeConf.is_pep484_tower
+# beartype_this_package(conf=BeartypeConf(is_pep484_tower=True))
 import jax
 import jax.numpy as jnp
 import mujoco
+
+# from beartype import BeartypeConf
+# from beartype.claw import beartype_this_package
 from mujoco import mjx
 
-from .agent import collect_body_scene_info, step_agent
+from .agent import collect_body_scene_info, step_agents
 from .constants import *
 
 # from .game import generate_game
@@ -16,7 +24,7 @@ from .world_gen.model_editing import edit_model_data
 from .world_gen.tile_data import TILECODES
 
 
-def sample(key: jax.Array, config: ICLandConfig) -> ICLandParams:
+def sample(key: jax.Array, config: ICLandConfig) -> ICLandParams:  # pragma: no cover
     """Sample a new set of environment parameters using 'key'.
 
     Returns:
@@ -112,10 +120,11 @@ def init(key: jax.Array, params: ICLandParams, base_model: MjxModelType) -> ICLa
     )
 
 
-def collect_agent_components(mj_model: mujoco.MjModel, agent_count: int) -> jax.Array:
-    """Collect object IDs for all agents."""
+def __collect_agent_components(
+    mj_model: mujoco.MjModel, agent_count: int
+) -> jax.Array:  # pragma: no cover
     agent_components = jnp.empty(
-        (agent_count, AGENT_COMPONENT_IDS_DIM), dtype=jnp.int32
+        (agent_count, AGENT_COMPONENT_IDS_DIM), dtype=jnp.float16
     )
 
     for agent_id in range(agent_count):
@@ -130,14 +139,15 @@ def collect_agent_components(mj_model: mujoco.MjModel, agent_count: int) -> jax.
         dof_address = mj_model.body_dofadr[body_id]
 
         agent_components = agent_components.at[agent_id].set(
-            [body_id, geom_id, dof_address]
+            [body_id, geom_id, dof_address, 0]
         )
 
     return agent_components
 
 
-def collect_prop_components(mj_model: mujoco.MjModel, prop_count: int) -> jax.Array:
-    """Collect object IDs for all agents."""
+def __collect_prop_components(
+    mj_model: mujoco.MjModel, prop_count: int
+) -> jax.Array:  # pragma: no cover
     agent_components = jnp.empty((prop_count, AGENT_COMPONENT_IDS_DIM), dtype=jnp.int32)
 
     for prop_id in range(prop_count):
@@ -168,7 +178,7 @@ def collect_agent_components_mjx(
         body_id = agent_id + BODY_OFFSET
         geom_id = (agent_id + width * height) * 2 + WALL_OFFSET
         dof_address = agent_id * 4
-        return jnp.array([body_id, geom_id, dof_address])
+        return jnp.array([body_id, geom_id, dof_address, 0])
 
     agent_components = jax.vmap(get_components_aux)(jnp.arange(agent_count)).astype(
         "int32"
@@ -179,7 +189,7 @@ def collect_agent_components_mjx(
 
 def collect_prop_components_mjx(
     mjx_model: mjx.Model, width: int, height: int, prop_count: int, agent_count: int
-) -> jax.Array:
+) -> jax.Array:  # pragma: no cover
     """Collect prop components in a GPU-optimized way using mjx.Model."""
 
     def get_components_aux(prop_id: jax.Array) -> jax.Array:
@@ -229,38 +239,16 @@ def step(
     """
     # Unpack state
     pipeline_state = state.pipeline_state
-
     mjx_model = pipeline_state.mjx_model
     mjx_data = pipeline_state.mjx_data
-
     agent_components = pipeline_state.component_ids
 
     # Ensure actions are in the correct shape
     actions = actions.reshape(-1, AGENT_ACTION_SPACE_DIM)
 
-    # Define a function to step a single agent
-    def step_single_agent(
-        carry: tuple[MjxStateType, jax.Array],
-        agent_components: tuple[jax.Array, jax.Array],
-    ) -> tuple[tuple[MjxStateType, jax.Array], None]:
-        mjx_data, action = carry
-
-        agent_component, agent_index = agent_components
-
-        #  Reshape agent_component to (1, 2) to match the expected shape of step_agent
-        agent_component = agent_component.reshape(-1, AGENT_COMPONENT_IDS_DIM)
-
-        # Step the agent
-        mjx_data = step_agent(
-            mjx_data, action[agent_index], agent_component[agent_index]
-        )
-        return (mjx_data, action), None
-
-    # Use `jax.lax.scan` to iterate through agents and step each one
-    (updated_data, _), _ = jax.lax.scan(
-        step_single_agent,
-        (mjx_data, actions),
-        (agent_components, jnp.arange(agent_components.shape[0], dtype=jnp.int32)),
+    # Use vmap to step through each agent.
+    updated_data, updated_agent_components = step_agents(
+        mjx_data, actions, agent_components
     )
 
     # Step the environment after applying all agent actions
