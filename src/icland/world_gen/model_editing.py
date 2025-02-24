@@ -12,11 +12,6 @@ from icland.constants import (
     WALL_OFFSET,
     WORLD_LEVEL,
 )
-from icland.presets import (
-    TEST_TILEMAP_BUMP,
-    TEST_TILEMAP_FLAT,
-    TEST_TILEMAP_WORLD42,
-)
 from icland.types import ICLandConfig, MjxModelType
 
 
@@ -271,15 +266,3 @@ def _edit_mj_model_data(
         b_geom_xpos[2 * i + WALL_OFFSET + 1] = r
         b_geom_xquat[2 * i + WALL_OFFSET + 1] = rq
 
-
-if __name__ == "__main__":
-    mjx_model_j, mj_model = generate_base_model(ICLandConfig(10, 10, 1, {}, 6))
-    mj_data = mujoco.MjData(mj_model)
-
-    batch = jax.jit(jax.vmap(edit_model_data, in_axes=(0, None, None)))(
-        jnp.array([TEST_TILEMAP_WORLD42, TEST_TILEMAP_FLAT, TEST_TILEMAP_BUMP]),
-        mjx_model_j,
-    )
-    batch_data = jax.vmap(mujoco.mjx.make_data)(batch)
-    # compare_dataclass_instances(mjx_model_j, mjx_model_c)
-    print(batch.geom_pos[2, 5:205])
