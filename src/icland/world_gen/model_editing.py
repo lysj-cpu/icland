@@ -265,4 +265,3 @@ def _edit_mj_model_data(
         b_geom_xpos[2 * i + WALL_OFFSET] = c
         b_geom_xpos[2 * i + WALL_OFFSET + 1] = r
         b_geom_xquat[2 * i + WALL_OFFSET + 1] = rq
-
