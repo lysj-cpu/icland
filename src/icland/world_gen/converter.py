@@ -268,6 +268,7 @@ def sample_spawn_points(
     key: jax.Array, tilemap: jax.Array, num_objects: jnp.int32 = 1
 ) -> jax.Array:  # pragma: no cover
     """Sample num_objects spawn points from the tilemap."""
+    TILE_DATA_HEIGHT_INDEX = 3
     spawn_map = __get_spawn_map(tilemap)
     flat_tilemap = spawn_map.flatten()
     nonzero_indices = jnp.where(
@@ -289,7 +290,9 @@ def sample_spawn_points(
         row = random_index // spawn_map.shape[0]
         col = random_index % spawn_map.shape[0]
 
-        return jnp.array([row + 0.5, col + 0.5, tilemap[row, col, 3] + 1])
+        return jnp.array(
+            [row + 0.5, col + 0.5, tilemap[row, col, TILE_DATA_HEIGHT_INDEX] + 1]
+        )
 
     keys = jax.random.split(key, num_objects)
 
@@ -301,11 +304,14 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
     w, h = combined.shape[0], combined.shape[1]
 
     # Initialize arrays with JAX functions
+    TILE_DATA_SIZE = 4
+    NUM_ROTATIONS = 4
+    NUM_COORDS = 2
     visited = jax.lax.full((w, h), False, dtype=jnp.bool)
     spawnable = jax.lax.full((w, h), 0, dtype=jnp.int32)
 
     def __adj_jit(i: jnp.int32, j: jnp.int32, combined: jax.Array) -> jax.Array:
-        slots = jnp.full((4, 2), -1)
+        slots = jnp.full((TILE_DATA_SIZE, NUM_COORDS), -1)
         dx = jnp.array([-1, 0, 1, 0])
         dy = jnp.array([0, 1, 0, -1])
 
@@ -318,7 +324,7 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
             dy: jax.Array,
         ) -> jax.Array:
             tile, r, f, level = combined[i, j]
-            for d in range(4):
+            for d in range(TILE_DATA_SIZE):
                 x = i + dx[d]
                 y = j + dy[d]
 
@@ -332,7 +338,8 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
                                         jnp.array(
                                             [
                                                 q == TileType.RAMP.value,
-                                                r2 == (4 - d) % 4,
+                                                r2
+                                                == (NUM_ROTATIONS - d) % NUM_ROTATIONS,
                                                 f2 == level - 1,
                                                 l == level,
                                             ]
@@ -342,7 +349,9 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
                                         jnp.array(
                                             [
                                                 q == TileType.RAMP.value,
-                                                r2 == (2 - d) % 4,
+                                                r2
+                                                == (NUM_ROTATIONS - 2 - d)
+                                                % NUM_ROTATIONS,
                                                 f2 == level,
                                                 l == level + 1,
                                             ]
@@ -389,7 +398,7 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
         ) -> jax.Array:
             tile, r, f, level = combined[i, j]
             mask = jnp.where((r + 1) % 2 == 0, 1, 0)
-            for d in range(4):
+            for d in range(NUM_ROTATIONS):
                 x = i + dx[d]
                 y = j + dy[d]
 
@@ -403,7 +412,9 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
                                         jnp.array(
                                             [
                                                 q == TileType.SQUARE.value,
-                                                d == (2 - r) % 4,
+                                                d
+                                                == (NUM_ROTATIONS - 2 - r)
+                                                % NUM_ROTATIONS,
                                                 l == level,
                                             ]
                                         )
@@ -412,7 +423,8 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
                                         jnp.array(
                                             [
                                                 q == TileType.SQUARE.value,
-                                                d == (4 - r) % 4,
+                                                d
+                                                == (NUM_ROTATIONS - r) % NUM_ROTATIONS,
                                                 l == f,
                                             ]
                                         )
@@ -421,7 +433,9 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
                                         jnp.array(
                                             [
                                                 q == TileType.RAMP.value,
-                                                d == (2 - r) % 4,
+                                                d
+                                                == (NUM_ROTATIONS - 2 - r)
+                                                % NUM_ROTATIONS,
                                                 r == r2,
                                                 f2 == level,
                                             ]
@@ -431,7 +445,8 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
                                         jnp.array(
                                             [
                                                 q == TileType.RAMP.value,
-                                                d == (4 - r) % 4,
+                                                d
+                                                == (NUM_ROTATIONS - r) % NUM_ROTATIONS,
                                                 r == r2,
                                                 l == f,
                                             ]

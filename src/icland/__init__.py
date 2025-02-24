@@ -91,8 +91,8 @@ def init(key: jax.Array, params: ICLandParams, base_model: MjxModelType) -> ICLa
         >>> base_model, _ = generate_base_model(DEFAULT_CONFIG)
         >>> key = jax.random.key(42)
         >>> params = sample(key, DEFAULT_CONFIG)
-        >>> init(key, params, base_model)
-        ICLandState(pipeline_state=PipelineState(mjx_model=Model, mjx_data=Data, component_ids=[[  1 205   0]], world=World(width: 10, height: 10)), observation=[0. 0. 0. 0.], data=ICLandInfo(agent_positions=Array([[0., 0., 0.]], dtype=float32), agent_velocities=Array([[0., 0., 0., 0.]], dtype=float32), agent_rotations=Array([0.], dtype=float32)))
+        >>> init(key, params, base_model) # doctest:+ELLIPSIS
+        ICLandState(pipeline_state=PipelineState(mjx_model=Model, mjx_data=Data, component_ids=[[  1 205   0   0]], world=World(width: 10, height: 10)), observation=[0. 0. 0. 0.], data=ICLandInfo(agents=[Agent(...)], props=[]))
     """
     # Unpack params
     world_tilemap = params.world
@@ -227,7 +227,7 @@ def step(
         >>> from icland import sample, init, step
         >>> import jax
         >>> import jax.numpy as jnp
-        >>> forward_policy = jnp.array([1, 0, 0])
+        >>> forward_policy = jnp.array([1, 0, 0, 0])
         >>> from icland.presets import DEFAULT_CONFIG
         >>> from icland.world_gen.model_editing import generate_base_model
         >>> base_model, _ = generate_base_model(DEFAULT_CONFIG)
@@ -235,7 +235,7 @@ def step(
         >>> params = sample(key, DEFAULT_CONFIG)
         >>> state = init(key, params, base_model)
         >>> step(key, state, params, forward_policy) # doctest:+ELLIPSIS
-        ICLandState(pipeline_state=PipelineState(mjx_model=Model, mjx_data=Data, component_ids=[[  1 205   0]], world=World(width: 10, height: 10)), observation=[...], data=ICLandInfo(agent_positions=Array([[0., 0., 0.]], dtype=float32), agent_velocities=Array([[0., 0., 0., 0.]], dtype=float32), agent_rotations=Array([0.], dtype=float32)))
+        ICLandState(pipeline_state=PipelineState(mjx_model=Model, mjx_data=Data, component_ids=[[  1 205   0   0]], world=World(width: 10, height: 10)), observation=[...], data=ICLandInfo(agents=[Agent(...)], props=[]))
     """
     # Unpack state
     pipeline_state = state.pipeline_state
