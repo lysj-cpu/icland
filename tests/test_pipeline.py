@@ -16,7 +16,7 @@ from icland.world_gen.tile_data import TILECODES
 
 
 def __generate_mjcf_spec(
-    tile_map: jax.Array,
+    tilemap: jax.Array,
     # agent_spawns: jax.Array,
     # prop_spawns: jax.Array,
 ) -> mujoco.MjSpec:
@@ -25,7 +25,7 @@ def __generate_mjcf_spec(
 
     spec.compiler.degree = 1
 
-    w, h = tile_map.shape[0], tile_map.shape[1]
+    w, h = tilemap.shape[0], tilemap.shape[1]
     # Add assets
     # Columns: 1 to 6
     for i in range(1, WORLD_LEVEL + 1):
@@ -93,7 +93,7 @@ def __generate_mjcf_spec(
 
     for i in range(w):
         for j in range(h):
-            t_type, rot, _, to_h = tile_map[i, j]
+            t_type, rot, _, to_h = tilemap[i, j]
             t_type_str = "r" if t_type == 1 else "c"
             spec.worldbody.add_geom(
                 type=mujoco.mjtGeom.mjGEOM_MESH,
@@ -201,19 +201,19 @@ def pipeline(
     MAX_STEPS = 100
     kn = key[1]
     # TODO: Vary the sample world using globally-defined config
-    tile_map = export(
+    tilemap = export(
         sample_world(height, width, MAX_STEPS, key, True, 1), TILECODES, height, width
     )
     key, s = jax.random.split(key)
     # TODO: Change num_objs from num_agents to num_agents + num_props
-    spawnpoints = sample_spawn_points(s, tile_map, num_objects=num_agents)
+    spawnpoints = sample_spawn_points(s, tilemap, num_objects=num_agents)
 
-    # pieces = create_world(tile_map)
+    # pieces = create_world(tilemap)
     # temp_dir = "temp"
     # export_stls(pieces, f"{temp_dir}/{temp_dir}")
-    # xml_str = __generate_mjcf_string(tile_map, (1.5, 1, 4), f"{temp_dir}/")
+    # xml_str = __generate_mjcf_string(tilemap, (1.5, 1, 4), f"{temp_dir}/")
     # mj_model = mujoco.MjModel.from_xml_string(xml_str)
-    mj_spec = __generate_mjcf_spec(tile_map)
+    mj_spec = __generate_mjcf_spec(tilemap)
     # icland_params = ICLandParams(model=mj_model, game=None, agent_count=1)
 
     # icland_state = icland.init(key, icland_params)

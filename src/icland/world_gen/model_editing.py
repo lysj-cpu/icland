@@ -12,19 +12,18 @@ from icland.constants import (
     WALL_OFFSET,
     WORLD_LEVEL,
 )
-from icland.types import ICLandConfig, MjxModelType
+from icland.types import ICLandAgentInfo, ICLandPropInfo, ICLandConfig, MjxModelType
 
 
 def generate_base_model(
-    config: ICLandConfig,
+    max_world_width: int,
+    max_world_depth: int,
+    max_world_height: int,
+    max_agent_count: int,
     # prop_spawns: jax.Array,
 ) -> MjxModelType:  # pragma: no cover
     """Generates base MJX model from column meshes that form the world."""
     # This code is run entirely on CPU
-    width = config.world_width
-    height = config.world_height
-    max_agent_count = config.max_agent_count
-    max_world_level = config.max_world_level
 
     spec = mujoco.MjSpec()
 
@@ -62,36 +61,36 @@ def generate_base_model(
     )
 
     # Add the walls
-    if width > 0 and height > 0:
+    if max_world_width > 0 and max_world_depth > 0:
         spec.worldbody.add_geom(
             type=mujoco.mjtGeom.mjGEOM_PLANE,
-            size=[height / 2, 10, 0.01],
+            size=[max_world_depth / 2, 10, 0.01],
             quat=[0.5, -0.5, -0.5, 0.5],
-            pos=[width, height / 2, 10],
+            pos=[max_world_width, max_world_depth / 2, 10],
             rgba=[0, 0, 0, 0],
         )
 
         spec.worldbody.add_geom(
             type=mujoco.mjtGeom.mjGEOM_PLANE,
-            size=[height / 2, 10, 0.01],
+            size=[max_world_depth / 2, 10, 0.01],
             quat=[0.5, 0.5, 0.5, 0.5],
-            pos=[0, height / 2, 10],
+            pos=[0, max_world_depth / 2, 10],
             rgba=[0, 0, 0, 0],
         )
 
         spec.worldbody.add_geom(
             type=mujoco.mjtGeom.mjGEOM_PLANE,
-            size=[10, width / 2, 0.01],
+            size=[10, max_world_width / 2, 0.01],
             quat=[0.5, -0.5, 0.5, 0.5],
-            pos=[width / 2, 0, 10],
+            pos=[max_world_width / 2, 0, 10],
             rgba=[0, 0, 0, 0],
         )
 
         spec.worldbody.add_geom(
             type=mujoco.mjtGeom.mjGEOM_PLANE,
-            size=[10, width / 2, 0.01],
+            size=[10, max_world_width / 2, 0.01],
             quat=[0.5, 0.5, -0.5, 0.5],
-            pos=[width / 2, height, 10],
+            pos=[max_world_width / 2, max_world_depth, 10],
             rgba=[0, 0, 0, 0],
         )
 
@@ -101,17 +100,17 @@ def generate_base_model(
 
     # Add tiles, all at max height to create correct BVH interactions
     # Tile indices: 5 to w * h + 4 inclusive
-    for i in range(width):
-        for j in range(height):
+    for i in range(max_world_width):
+        for j in range(max_world_depth):
             spec.worldbody.add_geom(
                 type=mujoco.mjtGeom.mjGEOM_BOX,
-                pos=[i + 0.5, j + 0.5, max_world_level - COLUMN_HEIGHT],
+                pos=[i + 0.5, j + 0.5, max_world_height - COLUMN_HEIGHT],
                 size=[0.5, 0.5, 3],
             )
             spec.worldbody.add_geom(
                 type=mujoco.mjtGeom.mjGEOM_MESH,
                 meshname="ramp",
-                pos=[i + 0.5, j + 0.5, max_world_level - RAMP_HEIGHT],
+                pos=[i + 0.5, j + 0.5, max_world_height - RAMP_HEIGHT],
             )
 
     # Add agents
@@ -130,12 +129,15 @@ def generate_base_model(
 def edit_model_data(
     tilemap: jax.Array,
     base_model: MjxModelType,
-    agent_spawns: jax.Array,  # shape (num_agents, 3)
+    agent_info: ICLandAgentInfo,
+    prop_info: ICLandPropInfo,
     prop_spawns: jax.Array = jnp.array([]),  # shape (num_props, 3)
-    max_world_level: int = WORLD_LEVEL,
+    max_world_height: int = WORLD_LEVEL,
 ) -> MjxModelType:
     """Edit the base model data such that the terrain matches that of the tilemap."""
     # Pre: the width and height of the tilemap MUST MATCH that of the base_model
+    agent_spawns = agent_info.spawn_points
+    prop_spawns = prop_info.spawn_points
 
     RAMP_OFFSET = 13 / 3
     COL_OFFSET = 2
@@ -158,7 +160,7 @@ def edit_model_data(
     ) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
         t_type, rot, _, to_h = tile
         is_ramp = t_type % 2
-        offset = to_h - is_ramp - max_world_level + 1
+        offset = to_h - is_ramp - max_world_height + 1
 
         x, y = i // w, i % w
         quat_consts = jnp.array(
@@ -216,7 +218,7 @@ def edit_model_data(
 
 
 def _edit_mj_model_data(
-    tilemap: jax.Array, base_model: mujoco.MjModel, max_world_level: int = WORLD_LEVEL
+    tilemap: jax.Array, base_model: mujoco.MjModel, max_world_height: int = WORLD_LEVEL
 ) -> None:  # pragma: no cover
     b_geom_xpos = base_model.geom_pos
     b_geom_xquat = base_model.geom_quat
@@ -237,7 +239,7 @@ def _edit_mj_model_data(
     ]:
         t_type, rot, _, to_h = tile
         is_ramp = t_type % 2
-        offset = to_h - is_ramp - max_world_level - 1
+        offset = to_h - is_ramp - max_world_height - 1
 
         x, y = i // w, i % w
         quat_consts = jnp.array(

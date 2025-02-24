@@ -69,7 +69,7 @@ def plot_trajectories_multi_policies(
     last_printed_time = -0.1
 
     default_agent_1 = 0
-    world_width = tilemap.shape[1]
+    max_world_width = tilemap.shape[1]
     get_camera_info = jax.jit(get_agent_camera_from_mjx)
 
     while mjx_data.time < duration:

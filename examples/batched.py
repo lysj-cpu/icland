@@ -15,7 +15,11 @@ key = jax.random.PRNGKey(SEED)
 
 # Set global configuration
 config = ICLandConfig(
-    world_width=2, world_height=2, max_agent_count=1, prop_counts={}, max_world_level=6
+    max_world_width=2,
+    max_world_depth=2,
+    max_agent_count=1,
+    prop_counts={},
+    max_world_height=6,
 )
 mjx_model, _ = generate_base_model(config)
 

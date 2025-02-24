@@ -176,11 +176,11 @@ def sdfr_interactive_simulation(config: ICLandConfig) -> None:
 
     # Set up default agent and world width for camera parameters.
     default_agent = 0
-    world_width = tilemap.shape[1]
+    max_world_width = tilemap.shape[1]
 
     # Define the frame callback using the SDF rendering functions.
     frame_callback = lambda state: render_frame(
-        *get_agent_camera_from_mjx(state, world_width, default_agent),
+        *get_agent_camera_from_mjx(state, max_world_width, default_agent),
         tilemap,
         view_width=96,
         view_height=72,
