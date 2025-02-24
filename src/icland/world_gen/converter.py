@@ -177,15 +177,15 @@ def __make_vramp_column(  # pragma: no cover
     return column, vramp
 
 
-def create_world(tile_map: jax.Array) -> jax.Array:  # pragma: no cover
+def create_world(tilemap: jax.Array) -> jax.Array:  # pragma: no cover
     """World generation with consistent shapes."""
     i_indices, j_indices = jnp.meshgrid(
-        jnp.arange(tile_map.shape[0]), jnp.arange(tile_map.shape[1]), indexing="ij"
+        jnp.arange(tilemap.shape[0]), jnp.arange(tilemap.shape[1]), indexing="ij"
     )
     i_indices = i_indices[..., jnp.newaxis]  # Shape: (w, h, 1)
     j_indices = j_indices[..., jnp.newaxis]  # Shape: (w, h, 1)
 
-    coords = jnp.concatenate([i_indices, j_indices, tile_map], axis=-1)
+    coords = jnp.concatenate([i_indices, j_indices, tilemap], axis=-1)
 
     def process_tile(entry: jax.Array) -> tuple[jax.Array, jax.Array]:
         x, y, block, rotation, frm, to = entry
@@ -198,11 +198,11 @@ def create_world(tile_map: jax.Array) -> jax.Array:  # pragma: no cover
         else:
             raise RuntimeError("Unknown tile type. Please check XMLReader")
 
-    pieces = jnp.zeros((tile_map.shape[0] * tile_map.shape[1], 12, 3, 3))
+    pieces = jnp.zeros((tilemap.shape[0] * tilemap.shape[1], 12, 3, 3))
     tile_start = 0
-    while tile_start < tile_map.shape[0] * tile_map.shape[1]:
-        i = tile_start // tile_map.shape[0]
-        j = tile_start % tile_map.shape[1]
+    while tile_start < tilemap.shape[0] * tilemap.shape[1]:
+        i = tile_start // tilemap.shape[0]
+        j = tile_start % tilemap.shape[1]
         a, _ = process_tile(coords.at[i, j].get())
         pieces = pieces.at[tile_start].set(a)
         tile_start += 1

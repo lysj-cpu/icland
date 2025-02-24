@@ -581,7 +581,7 @@ def render_frame(
 @jax.jit
 def get_agent_camera_from_mjx(
     icland_state: ICLandState,
-    world_width: int,
+    max_world_width: int,
     body_id: int,
 ) -> tuple[jax.Array, jax.Array]:
     """Get the camera position and direction from the MuJoCo data."""
@@ -592,7 +592,7 @@ def get_agent_camera_from_mjx(
 
     agent_pos = jnp.array(
         [
-            -data.xpos[agent_id][0] + world_width,
+            -data.xpos[agent_id][0] + max_world_width,
             data.xpos[agent_id][2],
             data.xpos[agent_id][1],
         ]

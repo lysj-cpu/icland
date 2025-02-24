@@ -79,13 +79,13 @@ SIMULATION_PRESETS: list[dict[str, Any]] = [
 # Helper Functions
 # ---------------------------------------------------------------------------
 def _generate_mjcf_string(
-    tile_map: jax.Array,
+    tilemap: jax.Array,
     agent_spawns: jax.Array,
     mesh_dir: str = "tests/assets/meshes/",
 ) -> str:
     """Generates an MJCF string from column meshes that form the world."""
     mesh_files = [f for f in os.listdir(mesh_dir) if f.endswith(".stl")]
-    w, h = tile_map.shape[0], tile_map.shape[1]
+    w, h = tilemap.shape[0], tilemap.shape[1]
 
     mjcf = f"""<mujoco model="generated_mesh_world">
     <compiler meshdir="{mesh_dir}"/>
@@ -216,10 +216,10 @@ def render_sdfr(
     icland_state = icland.step(key, icland_state, icland_params, policy)
 
     default_agent = 0
-    world_width = tilemap.shape[1]
+    max_world_width = tilemap.shape[1]
     # get_camera_info = jax.jit(get_agent_camera_from_mjx)
     frame_callback = lambda state: render_frame(
-        *get_agent_camera_from_mjx(state, world_width, default_agent),
+        *get_agent_camera_from_mjx(state, max_world_width, default_agent),
         tilemap,
         view_width=96,
         view_height=72,
@@ -299,7 +299,7 @@ def render_video_multi_agent(
 
     print(f"Starting simulation for {agent_count} agents: {video_name}")
     last_printed_time = -0.1
-    world_width = tilemap.shape[0]
+    max_world_width = tilemap.shape[0]
 
     # JIT-compiled
     get_camera_info = jax.jit(get_agent_camera_from_mjx)
@@ -326,7 +326,7 @@ def render_video_multi_agent(
 
         if len(agent_frames) < mjx_data.time * FPS:
             camera_pos, camera_dir = jax.vmap(get_camera_info, in_axes=(None, None, 0))(
-                icland_state, world_width, jnp.arange(agent_count)
+                icland_state, max_world_width, jnp.arange(agent_count)
             )
             players = jax.vmap(
                 lambda x: PlayerInfo(
@@ -402,7 +402,7 @@ def render_video(
     _edit_mj_model_data(
         tilemap=tilemap,
         base_model=mj_model,
-        max_world_level=config.max_world_level,
+        max_world_height=config.max_world_height,
     )
 
     third_person_frames: list[Any] = []
@@ -479,10 +479,10 @@ def render_video_from_world_with_policies(
     last_printed_time = -0.1
 
     default_agent = 0
-    world_width = tilemap.shape[1]
+    max_world_width = tilemap.shape[1]
     get_camera_info = jax.jit(get_agent_camera_from_mjx)
     frame_callback = lambda state: render_frame(
-        *get_camera_info(state, world_width, default_agent), tilemap
+        *get_camera_info(state, max_world_width, default_agent), tilemap
     )
 
     # Setup policy switching using a closure.

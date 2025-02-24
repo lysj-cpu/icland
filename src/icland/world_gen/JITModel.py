@@ -584,21 +584,20 @@ def _propagate(model: JITModel) -> tuple[JITModel, jax.Array]:
 
 
 @partial(jax.jit, static_argnums=[2, 3])
-def export(model: JITModel, tile_map: jax.Array, width: int, height: int) -> jax.Array:
+def export(model: JITModel, tilemap: jax.Array, width: int, height: int) -> jax.Array:
     """Reshapes model data, combines it with tile info via vectorization, and generates a one-hot encoded state."""
     observed_reshaped = jnp.reshape(model.observed, (width, height))
     # Combine observed state and tile information using jax.vmap
     # Apply combine function using vmap for vectorization
-    combined = jax.vmap(lambda x: tile_map.at[x].get())(observed_reshaped)
+    combined = jax.vmap(lambda x: tilemap.at[x].get())(observed_reshaped)
 
     return combined
 
 
-@partial(jax.jit, static_argnums=[0, 1, 2])
+@partial(jax.jit, static_argnames=["width", "height"])
 def sample_world(
     width: jax.Array,
     height: jax.Array,
-    max_steps: jax.Array,
     key: jax.Array,
     periodic: jax.Array,
     heuristic: jax.Array,

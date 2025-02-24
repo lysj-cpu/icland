@@ -62,7 +62,7 @@ def test_get_agent_camera_from_mjx() -> None:
     )
 
     icland_state = icland.init(jax.random.PRNGKey(42), icland_params, mjx_model)
-    world_width = 10
+    max_world_width = 10
 
     agent_pos = icland_state.pipeline_state.mjx_data.xpos[
         icland_state.pipeline_state.component_ids[0, 0].astype(int)
@@ -72,14 +72,14 @@ def test_get_agent_camera_from_mjx() -> None:
     camera_offset = 0.06
     cam_pos, cam_dir = get_agent_camera_from_mjx(
         icland_state,
-        world_width,
+        max_world_width,
         0,
     )
     assert jnp.allclose(
         cam_pos,
         jnp.array(
             [
-                -agent_pos[0] + world_width,
+                -agent_pos[0] + max_world_width,
                 agent_pos[2],
                 agent_pos[1],
             ]
