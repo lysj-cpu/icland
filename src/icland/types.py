@@ -70,6 +70,7 @@ class ICLandAgentInfo(PyTreeNode):  # type: ignore[misc]
     """Information about agents in the ICLand environment.
 
     Attributes:
+        agent_count: Actual number of agents.
         spawn_points: Array of spawn points for agents.
         spawn_orientations: Array of spawn orientations for agents.
         body_ids: Array of body IDs for agents.
@@ -78,6 +79,7 @@ class ICLandAgentInfo(PyTreeNode):  # type: ignore[misc]
         colour: Colour of agents.
     """
 
+    agent_count: int
     spawn_points: jax.Array
     spawn_orientations: jax.Array
     body_ids: jax.Array
@@ -100,6 +102,7 @@ class ICLandPropInfo(PyTreeNode):
     """Information about props in the ICLand environment.
 
     Attributes:
+        prop_count: Actual number of props.
         spawn_points: Array of spawn points for props.
         spawn_rotations: Array of spawn rotations for props:
         prop_types: Array of types for props.
@@ -109,6 +112,7 @@ class ICLandPropInfo(PyTreeNode):
         colour: Colour of props.
     """
 
+    prop_count: int
     spawn_points: jax.Array
     spawn_rotations: jax.Array
     prop_types: jax.Array
@@ -133,7 +137,7 @@ class ICLandParams(PyTreeNode):  # type: ignore[misc]
     agent_info: ICLandAgentInfo
     prop_info: ICLandPropInfo
     reward_function: int
-    model: MjxModelType
+    mjx_model: MjxModelType
 
     def __repr__(self) -> str:
         """Return a string representation of the ICLandParams object."""
@@ -174,7 +178,6 @@ class ICLandState(PyTreeNode):  # type: ignore[misc]
     """Information regarding the current step.
 
     Attributes:
-        reward: Reward values of agents.
         mjx_data: MJX data
         agent_variables: Variables for agents.
         prop_variables: Variables for props.

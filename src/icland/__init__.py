@@ -7,7 +7,7 @@ from mujoco import mjx
 
 from icland.constants import (
     AGENT_DOF_OFFSET,
-    AGENT_OBSERVATION_DIM,
+    AGENT_VARIABLES_DIM,
     PROP_DOF_OFFSET,
     PROP_DOF_MULTIPLIER,
     WALL_OFFSET,
@@ -125,6 +125,7 @@ def sample(key: jax.Array, config: ICLandConfig = DEFAULT_CONFIG) -> ICLandParam
 
     # Generate the agent and prop information
     agent_info = ICLandAgentInfo(
+        agent_count=num_agents,
         spawn_points=spawnpoints[:max_agent_count],
         spawn_orientations=jnp.zeros((max_agent_count,), dtype="float32"),
         body_ids=jnp.arange(1, max_agent_count + 1, dtype="int32"),
@@ -136,6 +137,7 @@ def sample(key: jax.Array, config: ICLandConfig = DEFAULT_CONFIG) -> ICLandParam
 
     # Generate the prop information
     prop_info = ICLandPropInfo(
+        prop_count=num_props,
         prop_types=jnp.zeros((max_prop_count, ), dtype="int32"),
         spawn_points=spawnpoints[max_agent_count:max_object_count],
         spawn_rotations=jnp.zeros((max_prop_count,), dtype="float32"),
@@ -161,15 +163,43 @@ def sample(key: jax.Array, config: ICLandConfig = DEFAULT_CONFIG) -> ICLandParam
         agent_info=agent_info,
         prop_info=prop_info,
         reward_function=None,
-        model=model,
+        mjx_model=model,
     )
 
-
-def init(params: ICLandParams) -> ICLandState:
+@jax.jit
+def init(icland_params: ICLandParams) -> ICLandState:
+    """Initialise the ICLand environment.
     
+    Args:
+        icland_params: The parameters for the ICLand environment.
 
-    
-    pass
+    Returns:
+        The initial state of the ICLand environment.
+
+    Example:
+        >>> import icland
+        >>> icland_params = icland.sample(jax.random.PRNGKey(42))
+        >>> icland.init(icland_params)
+        ICLandState(mjx_data=DeviceArray(...), agent_variables=ICLandAgentVariables(...), prop_variables=ICLandPropVariables(...))
+    """
+
+    max_agent_count = icland_params.agent_info.spawn_points.shape[0]
+    max_prop_count = icland_params.prop_info.spawn_points.shape[0]
+
+    agent_variables = ICLandAgentVariables(
+        pitch=jnp.zeros((max_agent_count,), dtype="float32"),
+        is_tagged=jnp.zeros((max_agent_count,), dtype="int"),
+    )
+
+    prop_variables = ICLandPropVariables(
+        prop_owner=jnp.zeros((max_prop_count,), dtype="int"),
+    )
+
+    return ICLandState(
+        mjx_data=icland_params.model,
+        agent_variables=agent_variables,
+        prop_variables=prop_variables
+    )
 
 
 def step(

@@ -28,7 +28,7 @@ def create_agent(
     # Define the agent's body.
     agent = specification.worldbody.add_body(
         name=f"agent{id}",
-        pos=pos[: (AGENT_COMPONENT_IDS_DIM - 1)],
+        pos=pos[: (4 - 1)],
     )
 
     # Add transformational freedom.

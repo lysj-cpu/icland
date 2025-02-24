@@ -14,37 +14,41 @@ BATCH_SIZE = 8
 key = jax.random.PRNGKey(SEED)
 
 # Set global configuration
-config = ICLandConfig(
-    max_world_width=2,
-    max_world_depth=2,
-    max_agent_count=1,
-    prop_counts={},
-    max_world_height=6,
+config = icland.config(
+    2,
+    2,
+    6,
+    1,
+    0,
+    0,
 )
-mjx_model, _ = generate_base_model(config)
 
 # Sample initial conditions
 keys = jax.random.split(key, BATCH_SIZE)
 icland_params = jax.vmap(icland.sample, in_axes=(0, None))(keys, config)
 
-# Initialize the environment
-init_states = jax.vmap(icland.init, in_axes=(0, 0, None))(
-    keys, icland_params, mjx_model
-)
+icland_state = jax.vmap(icland.init, in_axes=(0, ))(icland_params)
 
-# Batched step function
-batched_step = jax.vmap(icland.step, in_axes=(0, 0, 0, 0))
+print(icland_state)
 
-# Define actions to take
-actions = jnp.array([[1, 0, 0] for _ in range(BATCH_SIZE)])
+# # Initialize the environment
+# init_states = jax.vmap(icland.init, in_axes=(0, 0, None))(
+#     keys, icland_params, mjx_model
+# )
 
-# Optionally, regenerate the keys
-keys = jax.vmap(lambda k: jax.random.split(k)[0])(keys)
+# # Batched step function
+# batched_step = jax.vmap(icland.step, in_axes=(0, 0, 0, 0))
 
-# Take a step in the environment
-icland_states = batched_step(keys, init_states, icland_params, actions)
+# # Define actions to take
+# actions = jnp.array([[1, 0, 0] for _ in range(BATCH_SIZE)])
 
-# Calculate the reward
-if icland_params.reward_function is not None:
-    reward = icland_params.reward_function(icland_states.data)
-    print(reward)
+# # Optionally, regenerate the keys
+# keys = jax.vmap(lambda k: jax.random.split(k)[0])(keys)
+
+# # Take a step in the environment
+# icland_states = batched_step(keys, init_states, icland_params, actions)
+
+# # Calculate the reward
+# if icland_params.reward_function is not None:
+#     reward = icland_params.reward_function(icland_states.data)
+#     print(reward)
