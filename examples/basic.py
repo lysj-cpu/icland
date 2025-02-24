@@ -4,15 +4,20 @@ import jax
 import jax.numpy as jnp
 
 import icland
+from icland.types import *
+from icland.world_gen.model_editing import generate_base_model
 
 # Create a random key
 key = jax.random.PRNGKey(42)
 
+# Set global configuration
+config = ICLandConfig(2, 2, 1, {}, 6)
 # Sample initial conditions
-icland_params = icland.sample(key)
+icland_params = icland.sample(key, config)
 
 # Initialize the environment
-init_state = icland.init(key, icland_params)
+mjx_model, _ = generate_base_model(config)
+init_state = icland.init(key, icland_params, mjx_model)
 
 # Define an action to take
 action = jnp.array([1, 0, 0])

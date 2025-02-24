@@ -23,24 +23,29 @@ def test_generate_game_runs_without_error() -> None:
     key = jax.random.PRNGKey(0)
     agent_count = 3
 
-    # Generate the game reward function.
-    reward_fn = generate_game(key, agent_count)
-    # Ensure that a callable reward function is returned.
-    assert callable(reward_fn)
+    for i in range(5):
+        key, subkey = jax.random.split(key)
 
-    # Create a dummy ICLandInfo input.
-    # Both fields are provided even though only one is used depending on mode.
-    info = ICLandInfo(
-        agents=[
-            Agent(position=jnp.zeros(3), rotation=jnp.zeros(1), velocity=jnp.zeros(4))
-            for _ in range(agent_count)
-        ]
-    )
+        # Generate the game reward function.
+        reward_fn = generate_game(subkey, agent_count)
+        # Ensure that a callable reward function is returned.
+        assert callable(reward_fn)
 
-    # Call the reward function. We don't check the output here,
-    # only that the function runs without error.
-    rewards = reward_fn(info)
+        # Create a dummy ICLandInfo input.
+        # Both fields are provided even though only one is used depending on mode.
+        info = ICLandInfo(
+            agents=[
+                Agent(
+                    position=jnp.zeros(3), rotation=jnp.zeros(1), velocity=jnp.zeros(4)
+                )
+                for _ in range(agent_count)
+            ]
+        )
 
-    # Optionally, verify that the output is a JAX array with the expected shape.
-    assert isinstance(rewards, jax.Array) or isinstance(rewards, jnp.ndarray)
-    assert rewards.shape[0] == agent_count
+        # Call the reward function. We don't check the output here,
+        # only that the function runs without error.
+        rewards = reward_fn(info)
+
+        # Optionally, verify that the output is a JAX array with the expected shape.
+        assert isinstance(rewards, jax.Array) or isinstance(rewards, jnp.ndarray)
+        assert rewards.shape[0] == agent_count

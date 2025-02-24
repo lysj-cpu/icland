@@ -6,7 +6,9 @@ import mujoco
 import numpy as np
 from mujoco import mjx
 
+from icland.agent import create_agent
 from icland.constants import *
+from icland.presets import TEST_TILEMAP_FLAT
 from icland.types import *
 from icland.world_gen.converter import sample_spawn_points
 from icland.world_gen.JITModel import export, sample_world
@@ -26,7 +28,7 @@ def __generate_mjcf_spec(
     w, h = tile_map.shape[0], tile_map.shape[1]
     # Add assets
     # Columns: 1 to 6
-    for i in range(1, WORLD_HEIGHT + 1):
+    for i in range(1, WORLD_LEVEL + 1):
         spec.add_mesh(
             name=f"c{i}",  # ci for column level i
             uservert=[
@@ -58,7 +60,7 @@ def __generate_mjcf_spec(
         )
 
     # Ramps: 1-2 to 5-6
-    for i in range(1, WORLD_HEIGHT):
+    for i in range(1, WORLD_LEVEL):
         spec.add_mesh(
             name=f"r{i + 1}",  # ri for ramp to i
             uservert=[
@@ -135,16 +137,22 @@ def compare_dataclass_instances(
         if isinstance(value1, jnp.ndarray | np.ndarray):
             # Use jnp.allclose for floating point arrays.
             if not jnp.allclose(value1, value2, atol=atol, rtol=rtol):
-                i, j = 0, 0
-                header1 = ""
-                header2 = ""
-                while i < len(value1) and j < len(value2):
-                    if not jnp.allclose(value1[i], value2[j], atol=atol, rtol=rtol):
-                        header1 += f"At {i}: {value1[i]}\n"
-                        header2 += f"At {j}: {value2[j]}\n"
-                    i += 1
-                    j += 1
-                differences[field] = (header1, header2)
+                if value1.shape == value2.shape:
+                    i, j = 0, 0
+                    header1 = ""
+                    header2 = ""
+                    while i < len(value1) and j < len(value2):
+                        if not jnp.allclose(value1[i], value2[j], atol=atol, rtol=rtol):
+                            header1 += f"At {i}: {value1[i]}\n"
+                            header2 += f"At {j}: {value2[j]}\n"
+                        i += 1
+                        j += 1
+                    differences[field] = (header1, header2)
+                else:
+                    differences[field] = (
+                        f"Shape {value1.shape}\n" + str(value1),
+                        f"Shape {value2.shape}\n" + str(value2),
+                    )
         elif isinstance(value1, int | bool | float):
             # For non-array values, use the normal equality check.
             # if not jnp.all(value1.data & value2.data):
@@ -190,7 +198,7 @@ def pipeline(
 ) -> MjxModelType:  # pragma: no cover
     """Test pipeline."""
     # Sample the world and create tile map.
-    MAX_STEPS = 1000
+    MAX_STEPS = 100
     kn = key[1]
     # TODO: Vary the sample world using globally-defined config
     tile_map = export(
@@ -217,7 +225,34 @@ def pipeline(
     # Save as a .txt file
     # with open(f"model_output_{kn}.txt", "w") as f:
     #     f.write(mjx_model)
-    print(xml_string)
+    # print(xml_string)
 
     # output as .txt file
     return mjx_model
+
+
+if __name__ == "__main__":
+    t = TEST_TILEMAP_FLAT
+    # for i in range(1, WORLD_LEVEL + 1):
+    #     # for j in range(4):
+    #     spec_1 = __generate_mjcf_spec(t.at[0, 0].set(jnp.array([0, 0, 0, i])))
+    #     mj_model_1 = spec_1.compile()
+    #     mjx_model_1 = mjx.put_model(mj_model_1)
+    #     print(f"r{i}{i + 1}, rotation {0}: {round(mjx_model_1.geom_rbound[0], 6)}")
+    # print(f"Indices for rotations for r{i}{i + 1} are", [(i - 1) * 10 + j for j in range(4)])
+    # __compare_two_models(TEST_TILEMAP_FLAT.at[:, :].set(jnp.array([0, 0, 0, 1])), t)
+
+    # t = TEST_TILEMAP_FLAT
+    spec_1 = __generate_mjcf_spec(t)
+    spec_2 = __generate_mjcf_spec(t)
+    # spec_2 = create_agent(0, jnp.array([1, 1, 3.5]), spec_2)
+    spec_1 = create_agent(0, jnp.array([8, 8, 3.5]), spec_1)
+    spec_1 = create_agent(1, jnp.array([8, 9, 3.5]), spec_1)
+    spec_2 = create_agent(0, jnp.array([0, 0, 0]), spec_2)
+    spec_2 = create_agent(1, jnp.array([0, 0, 0]), spec_2)
+
+    mj_model_1 = spec_1.compile()
+    mj_model_2 = spec_2.compile()
+    mjx_model_1 = mjx.put_model(mj_model_1)
+    mjx_model_2 = mjx.put_model(mj_model_2)
+    compare_dataclass_instances(mjx_model_1, mjx_model_2)

@@ -41,16 +41,17 @@ import icland
 # Import your policies and worlds from your assets.
 from icland.presets import *
 from icland.types import *
+from icland.world_gen.model_editing import generate_base_model
 
 
-def interactive_simulation() -> None:
+def interactive_simulation(config: ICLandConfig) -> None:
     """Runs an interactive simulation where you can change the agent's policy via keyboard input."""
-    # Create the MuJoCo model from the XML string.
-    icland_params = icland.sample(jax.random.PRNGKey(42))
-    mj_model = icland_params.model
+    # Create the MuJoCo model from the .
+    icland_params = icland.sample(jax.random.PRNGKey(42), DEFAULT_CONFIG)
+    mjx_model, mj_model = generate_base_model(DEFAULT_CONFIG)
 
     jax_key = jax.random.PRNGKey(42)
-    icland_state = icland.init(jax_key, icland_params)
+    icland_state = icland.init(jax_key, icland_params, mjx_model)
 
     # Set up the camera.
     cam = mujoco.MjvCamera()
@@ -149,7 +150,7 @@ def interactive_simulation() -> None:
     print("Interactive simulation ended.")
 
 
-def sdfr_interactive_simulation() -> None:
+def sdfr_interactive_simulation(config: ICLandConfig) -> None:
     """Runs an interactive SDF simulation using a generated world and SDF rendering."""
     # Set up the JAX random key.
     jax_key = jax.random.PRNGKey(42)
@@ -164,9 +165,11 @@ def sdfr_interactive_simulation() -> None:
 
     # Create the MuJoCo model using an EMPTY_WORLD MJCF string.
     # (Assumes EMPTY_WORLD is imported from icland.presets)
-    mj_model = mujoco.MjModel.from_xml_string(EMPTY_WORLD)
-    icland_params = ICLandParams(model=mj_model, reward_function=None, agent_count=1)
-    icland_state = icland.init(jax_key, icland_params)
+    icland_params = icland.sample(jax.random.PRNGKey(42), DEFAULT_CONFIG)
+    mjx_model, mj_model = generate_base_model(DEFAULT_CONFIG)
+
+    jax_key = jax.random.PRNGKey(42)
+    icland_state = icland.init(jax_key, icland_params, mjx_model)
     # Take an initial step with the default (no-op) policy.
     current_policy = NOOP_POLICY
     icland_state = icland.step(jax_key, icland_state, icland_params, current_policy)
@@ -240,6 +243,6 @@ def sdfr_interactive_simulation() -> None:
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "-sdfr":
-        sdfr_interactive_simulation()
+        sdfr_interactive_simulation(DEFAULT_CONFIG)
     else:
-        interactive_simulation()
+        interactive_simulation(DEFAULT_CONFIG)

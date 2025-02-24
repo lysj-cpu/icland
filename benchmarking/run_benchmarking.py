@@ -13,6 +13,7 @@ import psutil
 import pynvml
 
 import icland
+from icland.presets import DEFAULT_CONFIG
 
 # --------------------------------------------------------------------------------------
 # SCENARIOS: a dictionary for all your benchmark scenarios.
@@ -62,7 +63,8 @@ def setup_environment(seed: int) -> tuple[jnp.ndarray, Any, Any, Callable[..., A
             - batched_step (Callable): The vectorized step function.
     """
     key = jax.random.PRNGKey(seed)
-    icland_params = icland.sample(key)
+    icland_params = icland.sample(key, DEFAULT_CONFIG)
+    base_model = generate_base_model(DEFAULT_CONFIG)
     init_state = icland.init(key, icland_params)
 
     # Vmap the step function to handle batched states

@@ -9,6 +9,8 @@ import psutil
 import pynvml
 
 import icland
+from icland.types import *
+from icland.world_gen.model_editing import generate_base_model
 
 SEED = 42
 
@@ -30,8 +32,10 @@ def benchmark_batch_size(batch_size: int) -> BenchmarkMetrics:
     NUM_STEPS = 100
 
     key = jax.random.PRNGKey(SEED)
-    icland_params = icland.sample(key)
-    init_state = icland.init(key, icland_params)
+    config = ICLandConfig(2, 2, 1, {}, 6)
+    mjx_model, _ = generate_base_model(config)
+    icland_params = icland.sample(key, config)
+    init_state = icland.init(key, icland_params, mjx_model)
 
     # Batched step function
     batched_step = jax.vmap(icland.step, in_axes=(0, 0, icland_params, 0))
