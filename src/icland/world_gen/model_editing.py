@@ -7,7 +7,6 @@ import numpy as np
 
 from icland.agent import create_agent
 from icland.constants import (
-    AGENT_COMPONENT_IDS_DIM,
     BODY_OFFSET,
     WALL_OFFSET,
     WORLD_LEVEL,
@@ -116,7 +115,7 @@ def generate_base_model(
     # Add agents
     # Agent indices: w * h + 5 to num_agents + w * h + 4 inclusive
     for i in range(max_agent_count):
-        create_agent(i, jnp.zeros((AGENT_COMPONENT_IDS_DIM,)), spec)  # default position
+        create_agent(i, jnp.zeros((3,)), spec)  # default position
 
     # TODO: Add props
     mj_model = spec.compile()

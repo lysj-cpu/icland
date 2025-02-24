@@ -14,10 +14,11 @@ key = jax.random.PRNGKey(42)
 icland_params = icland.sample(key)
 print(icland_params)
 
+init_state = icland.init(icland_params)
+print(init_state)
 
 # Initialize the environment
 # mjx_model, _ = generate_base_model(config)
-# init_state = icland.init(key, icland_params, mjx_model)
 
 # Define an action to take
 # action = jnp.array([1, 0, 0])
