@@ -191,31 +191,6 @@ class ICLandState(PyTreeNode):  # type: ignore[misc]
         """Return a string representation of the ICLandState object."""
         return f"ICLandState(mjx_data={self.mjx_data}, agent_variables={self.agent_variables}, prop_variables={self.prop_variables})"
 
-
-class ICLandAction(PyTreeNode):  # type: ignore[misc]
-    """Action set for the ICLand environment.
-
-    Attributes:
-        forward: Forward / backward movement.
-        right: Right / left movement.
-        yaw: Yaw movement.
-        pitch: Pitch movement.
-        grab: Grab prop.
-        tag: Tag Agent.
-    """
-
-    forward: jax.Array
-    right: jax.Array
-    yaw: jax.Array
-    pitch: jax.Array
-    grab: jax.Array
-    tag: jax.Array
-
-    def __repr__(self) -> str:
-        """Return a string representation of the ICLandAction object."""
-        return f"ICLandAction(forward={self.forward}, right={self.right}, yaw={self.yaw}, pitch={self.pitch}, grab={self.grab}, tag={self.tag})"
-
-
 class ICLandObservation(PyTreeNode):  # type: ignore[misc]
     """Observation set for the ICLand environment.
 
