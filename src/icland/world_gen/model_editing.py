@@ -7,11 +7,13 @@ import numpy as np
 
 from icland.agent import create_agent
 from icland.constants import (
+    AGENT_DOF_OFFSET,
     BODY_OFFSET,
     WALL_OFFSET,
     WORLD_LEVEL,
 )
-from icland.types import ICLandAgentInfo, ICLandPropInfo, ICLandConfig, MjxModelType
+from icland.prop import PropType, create_prop
+from icland.types import ICLandAgentInfo, ICLandConfig, ICLandPropInfo, MjxModelType
 
 
 def generate_base_model(
@@ -19,7 +21,8 @@ def generate_base_model(
     max_world_depth: int,
     max_world_height: int,
     max_agent_count: int,
-    # prop_spawns: jax.Array,
+    max_sphere_count: int,
+    max_cube_count: int
 ) -> MjxModelType:  # pragma: no cover
     """Generates base MJX model from column meshes that form the world."""
     # This code is run entirely on CPU
@@ -117,7 +120,12 @@ def generate_base_model(
     for i in range(max_agent_count):
         create_agent(i, jnp.zeros((3,)), spec)  # default position
 
-    # TODO: Add props
+    for i in range(max_sphere_count):
+        create_prop(i, jnp.zeros((3,)), spec, PropType.SPHERE)
+
+    for i in range(max_cube_count):
+        create_prop(i, jnp.zeros((3,)), spec, PropType.CUBE)
+    
     mj_model = spec.compile()
     mjx_model = mujoco.mjx.put_model(mj_model)
 
@@ -145,10 +153,8 @@ def edit_model_data(
     b_geom_xpos = base_model.geom_pos
     b_geom_xquat = base_model.geom_quat
     b_pos = base_model.body_pos
-    # b_agent_pos, b_prop_pos = (
-    #     b_pos[1:agent_count + 1],
-    #     b_pos[agent_count + 1 : agent_count + prop_count + 1],
-    # )
+    b_q_pos0 = base_model.qpos0
+    b_q_pos_spring = base_model.qpos_spring
     w, h = tilemap.shape[0], tilemap.shape[1]
 
     def rot_offset(i: jax.Array) -> jax.Array:
@@ -210,6 +216,28 @@ def edit_model_data(
         BODY_OFFSET + agent_count,
         axis=0,
     )
+    
+    prop_spawns = prop_spawns.astype("float32").reshape((-1, 3))
+
+    # Update props qsprings
+    prop_qpos = jax.vmap(lambda s: jnp.concatenate([s, jnp.array([1, 0, 0, 0])], axis=0))(
+        prop_spawns
+    )
+
+    b_q_pos0 = jax.lax.dynamic_update_slice_in_dim(
+        b_q_pos0,
+        prop_qpos.astype("float32").flatten(),
+        WALL_OFFSET - 1 + AGENT_DOF_OFFSET * agent_count,
+        axis=0,
+    )
+
+    b_q_pos_spring = jax.lax.dynamic_update_slice_in_dim(
+        b_q_pos_spring,
+        prop_qpos.astype("float32").flatten(),
+        WALL_OFFSET - 1 + AGENT_DOF_OFFSET * agent_count,
+        axis=0,
+    )
+
 
     return base_model.replace(
         geom_pos=b_geom_xpos, geom_quat=b_geom_xquat, body_pos=b_pos

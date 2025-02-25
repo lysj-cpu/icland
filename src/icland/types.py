@@ -64,7 +64,7 @@ class ICLandWorld(PyTreeNode):
     max_world_width: int
     max_world_depth: int
     max_world_height: int
-
+    cmap: jax.Array
 
 class ICLandAgentInfo(PyTreeNode):  # type: ignore[misc]
     """Information about agents in the ICLand environment.

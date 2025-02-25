@@ -112,8 +112,8 @@ def test_generate_colormap() -> None:
 def test_render_frame_with_objects() -> None:
     """Test if the render_frame_with_objects can correctly render one frame with props."""
     key = jax.random.PRNGKey(42)
-    players = PlayerInfo(jnp.array([[8.5, 3, 1]]), jnp.array([[1.0, 0.0, 1.0]]))
-    props = PropInfo(
+    players = RenderAgentInfo(jnp.array([[8.5, 3, 1]]), jnp.array([[1.0, 0.0, 1.0]]))
+    props = RenderPropInfo(
         jnp.array([1]),
         jnp.array([[4, 3, 1]]),
         jnp.array([[1, 0, 0, 0]]),

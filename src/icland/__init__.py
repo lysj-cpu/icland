@@ -1,6 +1,5 @@
 """Recreating Google DeepMind's XLand RL environment in JAX."""
 
-from typing import Tuple
 import jax
 import jax.numpy as jnp
 from mujoco import mjx
@@ -10,28 +9,25 @@ from icland.constants import (
     ACTION_SPACE_DIM,
     AGENT_DOF_OFFSET,
     AGENT_VARIABLES_DIM,
-    PROP_DOF_OFFSET,
+    BODY_OFFSET,
     PROP_DOF_MULTIPLIER,
+    PROP_DOF_OFFSET,
     WALL_OFFSET,
 )
+from icland.renderer.renderer import generate_colormap, render
 from icland.types import *
-from icland.world_gen.JITModel import export, sample_world
 from icland.world_gen.converter import sample_spawn_points
+from icland.world_gen.JITModel import export, sample_world
 from icland.world_gen.model_editing import edit_model_data, generate_base_model
 from icland.world_gen.tile_data import TILECODES
 
 
-def config(*args: Tuple[int, ...]) -> ICLandConfig:
+def config(*args: tuple[int, ...]) -> ICLandConfig:
     """Smart constructor for ICLand config, initialising the base model on the fly."""
-
     # Unpack the arguments
-    world_width, world_depth, world_height, agent_count = args[0:4]
-    model, _ = generate_base_model(world_width, world_depth, world_height, agent_count)
-    
-    return ICLandConfig(
-        *args,
-        model=model
-    )
+    model, _ = generate_base_model(*args)
+
+    return ICLandConfig(*args, model=model)
 
 
 # Default configuration
@@ -63,7 +59,6 @@ def sample(key: jax.Array, config: ICLandConfig = DEFAULT_CONFIG) -> ICLandParam
         >>> icland.sample(key)
         ICLandParams(world=ICLandWorld(...), agent_info=ICLandAgentInfo(...), prop_info=ICLandPropInfo(...), reward_function=None)
     """
-
     # Unpack config
     (
         max_world_width,
@@ -106,7 +101,7 @@ def sample(key: jax.Array, config: ICLandConfig = DEFAULT_CONFIG) -> ICLandParam
     )
 
     # Update with randomised number of agents
-    num_agents = jax.random.randint(key, (1, ), 1, max_agent_count)[0]
+    num_agents = jax.random.randint(key, (1,), 1, max_agent_count)[0]
 
     # Update with randomised number of props
     num_props = jax.random.randint(key, (), 0, max_prop_count)
@@ -132,7 +127,7 @@ def sample(key: jax.Array, config: ICLandConfig = DEFAULT_CONFIG) -> ICLandParam
         agent_count=num_agents,
         spawn_points=spawnpoints[:max_agent_count],
         spawn_orientations=jnp.zeros((max_agent_count,), dtype="float32"),
-        body_ids=jnp.arange(1, max_agent_count + 1, dtype="int32"),
+        body_ids=jnp.arange(BODY_OFFSET, max_agent_count + BODY_OFFSET, dtype="int32"),
         geom_ids=(jnp.arange(max_agent_count) + max_world_width * max_world_depth) * 2
         + WALL_OFFSET,
         dof_addresses=jnp.arange(max_agent_count) * AGENT_DOF_OFFSET,
@@ -145,26 +140,27 @@ def sample(key: jax.Array, config: ICLandConfig = DEFAULT_CONFIG) -> ICLandParam
         prop_types=jnp.zeros((max_prop_count,), dtype="int32"),
         spawn_points=spawnpoints[max_agent_count:max_object_count],
         spawn_rotations=jnp.zeros((max_prop_count,), dtype="float32"),
-        body_ids=jnp.arange(
-            1 + max_agent_count, max_agent_count + max_prop_count + 1, dtype="int32"
-        ),
-        geom_ids=max_agent_count * 2
-        + jnp.arange(max_prop_count)
+        body_ids=BODY_OFFSET
         + max_agent_count
-        + max_world_width * max_world_depth
+        + jnp.arange(max_prop_count, dtype="int32"),
+        geom_ids=(max_agent_count + max_world_width * max_world_depth) * 2
+        + jnp.arange(max_prop_count, dtype="int32")
         + WALL_OFFSET,
-        dof_addresses=jnp.arange(max_prop_count) * PROP_DOF_MULTIPLIER
+        dof_addresses=jnp.arange(max_prop_count, dtype="int32") * PROP_DOF_MULTIPLIER
         + PROP_DOF_OFFSET,
         colour=jnp.zeros((max_prop_count,), dtype="float32"),
     )
 
     # Edit the model data for the specification
     model = edit_model_data(world_tilemap, model, agent_info, prop_info)
+    cmap = generate_colormap(key, max_world_width, max_world_depth)
+
     icland_world = ICLandWorld(
         tilemap=world_tilemap,
         max_world_width=max_world_width,
         max_world_depth=max_world_depth,
         max_world_height=max_world_height,
+        cmap=cmap,
     )
 
     # Return the parameters
@@ -192,7 +188,6 @@ def init(icland_params: ICLandParams) -> ICLandState:
         >>> icland.init(icland_params)
         ICLandState(mjx_data=DeviceArray(...), agent_variables=ICLandAgentVariables(...), prop_variables=ICLandPropVariables(...))
     """
-
     max_agent_count = icland_params.agent_info.spawn_points.shape[0]
     max_prop_count = icland_params.prop_info.spawn_points.shape[0]
 
@@ -211,24 +206,24 @@ def init(icland_params: ICLandParams) -> ICLandState:
         prop_variables=prop_variables,
     )
 
+
 @jax.jit
 def step(
-    state: ICLandState, params: ICLandParams, action_batch: jax.Array
-) -> Tuple[ICLandState, ICLandObservation, jax.Array]:
+    state: ICLandState, params: ICLandParams, action_batch: ICLandAction
+) -> tuple[ICLandState, ICLandObservation, jax.Array]:
     # Unpack state
     mjx_data = state.mjx_data
     agent_variables = state.agent_variables
     prop_variables = state.prop_variables
-    
+
     # Unpack params
     mjx_model = params.mjx_model
     agent_info = params.agent_info
-    prop_info = params.prop_info 
+    prop_info = params.prop_info
     world = params.world
-    
+
     # Unpack actions
-    
-    
+
     # Ensure parameters are in correct shape
     action_batch = action_batch.reshape(-1, ACTION_SPACE_DIM)
 
@@ -236,17 +231,20 @@ def step(
     applied_agent_forces, new_agent_variables = step_agents(
         mjx_data, action_batch, agent_info, agent_variables
     )
-    
+
     # Evaluate reward function
-    reward = 0 # params.reward_function(state)
-    
+    reward = 0  # params.reward_function(state)
+
     # Update state
     new_mjx_state = mjx.step(params.mjx_model, applied_agent_forces)
-    
+
     # Update observation and render frames
-    # TODO: Render frame here
-    # Need: agent_var, prop_var, agent_info, prop_info, world
-    observation = ICLandObservation(jnp.array([]), 0)
+    frames = render(
+        agent_info, agent_variables, prop_info, prop_variables, world, mjx_data
+    )
+    observation = ICLandObservation(frames, 0)
+    new_agent_variables = agent_vars
+    new_prop_variables = prop_vars
 
     new_icland_state = ICLandState(
         mjx_data=new_mjx_state,

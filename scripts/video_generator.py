@@ -39,8 +39,8 @@ os.environ["XLA_FLAGS"] = xla_flags
 import icland
 from icland.presets import *
 from icland.renderer.renderer import (
-    PlayerInfo,
-    PropInfo,
+    RenderAgentInfo,
+    RenderPropInfo,
     generate_colormap,
     get_agent_camera_from_mjx,
     render_frame,
@@ -329,13 +329,13 @@ def render_video_multi_agent(
                 icland_state, max_world_width, jnp.arange(agent_count)
             )
             players = jax.vmap(
-                lambda x: PlayerInfo(
+                lambda x: RenderAgentInfo(
                     pos=camera_pos[x].at[1].add(0.2),
                     col=colors[x],
                 )
             )(jnp.arange(agent_count))
 
-            props = PropInfo(
+            props = RenderPropInfo(
                 prop_type=jnp.array([0]),
                 pos=jnp.empty((1, 3)),
                 rot=jnp.array([[1, 0, 0, 0]]),
