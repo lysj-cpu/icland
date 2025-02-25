@@ -224,7 +224,7 @@ class ICLandObservation(PyTreeNode):  # type: ignore[misc]
         is_grabbing: Is agent grabbing prop.
     """
 
-    render: int
+    render: jax.Array
     is_grabbing: int
 
     def __repr__(self) -> str:

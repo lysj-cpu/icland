@@ -27,7 +27,7 @@ config = icland.config(
 keys = jax.random.split(key, BATCH_SIZE)
 icland_params = jax.vmap(icland.sample, in_axes=(0, None))(keys, config)
 
-icland_state = jax.vmap(icland.init, in_axes=(0, ))(icland_params)
+icland_state = jax.vmap(icland.init, in_axes=(0,))(icland_params)
 
 print(icland_state)
 

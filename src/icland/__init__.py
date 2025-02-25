@@ -5,6 +5,7 @@ import jax
 import jax.numpy as jnp
 from mujoco import mjx
 
+from icland.agent import step_agents
 from icland.constants import (
     AGENT_DOF_OFFSET,
     AGENT_VARIABLES_DIM,
@@ -27,7 +28,9 @@ def config(*args: Tuple[int, ...]) -> ICLandConfig:
 
     return ICLandConfig(
         *args,
-        model=generate_base_model(world_width, world_depth, world_height, agent_count)[0],
+        model=generate_base_model(world_width, world_depth, world_height, agent_count)[
+            0
+        ],
     )
 
 
@@ -40,6 +43,7 @@ DEFAULT_CONFIG = config(
     0,
     0,
 )
+
 
 @jax.jit
 def sample(key: jax.Array, config: ICLandConfig = DEFAULT_CONFIG) -> ICLandParams:
@@ -59,7 +63,7 @@ def sample(key: jax.Array, config: ICLandConfig = DEFAULT_CONFIG) -> ICLandParam
         >>> icland.sample(key)
         ICLandParams(world=ICLandWorld(...), agent_info=ICLandAgentInfo(...), prop_info=ICLandPropInfo(...), reward_function=None)
     """
-    
+
     # Unpack config
     (
         max_world_width,
@@ -68,7 +72,7 @@ def sample(key: jax.Array, config: ICLandConfig = DEFAULT_CONFIG) -> ICLandParam
         max_agent_count,
         max_sphere_count,
         max_cube_count,
-        model
+        model,
     ) = vars(config).values()
 
     # Define constants
@@ -132,19 +136,25 @@ def sample(key: jax.Array, config: ICLandConfig = DEFAULT_CONFIG) -> ICLandParam
         geom_ids=(jnp.arange(max_agent_count) + max_world_width * max_world_depth) * 2
         + WALL_OFFSET,
         dof_addresses=jnp.arange(max_agent_count) * AGENT_DOF_OFFSET,
-        colour=jnp.zeros((max_agent_count,), dtype="int"),
+        colour=jnp.zeros((max_agent_count,), dtype="int32"),
     )
 
     # Generate the prop information
     prop_info = ICLandPropInfo(
         prop_count=num_props,
-        prop_types=jnp.zeros((max_prop_count, ), dtype="int32"),
+        prop_types=jnp.zeros((max_prop_count,), dtype="int32"),
         spawn_points=spawnpoints[max_agent_count:max_object_count],
         spawn_rotations=jnp.zeros((max_prop_count,), dtype="float32"),
-        body_ids=jnp.arange(1 + max_agent_count, max_agent_count + max_prop_count + 1, dtype="int32"),
-        geom_ids=max_agent_count * 2 + jnp.arange(max_prop_count) + max_agent_count + max_world_width * max_world_depth
+        body_ids=jnp.arange(
+            1 + max_agent_count, max_agent_count + max_prop_count + 1, dtype="int32"
+        ),
+        geom_ids=max_agent_count * 2
+        + jnp.arange(max_prop_count)
+        + max_agent_count
+        + max_world_width * max_world_depth
         + WALL_OFFSET,
-        dof_addresses=jnp.arange(max_prop_count) * PROP_DOF_MULTIPLIER + PROP_DOF_OFFSET,
+        dof_addresses=jnp.arange(max_prop_count) * PROP_DOF_MULTIPLIER
+        + PROP_DOF_OFFSET,
         colour=jnp.zeros((max_prop_count,), dtype="float32"),
     )
 
@@ -166,10 +176,10 @@ def sample(key: jax.Array, config: ICLandConfig = DEFAULT_CONFIG) -> ICLandParam
         mjx_model=model,
     )
 
-@jax.jit
+
 def init(icland_params: ICLandParams) -> ICLandState:
     """Initialise the ICLand environment.
-    
+
     Args:
         icland_params: The parameters for the ICLand environment.
 
@@ -188,21 +198,32 @@ def init(icland_params: ICLandParams) -> ICLandState:
 
     agent_variables = ICLandAgentVariables(
         pitch=jnp.zeros((max_agent_count,), dtype="float32"),
-        is_tagged=jnp.zeros((max_agent_count,), dtype="int"),
+        is_tagged=jnp.zeros((max_agent_count,), dtype="int32"),
     )
 
     prop_variables = ICLandPropVariables(
-        prop_owner=jnp.zeros((max_prop_count,), dtype="int"),
+        prop_owner=jnp.zeros((max_prop_count,), dtype="int32"),
     )
 
     return ICLandState(
-        mjx_data=icland_params.model,
+        mjx_data=mjx.make_data(icland_params.mjx_model),
         agent_variables=agent_variables,
-        prop_variables=prop_variables
+        prop_variables=prop_variables,
     )
 
-
+@jax.jit
 def step(
     state: ICLandState, params: ICLandParams, action_batch: Tuple[ICLandAction, ...]
 ) -> Tuple[ICLandState, ICLandObservation, jax.Array]:
-    pass
+    
+    # applied_agent_forces = step_agents(
+    #     state.mjx_data, action_batch, params.agent_info
+    # )
+
+    new_state = mjx.step(params.mjx_model, applied_agent_forces)
+
+    observation = ICLandObservation(jnp.array([]), 0)
+
+    reward = 0
+
+    return new_state, observation, reward
