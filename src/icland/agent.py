@@ -192,9 +192,7 @@ def step_agents(
 
 
 @jax.jit
-def collect_body_scene_info(
-    component_ids: jnp.ndarray, mjx_data: MjxStateType
-) -> None:
+def collect_body_scene_info(component_ids: jnp.ndarray, mjx_data: MjxStateType) -> None:
     # """Collects information about the bodies in the scene including position and rotation.
 
     # Args:
