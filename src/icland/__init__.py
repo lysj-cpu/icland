@@ -25,12 +25,11 @@ def config(*args: Tuple[int, ...]) -> ICLandConfig:
 
     # Unpack the arguments
     world_width, world_depth, world_height, agent_count = args[0:4]
-
+    model, _ = generate_base_model(world_width, world_depth, world_height, agent_count)
+    
     return ICLandConfig(
         *args,
-        model=generate_base_model(world_width, world_depth, world_height, agent_count)[
-            0
-        ],
+        model=model
     )
 
 
@@ -213,17 +212,40 @@ def init(icland_params: ICLandParams) -> ICLandState:
 
 @jax.jit
 def step(
-    state: ICLandState, params: ICLandParams, action_batch: Tuple[ICLandAction, ...]
+    state: ICLandState, params: ICLandParams, action_batch: ICLandAction
 ) -> Tuple[ICLandState, ICLandObservation, jax.Array]:
+    # Unpack state
+    mjx_data = state.mjx_data
+    agent_vars = state.agent_variables
+    prop_vars = state.prop_variables
     
-    # applied_agent_forces = step_agents(
-    #     state.mjx_data, action_batch, params.agent_info
-    # )
-
+    # Unpack params
+    mjx_model = params.mjx_model
+    agent_info = params.agent_info
+    prop_info = params.prop_info
+    world = params.world
+    
+    # Unpack actions
+    
+    
+    # Ensure parameters are in correct shape
+    
+    
+    # Step through each agent
+    applied_agent_forces = step_agents(
+        mjx_data, action_batch, agent_info
+    )
+    
+    # Evaluate reward function
+    reward = 0 # params.reward_function(state)
+    
+    # Update state
     new_state = mjx.step(params.mjx_model, applied_agent_forces)
-
+    
+    # Update observation and render frames
+    # TODO: Render frame here
+    # Need: agent_var, prop_var, agent_info, prop_info, world
     observation = ICLandObservation(jnp.array([]), 0)
 
-    reward = 0
 
     return new_state, observation, reward
