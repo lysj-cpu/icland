@@ -11,27 +11,18 @@ from icland.world_gen.model_editing import generate_base_model
 key = jax.random.PRNGKey(42)
 
 # Sample initial conditions
-icland_params = icland.sample(key)
+icland_params: ICLandParams = icland.sample(key)
 
-init_state = icland.init(icland_params)
+state = icland.init(icland_params)
 
-action = ICLandAction(
-    forward=1.0,
-    right=0.0,
-    yaw=0.0,
-    pitch=0.0,
-    grab=0,
-    tag=0
-)
+agent_count = icland_params.agent_info.agent_count
 
-batched_action = jax.tree.map(
-        lambda x: jnp.stack([x] * int(icland_params.agent_info.agent_count)), action
-    )
+batched_action = jnp.array([1, 0, 0, 0, 0, 0])
 
 # Take a step in the environment
-next_state = icland.step(init_state, icland_params, batched_action)
-
-# print(next_state)
+while True:
+    state, obs, rew = icland.step(state, icland_params, batched_action)
+    print(state.mjx_data.time)
 
 # Calculate the reward
 # if icland_params.reward_function is not None:

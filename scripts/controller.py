@@ -44,21 +44,21 @@ from icland.types import *
 from icland.world_gen.model_editing import generate_base_model
 
 
-def interactive_simulation(config: ICLandConfig) -> None:
+def interactive_simulation() -> None:
     """Runs an interactive simulation where you can change the agent's policy via keyboard input."""
     # Create the MuJoCo model from the .
-    icland_params = icland.sample(jax.random.PRNGKey(42), DEFAULT_CONFIG)
-    mjx_model, mj_model = generate_base_model(DEFAULT_CONFIG)
+    icland_params = icland.sample(jax.random.PRNGKey(42))
+    mjx_model, mj_model = generate_base_model(2, 2, 6, 1)
 
     jax_key = jax.random.PRNGKey(42)
-    icland_state = icland.init(jax_key, icland_params, mjx_model)
+    icland_state = icland.init(icland_params)
 
     # Set up the camera.
     cam = mujoco.MjvCamera()
     mujoco.mjv_defaultCamera(cam)
     cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
     # Use the first component id (e.g. the first agent's body) as the track target.
-    cam.trackbodyid = icland_state.pipeline_state.component_ids[0, 0]
+    cam.trackbodyid = icland_params.agent_info.body_ids[0]
     cam.distance = 1.5
     cam.azimuth = 0.0
     cam.elevation = -30.0
@@ -84,7 +84,7 @@ def interactive_simulation(config: ICLandConfig) -> None:
             cv2.waitKey(1)
 
             # Stop if simulation time exceeds the duration.
-            mjx_data = icland_state.pipeline_state.mjx_data
+            mjx_data = icland_state.mjx_data
 
             # Quit if 'q' is pressed.
             if keyboard.is_pressed("q"):
@@ -117,14 +117,14 @@ def interactive_simulation(config: ICLandConfig) -> None:
                 print(f"Time {mjx_data.time:.2f}: {current_policy}")
 
             # Step the simulation using the current_policy.
-            icland_state = icland.step(
-                jax_key, icland_state, icland_params, current_policy
+            icland_state, observation, reward = icland.step(
+                icland_state, icland_params, current_policy
             )
             # (Optional) Update the JAX random key.
             jax_key, _ = jax.random.split(jax_key)
 
             # Get the latest simulation data.
-            mjx_data = icland_state.pipeline_state.mjx_data
+            mjx_data = icland_state.mjx_data
             mj_data = mjx.get_data(mj_model, mjx_data)
 
             # Update the scene.
@@ -242,7 +242,7 @@ def sdfr_interactive_simulation(config: ICLandConfig) -> None:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "-sdfr":
-        sdfr_interactive_simulation(DEFAULT_CONFIG)
-    else:
-        interactive_simulation(DEFAULT_CONFIG)
+    # if len(sys.argv) > 1 and sys.argv[1] == "-sdfr":
+    #     sdfr_interactive_simulation(DEFAULT_CONFIG)
+    # else:
+        interactive_simulation()

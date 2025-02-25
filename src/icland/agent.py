@@ -58,7 +58,7 @@ def create_agent(
 
 @jax.jit
 def step_agents(
-    mjx_data: MjxStateType, actions: jax.Array, agents_data: jax.Array
+    mjx_data: MjxStateType, actions: jax.Array, agents_data: ICLandAgentInfo, agent_variables: ICLandAgentVariables
 ) -> tuple[MjxStateType, jax.Array]:
     """Update the agents in the physics environment based on the provided actions.
 
@@ -75,7 +75,10 @@ def step_agents(
     movement_friction = 1.0 - AGENT_MOVEMENT_FRICTION_COEFFICIENT
 
     def agent_update(
-        agent: jax.Array,
+        body_id: int,
+        geom_id: int,
+        dof: int,
+        pitch: float,
         action: jax.Array,
         contact_geom: jax.Array,
         contact_frame: jax.Array,
@@ -89,12 +92,7 @@ def step_agents(
         Any,  # force
         Any,  # new_pitch
     ]:
-        # Cast indices and read current pitch.
-        body_id = agent[0].astype(jnp.int32)
-        geom_id = agent[1].astype(jnp.int32)
-        dof = agent[2].astype(jnp.int32)
-        pitch = agent[3].astype(jnp.float16)
-
+        
         # (A) Determine local movement and rotate it to world frame.
         local_movement = action[:2]
         angle = mjx_data.qpos[dof + 3]
@@ -166,8 +164,17 @@ def step_agents(
 
     # Vectorize the per-agent update.
     (body_ids, dofs, new_angles, new_vels, new_omegas, forces, new_pitches) = jax.vmap(
-        agent_update, in_axes=(0, 0, None, None, None)
-    )(agents_data, actions, contact_geom, contact_frame, contact_dist)
+        agent_update, in_axes=(0, 0, 0, 0, 0, None, None, None)
+    )(
+        agents_data.body_ids,
+        agents_data.geom_ids,
+        agents_data.dof_addresses,
+        agent_variables.pitch,
+        actions, 
+        contact_geom, 
+        contact_frame, 
+        contact_dist
+        )
 
     # Combine per-agent updates into new simulation arrays.
     new_xfrc_applied = mjx_data.xfrc_applied.at[body_ids, :3].set(forces)
@@ -186,9 +193,12 @@ def step_agents(
     )
 
     # Update the agents_data with the new pitch.
-    new_agents_data = agents_data.at[:, 3].set(new_pitches)
+    new_agents_variables = ICLandAgentVariables(
+        pitch=new_pitches,
+        is_tagged=agent_variables.is_tagged,
+    )
 
-    return new_mjx_data, new_agents_data
+    return new_mjx_data, new_agents_variables
 
 
 @jax.jit
