@@ -5,6 +5,7 @@ description = "Recreating Google DeepMind's XLand RL environment in JAX"
 readme = "README.md"
 authors = []
 requires-python = ">=3.13"
+license_files = ["LICENSE"]
 dependencies = [
     "beartype>=0.19.0",
     "brax>=0.12.1",
