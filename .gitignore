@@ -270,3 +270,4 @@ $RECYCLE.BIN/
 
 scripts/video_output/*
 scripts/benchmark_output/*
+**/_autosummary
