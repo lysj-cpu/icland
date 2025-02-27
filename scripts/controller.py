@@ -47,7 +47,15 @@ def interactive_simulation() -> None:
     """Runs an interactive simulation where you can change the agent's policy via keyboard input."""
     # Create the MuJoCo model from the .
     icland_params = icland.sample(jax.random.PRNGKey(42))
-    mjx_model, mj_model = generate_base_model(2, 2, 6, 1)
+    tilemap = icland_params.world.tilemap
+    mjx_model, mj_model = generate_base_model(
+        tilemap.shape[0], tilemap.shape[1], 6, 1, 0, 0
+    )
+
+    for field in mjx.Model.fields():
+        if field.type in [jax.Array, np.ndarray]:
+            value = getattr(mjx_model, field.name)
+            setattr(mj_model, field.name, value)
 
     jax_key = jax.random.PRNGKey(42)
     icland_state = icland.init(icland_params)
@@ -116,9 +124,7 @@ def interactive_simulation() -> None:
                 print(f"Time {mjx_data.time:.2f}: {current_policy}")
 
             # Step the simulation using the current_policy.
-            icland_state, observation, reward = icland.step(
-                icland_state, icland_params, current_policy
-            )
+            icland_state = icland.step(icland_state, icland_params, current_policy)
             # (Optional) Update the JAX random key.
             jax_key, _ = jax.random.split(jax_key)
 
@@ -160,21 +166,22 @@ def sdfr_interactive_simulation(config: ICLandConfig) -> None:
     # Sample the world (we follow render_sdfr's approach).
     # model = sample_world(height, width, 1000, jax_key, True, 1)
     # Create a dummy tilemap (all zeros) as in render_sdfr.
-    tilemap = jnp.zeros((width, height, 4), dtype=np.int32)
 
     # Create the MuJoCo model using an EMPTY_WORLD MJCF string.
     # (Assumes EMPTY_WORLD is imported from icland.presets)
-    icland_params = icland.sample(jax.random.PRNGKey(42), DEFAULT_CONFIG)
-    mjx_model, mj_model = generate_base_model(DEFAULT_CONFIG)
-
     jax_key = jax.random.PRNGKey(42)
-    icland_state = icland.init(jax_key, icland_params, mjx_model)
+    icland_params = icland.sample(jax_key)
+
+    icland_state = icland.init(icland_params)
     # Take an initial step with the default (no-op) policy.
     current_policy = NOOP_POLICY
-    icland_state = icland.step(jax_key, icland_state, icland_params, current_policy)
+    icland_state = icland.step(
+        jax_key, icland_state, icland_params, jnp.array([current_policy])
+    )
 
     # Set up default agent and world width for camera parameters.
     default_agent = 0
+    tilemap = icland_params.world.tilemap
     max_world_width = tilemap.shape[1]
 
     # Define the frame callback using the SDF rendering functions.

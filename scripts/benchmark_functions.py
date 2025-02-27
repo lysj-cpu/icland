@@ -10,7 +10,6 @@ import pynvml
 
 import icland
 from icland.types import *
-from icland.world_gen.model_editing import generate_base_model
 
 SEED = 42
 
@@ -32,17 +31,16 @@ def benchmark_batch_size(batch_size: int) -> BenchmarkMetrics:
     NUM_STEPS = 100
 
     key = jax.random.PRNGKey(SEED)
-    config = ICLandConfig(2, 2, 1, {}, 6)
-    mjx_model, _ = generate_base_model(config)
+    config = icland.config(2, 2, 6, 1, 0, 0)
     icland_params = icland.sample(key, config)
-    init_state = icland.init(key, icland_params, mjx_model)
+    init_state = icland.init(icland_params)
 
     # Batched step function
     batched_step = jax.vmap(icland.step, in_axes=(0, 0, icland_params, 0))
 
     # Prepare batch
     icland_states = jax.tree.map(lambda x: jnp.stack([x] * batch_size), init_state)
-    actions = jnp.array([[1, 0, 0] for _ in range(batch_size)])
+    actions = jnp.array([[1, 0, 0, 0, 0, 0] for _ in range(batch_size)])
     keys = jax.random.split(key, batch_size)
 
     process = psutil.Process()

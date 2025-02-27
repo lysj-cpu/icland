@@ -277,14 +277,16 @@ def sample_spawn_points(
 
     def run_once(key: jax.Array) -> jax.Array:
         def pick(
-            item: tuple[int, jax.Array],
-        ) -> tuple[int, jax.Array]:
+            item: tuple[jax.Array, jax.Array],
+        ) -> tuple[jax.Array, jax.Array]:
             _, key = item
             key, subkey = jax.random.split(key)
             choice = jax.random.choice(subkey, nonzero_indices)
             return choice, key
 
-        random_index, key = jax.lax.while_loop(lambda x: x[0] < 0, pick, (-1, key))
+        random_index, key = jax.lax.while_loop(
+            lambda x: x[0] < 0, pick, (jnp.array(-1), key)
+        )
 
         # Convert the flat index back to 2D coordinates
         row = random_index // spawn_map.shape[0]
@@ -492,9 +494,9 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
         return slots
 
     def __bfs(
-        i: int,
-        j: int,
-        ind: int,
+        i: jax.Array,
+        j: jax.Array,
+        ind: jax.Array,
         visited: jax.Array,
         spawnable: jax.Array,
         combined: jax.Array,
@@ -504,8 +506,8 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
         front, rear, size = 0, 0, 0
 
         def __enqueue(
-            i: int,
-            j: int,
+            i: jax.Array,
+            j: jax.Array,
             rear: int,
             queue: jax.Array,
             size: int,
@@ -517,7 +519,7 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
 
         def __dequeue(
             front: int, queue: jax.Array, size: int
-        ) -> tuple[jax.Array, jax.Array, int]:
+        ) -> tuple[jax.Array, int, int]:
             res = queue[front]
             front = (front + 1) % capacity
             size -= 1
@@ -593,7 +595,7 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
         return visited, spawnable
 
     def scan_body(
-        carry: tuple[jax.Array, jax.Array], ind: int
+        carry: tuple[jax.Array, jax.Array], ind: jax.Array
     ) -> tuple[tuple[jax.Array, jax.Array], None]:
         visited, spawnable = carry
         i = ind // w

@@ -45,9 +45,6 @@ from icland.renderer.renderer import (
     render_frame_with_objects,
 )
 from icland.types import *
-from icland.world_gen.JITModel import export, sample_world
-from icland.world_gen.model_editing import generate_base_model
-from icland.world_gen.tile_data import TILECODES
 
 # ---------------------------------------------------------------------------
 # Simulation Presets
@@ -76,82 +73,6 @@ SIMULATION_PRESETS: list[dict[str, Any]] = [
 # ---------------------------------------------------------------------------
 # Helper Functions
 # ---------------------------------------------------------------------------
-def _generate_mjcf_string(
-    tilemap: jax.Array,
-    agent_spawns: jax.Array,
-    mesh_dir: str = "tests/assets/meshes/",
-) -> str:
-    """Generates an MJCF string from column meshes that form the world."""
-    mesh_files = [f for f in os.listdir(mesh_dir) if f.endswith(".stl")]
-    w, h = tilemap.shape[0], tilemap.shape[1]
-
-    mjcf = f"""<mujoco model="generated_mesh_world">
-    <compiler meshdir="{mesh_dir}"/>
-    <default>
-        <geom type="mesh" />
-    </default>
-    <worldbody>
-"""
-    # Add agent bodies
-    for i, s in enumerate(agent_spawns):
-        spawn_loc = s.tolist()
-        spawn_loc[2] += 1
-        mjcf += (
-            f'            <body name="agent{i}" pos="{" ".join([str(s) for s in spawn_loc])}">'
-            + """
-                <joint type="slide" axis="1 0 0" />
-                <joint type="slide" axis="0 1 0" />
-                <joint type="slide" axis="0 0 1" />
-                <joint type="hinge" axis="0 0 1" stiffness="1"/>
-                <geom"""
-        )
-        mjcf += f'        name="agent{i}_geom"'
-        mjcf += """        type="capsule"
-                    size="0.06"
-                    fromto="0 0 0 0 0 -0.4"
-                    mass="1"
-                />
-                <geom
-                    type="box"
-                    size="0.05 0.05 0.05"
-                    pos="0 0 0.2"
-                    mass="0"
-                />
-            </body>
-"""
-    # Add mesh geoms
-    for mesh_file in mesh_files:
-        mesh_name = os.path.splitext(mesh_file)[0]
-        mjcf += f'        <geom name="{mesh_name}" mesh="{mesh_name}" pos="0 0 0"/>\n'
-
-    # Add walls
-    mjcf += f'        <geom name="east_wall" type="plane"\n'
-    mjcf += f"""            pos="{w} {h / 2} 10"
-            quat="0.5 -0.5 -0.5 0.5"
-            size="{h / 2} 10 0.01"
-            rgba="1 0.819607843 0.859375 0.5" />\n"""
-    mjcf += f'        <geom name="west_wall" type="plane"\n'
-    mjcf += f"""            pos="0 {h / 2} 10"
-            quat="0.5 0.5 0.5 0.5"
-            size="{h / 2} 10 0.01"
-            rgba="1 0.819607843 0.859375 0.5" />\n"""
-    mjcf += f'        <geom name="north_wall" type="plane"\n'
-    mjcf += f"""            pos="{w / 2} 0 10"
-            quat="0.5 -0.5 0.5 0.5"
-            size="10 {w / 2} 0.01"
-            rgba="1 0.819607843 0.859375 0.5" />\n"""
-    mjcf += f'        <geom name="south_wall" type="plane"\n'
-    mjcf += f"""            pos="{w / 2} {h} 10"
-            quat="0.5 0.5 -0.5 0.5"
-            size="10 {w / 2} 0.01"
-            rgba="1 0.819607843 0.859375 0.5" />\n"""
-    mjcf += "    </worldbody>\n\n    <asset>\n"
-    for mesh_file in mesh_files:
-        mesh_name = os.path.splitext(mesh_file)[0]
-        mjcf += f'        <mesh name="{mesh_name}" file="{mesh_file}"/>\n'
-    mjcf += "    </asset>\n</mujoco>\n"
-
-    return mjcf
 
 
 def _simulate_frames(
@@ -169,7 +90,7 @@ def _simulate_frames(
     Optionally, a `policy_switcher` function may update the policy based on simulation time.
     """
     frames = []  # type: list[Any]
-    mjx_data = icland_state.pipeline_state.mjx_data
+    mjx_data = icland_state.mjx_data
     last_printed_time = -0.1
     current_policy = policy
 
@@ -180,7 +101,7 @@ def _simulate_frames(
             print(f"Time: {mjx_data.time:.1f}")
             last_printed_time = mjx_data.time
         icland_state = icland.step(key, icland_state, icland_params, current_policy)
-        mjx_data = icland_state.pipeline_state.mjx_data
+        mjx_data = icland_state.mjx_data
         if len(frames) < mjx_data.time * frame_rate:
             frames.append(frame_callback(icland_state))
     return frames
@@ -198,26 +119,17 @@ def render_sdfr(
     width: int = 10,
 ) -> None:
     """Renders a video using an SDF function."""
-    print(f"Sampling world with key {key[1]}")
-    model = sample_world(height, width, 1000, key, True, 1)
-    print("Exporting tilemap")
-    tilemap = np.zeros((width, height, 4), dtype=np.int32)
-    mjx_model, mj_model = generate_base_model(ICLandConfig(width, height, 1, {}, 6))
-    icland_params = ICLandParams(
-        world=tilemap,
-        reward_function=None,
-        agent_spawns=jnp.array([[0, 0, 0]]),
-        world_level=6,
-    )
+    config = icland.config(width, height, 6, 1, 0, 0)
+    icland_params = icland.sample(key, config)
 
-    icland_state = icland.init(key, icland_params, mjx_model)
-    icland_state = icland.step(key, icland_state, icland_params, policy)
+    icland_state = icland.init(icland_params)
+    icland_state = icland.step(key, icland_state, icland_params, jnp.array([policy]))
 
     default_agent = 0
-    max_world_width = tilemap.shape[1]
+    tilemap = icland_params.world.tilemap
     # get_camera_info = jax.jit(get_agent_camera_from_mjx)
     frame_callback = lambda state: render_frame(
-        *get_agent_camera_from_mjx(state, max_world_width, default_agent),
+        *get_agent_camera_from_mjx(state, width, default_agent),
         tilemap,
         view_width=96,
         view_height=72,
@@ -277,20 +189,15 @@ def render_video_multi_agent(
     agent_count = len(policies)
 
     # Initialize global config
-    config = ICLandConfig(width, height, agent_count, {}, 6)
-    mjx_model, _ = generate_base_model(config)
-    print(f"Sampling world with key {key[1]}...")
+    config = icland.config(width, height, agent_count, 1, 0, 0)
+    icland_params = icland.sample(key)
 
     # Use ICLand API to sample and initialize world
-    icland_params = icland.sample(key, config)
-    # icland_params = icland_params.replace(
-    #     agent_spawns=jnp.array([[1 + i, 1, 4] for i in range(agent_count)])
-    # )
-    icland_state = icland.init(key, icland_params, mjx_model)
+    icland_state = icland.init(icland_params)
     icland_state = icland.step(key, icland_state, icland_params, jnp.array(policies))
-    tilemap = icland_state.pipeline_state.world
+    tilemap = icland_params.world
     print(f"Init mjx model and data...")
-    mjx_data = icland_state.pipeline_state.mjx_data
+    mjx_data = icland_state.mjx_data
 
     # Store frames for each agent
     agent_frames: list[Any] = []
@@ -320,11 +227,11 @@ def render_video_multi_agent(
         icland_state = icland.step(
             key, icland_state, icland_params, jnp.array(policies)
         )
-        mjx_data = icland_state.pipeline_state.mjx_data
+        mjx_data = icland_state.mjx_data
 
         if len(agent_frames) < mjx_data.time * FPS:
             camera_pos, camera_dir = jax.vmap(get_camera_info, in_axes=(None, None, 0))(
-                icland_state, max_world_width, jnp.arange(agent_count)
+                icland_state, width, jnp.arange(agent_count)
             )
             players = jax.vmap(
                 lambda x: RenderAgentInfo(
@@ -377,19 +284,12 @@ def render_video_from_world_with_policies(
     """
     print(f"Sampling world with key {key}")
     width, height = 10, 10
-    model = sample_world(width, height, 1000, key, True, 1)
-    tilemap = export(model, TILECODES, width, height)
-    mjx_model, mj_model = generate_base_model(ICLandConfig(width, height, 1, {}, 6))
-    icland_params = ICLandParams(
-        world=tilemap,
-        reward_function=None,
-        agent_spawns=jnp.array([[1.5, 1, 4]]),
-        world_level=6,
-    )
+    config = icland.config(width, height, 6, 1, 0, 0)
+    icland_params = icland.sample(key)
 
-    icland_state = icland.init(key, icland_params, mjx_model)
+    icland_state = icland.init(icland_params)
 
-    mjx_data = icland_state.pipeline_state.mjx_data
+    mjx_data = icland_state.mjx_data
     frames: list[Any] = []
 
     current_policy_idx = 0
@@ -399,10 +299,11 @@ def render_video_from_world_with_policies(
     last_printed_time = -0.1
 
     default_agent = 0
-    max_world_width = tilemap.shape[1]
+    max_world_width = width
     get_camera_info = jax.jit(get_agent_camera_from_mjx)
     frame_callback = lambda state: render_frame(
-        *get_camera_info(state, max_world_width, default_agent), tilemap
+        *get_camera_info(state, max_world_width, default_agent),
+        icland_params.world.tilemap,
     )
 
     # Setup policy switching using a closure.

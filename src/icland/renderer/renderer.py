@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 from functools import partial
-from typing import Any
+from typing import Any, cast
 
 import imageio
 import jax
@@ -619,6 +619,40 @@ def render_frame(
     return frame.reshape((view_height, view_width, NUM_CHANNELS))
 
 
+@jax.jit
+def get_agent_camera_from_mjx(
+    icland_state: ICLandState,
+    world_width: int,
+    body_id: int,
+) -> tuple[jax.Array, jax.Array]:
+    """Get the camera position and direction from the MuJoCo data."""
+    data = icland_state.pipeline_state.mjx_data
+    agent_id = icland_state.pipeline_state.component_ids[body_id, 0].astype(int)
+    pitch = icland_state.pipeline_state.component_ids[body_id, 3] * 0.5
+    dof_address = icland_state.pipeline_state.component_ids[body_id, 2].astype(int)
+
+    agent_pos = jnp.array(
+        [
+            -data.xpos[agent_id][0] + world_width,
+            data.xpos[agent_id][2],
+            data.xpos[agent_id][1],
+        ]
+    )
+
+    # Get yaw from the MuJoCo data
+    yaw = data.qpos[dof_address + body_id * 4 + 3]  # Get angle from dof address
+
+    # Compute forward direction using both yaw and pitch.
+    # When pitch=0, this reduces to [-cos(yaw), 0, sin(yaw)] as before.
+    forward_dir = jnp.array(
+        [-jnp.cos(pitch) * jnp.cos(yaw), jnp.sin(pitch), jnp.cos(pitch) * jnp.sin(yaw)]
+    )
+
+    camera_pos = agent_pos
+
+    return camera_pos, forward_dir
+
+
 @partial(jax.jit, static_argnames=["view_width", "view_height"])
 def render(
     agent_info: ICLandAgentInfo,
@@ -653,7 +687,7 @@ def render(
         prop_info: ICLandPropInfo,
         prop_vars: ICLandPropVariables,
         max_world_width: int,
-    ):
+    ) -> RenderPropInfo:
         max_prop_count = prop_info.spawn_points.shape[0]
         max_agent_count = agent_info.spawn_points.shape[0]
         prop_count = prop_info.prop_count
@@ -661,7 +695,7 @@ def render(
 
         prop_mask = jax.vmap(lambda i: i < prop_count)(prop_indices)
 
-        def __get_prop_data(prop_id: int):
+        def __get_prop_data(prop_id: jax.Array) -> RenderPropInfo:
             body_id = prop_info.body_ids[prop_id].astype(int)
             prop_dof = PROP_DOF_MULTIPLIER + 1
             prop_pos_index = AGENT_DOF_OFFSET * max_agent_count + prop_dof * prop_id
@@ -673,7 +707,6 @@ def render(
                 ]
             )
 
-            jax.debug.print("Prop {} pos {}", prop_id, prop_pos)
             # Get rotation from the MJX data
             prop_quat = jax.lax.dynamic_slice_in_dim(
                 mjx_data.qpos,
@@ -710,7 +743,7 @@ def render(
         agent_mask = jax.vmap(lambda i: i < agent_count)(agent_indices)
 
         def __get_agent_data(
-            agent_id: int,
+            agent_id: jax.Array,
         ) -> tuple[jax.Array, jax.Array]:
             body_id = agent_info.body_ids[agent_id].astype(int)
             pitch = agent_vars.pitch[agent_id]  # TODO: Change multiplier
@@ -746,7 +779,7 @@ def render(
 
             return RenderAgentInfo(pos=agent_pos, col=colour), forward_dir
 
-        return jax.vmap(__get_agent_data)(agent_indices)
+        return cast(RenderAgentInfo, jax.vmap(__get_agent_data)(agent_indices))
 
     render_agent_info, agent_dirs = __get_agents_info(
         mjx_data, agent_info, agent_vars, world.max_world_width

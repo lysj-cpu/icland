@@ -15,8 +15,8 @@ config = icland.config(
     5,
     6,
     1,
-    2,
-    2,
+    0,
+    0,
 )
 icland_params: ICLandParams = icland.sample(key, config)
 

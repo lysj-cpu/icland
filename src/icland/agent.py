@@ -76,10 +76,10 @@ def step_agents(
     movement_friction = 1.0 - AGENT_MOVEMENT_FRICTION_COEFFICIENT
 
     def agent_update(
-        body_id: int,
-        geom_id: int,
-        dof: int,
-        pitch: float,
+        body_id: jax.Array,
+        geom_id: jax.Array,
+        dof: jax.Array,
+        pitch: jax.Array,
         action: jax.Array,
         contact_geom: jax.Array,
         contact_frame: jax.Array,
@@ -199,4 +199,3 @@ def step_agents(
     )
 
     return new_mjx_data, new_agents_variables
-

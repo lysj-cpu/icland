@@ -47,7 +47,9 @@ window_name = "ICLand Video"
 
 
 def __combine_frames(
-    frames_list: list[np.ndarray[Any, np.dtype[np.float32]]] | jax.Array,
+    frames_list: list[np.ndarray[Any, np.dtype[np.float32]]]
+    | jax.Array
+    | np.ndarray[tuple[int, ...], np.dtype[Any]],
     grid_shape: tuple[int, int] | None = None,
     padding: int = 0,
     pad_value: int = 0,
@@ -80,7 +82,7 @@ def __combine_frames(
     return (grid * 255).astype(np.uint8)
 
 
-agent_frames = []
+agent_frames: list[Any] = []
 TIME = 4
 timestep = 0
 while state.mjx_data.time < TIME:
@@ -100,7 +102,7 @@ while state.mjx_data.time < TIME:
     # Render the frame using the SDF rendering callback.
     frame = state.observation.render
     frame_rgb = np.nan_to_num(frame)
-    frame_rgb_combined = __combine_frames(frame_rgb[:agent_count])
+    frame_rgb_combined = __combine_frames(frame_rgb[:agent_count].astype("float32"))
     # Frame is of shape (w, h, 3) with values in [0, 1].
     # We repace all NaN values with 0 for OpenCV compatibility
     # frames = __combine_frames(frames_list=frame)

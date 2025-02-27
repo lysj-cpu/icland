@@ -181,7 +181,6 @@ def edit_model_data(
     """
     agent_spawns = agent_info.spawn_points
     prop_spawns = prop_info.spawn_points
-    jax.debug.print("{}", prop_spawns)
 
     RAMP_OFFSET = 13 / 3
     COL_OFFSET = 2
@@ -260,7 +259,6 @@ def edit_model_data(
     prop_qpos = jax.vmap(
         lambda s: jnp.concatenate([s, jnp.array([1, 0, 0, 0])], axis=0)
     )(prop_spawns)
-    jax.debug.print("{}", prop_qpos)
 
     b_q_pos0 = jax.lax.dynamic_update_slice_in_dim(
         b_q_pos0,

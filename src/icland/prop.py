@@ -13,7 +13,7 @@ class PropType(Enum):
     CUBE = 1
     SPHERE = 2
 
-    def _to_geom(cls):
+    def _to_geom(cls) -> mujoco.mjtGeom:
         prop_to_geom = {
             PropType.NONE.value: mujoco.mjtGeom.mjGEOM_BOX,
             PropType.CUBE.value: mujoco.mjtGeom.mjGEOM_BOX,

@@ -15,7 +15,7 @@ from icland.world_gen.model_editing import edit_model_data, generate_base_model
 from icland.world_gen.tile_data import TILECODES
 
 
-def config(*args: tuple[int, ...]) -> ICLandConfig:
+def config(*args: int) -> ICLandConfig:
     """Smart constructor for ICLand config, initialising the base model on the fly.
 
     This function is the recommended way to create ICLandConfig objects.
@@ -38,7 +38,7 @@ def config(*args: tuple[int, ...]) -> ICLandConfig:
 
     Example:
         >>> config(5, 5, 6, 1, 0, 0)
-        ICLandConfig(max_world_width=5, max_world_depth=5, max_world_height=6, max_agent_count=1, max_sphere_count=0, max_cube_count=0, no_props=True, model=MjModel(...))
+        ICLandConfig(max_world_width=5, max_world_depth=5, max_world_height=6, max_agent_count=1, max_sphere_count=0, max_cube_count=0, no_props=True)
     """
     # Unpack the arguments
     model, _ = generate_base_model(*args)
@@ -76,7 +76,7 @@ def sample(key: jax.Array, config: ICLandConfig = DEFAULT_CONFIG) -> ICLandParam
         >>> import icland
         >>> key = jax.random.PRNGKey(42)
         >>> icland.sample(key)
-        ICLandParams(world=ICLandWorld(...), agent_info=ICLandAgentInfo(...), prop_info=ICLandPropInfo(...), reward_function=None)
+        ICLandParams(world=ICLandWorld(tilemap.shape=(5, 5, 4), max_world_width=5, max_world_depth=5, max_world_height=6, cmap.shape=(5, 5, 3)), agent_info=ICLandAgentInfo(agent_count=1, spawn_points.shape=(1, 3), body_ids.shape=(1,), colour.shape=(1, 3)), prop_info=ICLandPropInfo(prop_count=1, prop_types.shape=(1,), spawn_points.shape=(1, 3), body_ids.shape=(1,), colour.shape=(1, 3)), reward_function=None)
     """
     # Unpack config
     (
@@ -123,12 +123,10 @@ def sample(key: jax.Array, config: ICLandConfig = DEFAULT_CONFIG) -> ICLandParam
 
     # Update with randomised number of agents
     num_agents = jax.random.randint(key, (), 1, max_agent_count + 1)
-    jax.debug.print("Num agents: {}", num_agents)
 
     # Update with randomised number of props
     key, s = jax.random.split(key)
     num_props = jax.random.randint(s, (), 0, max_prop_count + 1)
-    jax.debug.print("Num props: {}", num_props)
     spawnpoints = jax.lax.dynamic_update_slice_in_dim(
         spawnpoints,
         jax.vmap(lambda i: (i < num_agents) * spawnpoints[i])(
@@ -224,7 +222,7 @@ def init(icland_params: ICLandParams) -> ICLandState:
         >>> import icland
         >>> icland_params = icland.sample(jax.random.PRNGKey(42))
         >>> icland.init(icland_params)
-        ICLandState(mjx_data=DeviceArray(...), agent_variables=ICLandAgentVariables(...), prop_variables=ICLandPropVariables(...))
+        ICLandState(agent_variables=ICLandAgentVariables(pitch.shape=(1,), is_tagged.shape=(1,)), prop_variables=ICLandPropVariables(prop_owner.shape=(1,)), observation=ICLandObservation(render.shape=(1, 72, 96, 3), is_grabbing=0), reward.shape=(1,))
     """
     max_agent_count = icland_params.agent_info.spawn_points.shape[0]
     max_prop_count = icland_params.prop_info.spawn_points.shape[0]
@@ -272,7 +270,7 @@ def step(
         >>> params = icland.sample(key)
         >>> state = icland.init(params)
         >>> actions = jnp.zeros((params.agent_info.agent_count, icland.constants.ACTION_SPACE_DIM))
-        >>> new_state, reward = icland.step(state, params, actions)
+        >>> new_state = icland.step(state, params, actions)
     """
     # Unpack state
     mjx_data = state.mjx_data
@@ -326,7 +324,7 @@ def step(
         agent_variables=new_agent_variables,
         prop_variables=prop_variables,
         observation=observation,
-        reward=reward
+        reward=reward,
     )
 
     return new_icland_state
