@@ -25,6 +25,11 @@ xla_flags = os.environ.get("XLA_FLAGS", "")
 xla_flags += " --xla_gpu_triton_gemm_any=True"
 os.environ["XLA_FLAGS"] = xla_flags
 
+view_width = 1920
+view_height = 1080
+fps = 60
+quality = 10
+
 from typing import Any
 
 import imageio
@@ -199,20 +204,20 @@ def render_video_from_world(
             last_printed_time = mjx_data.time
         icland_state = icland.step(key, icland_state, icland_params, policy)
         mjx_data = icland_state.pipeline_state.mjx_data
-        if len(frames) < mjx_data.time * 30:
+        if len(frames) < mjx_data.time * fps:
             camera_pos, camera_dir = get_camera_info(
                 icland_state, world_width, default_agent_1
             )
             # print("Got camera angle")
             f = render_frame(
-                camera_pos, camera_dir, tilemap, view_width=96, view_height=72
+                camera_pos, camera_dir, tilemap, view_width=view_width, view_height=view_height
             )
             # print("Rendered frame")
             frames.append(f)
 
     shutil.rmtree(f"{temp_dir}")
 
-    imageio.mimsave(video_name, frames, fps=30, quality=8)
+    imageio.mimsave(video_name, frames, fps=fps, quality=quality)
 
 
 def render_video(
@@ -271,7 +276,7 @@ def render_video(
                 last_printed_time = mjx_data.time
             icland_state = icland.step(key, icland_state, icland_params, policy)
             mjx_data = icland_state.pipeline_state.mjx_data
-            if len(third_person_frames) < mjx_data.time * 30:
+            if len(third_person_frames) < mjx_data.time * fps:
                 mj_data = mjx.get_data(mj_model, mjx_data)
                 mujoco.mjv_updateScene(
                     mj_model,
@@ -284,7 +289,7 @@ def render_video(
                 )
                 third_person_frames.append(renderer.render())
 
-    imageio.mimsave(video_name, third_person_frames, fps=30, quality=8)
+    imageio.mimsave(video_name, third_person_frames, fps=fps, quality=quality)
 
 
 def render_video_from_world_with_policies(
@@ -347,7 +352,7 @@ def render_video_from_world_with_policies(
         icland_state = icland.step(key, icland_state, icland_params, policy)
         mjx_data = icland_state.pipeline_state.mjx_data
 
-        if len(frames) < mjx_data.time * 30:
+        if len(frames) < mjx_data.time * fps:
             camera_pos, camera_dir = get_camera_info(
                 icland_state, world_width, default_agent_1
             )
@@ -356,18 +361,18 @@ def render_video_from_world_with_policies(
 
     shutil.rmtree(f"{temp_dir}")
 
-    imageio.mimsave(video_name, frames, fps=30, quality=8)
+    imageio.mimsave(video_name, frames, fps=fps, quality=quality)
 
 
 if __name__ == "__main__":
-    # keys = [
-    #     jax.random.PRNGKey(42),
-    #     # jax.random.PRNGKey(420),
-    #     # jax.random.PRNGKey(2004),
-    # ]
-    # for k in keys:
-    #     render_video_from_world(
-    #         k, FORWARD_POLICY, 4, f"tests/video_output/world_convex_{k[1]}_mjx.mp4")
+    keys = [
+        jax.random.PRNGKey(42),
+        # jax.random.PRNGKey(420),
+        # jax.random.PRNGKey(2004),
+    ]
+    for k in keys:
+        render_video_from_world(
+            k, FORWARD_POLICY, 4, f"scripts/video_output/world_convex_{k[1]}_mjx.mp4")
     for i, preset in enumerate(SIMULATION_PRESETS):
         print(f"Running preset {i + 1}/{len(SIMULATION_PRESETS)}: {preset['name']}")
         render_video(
