@@ -12,6 +12,8 @@ import sys
 import time
 from dataclasses import dataclass
 from typing import Any
+import json
+from dataclasses import asdict
 
 import cpuinfo
 import GPUtil
@@ -19,7 +21,7 @@ import matplotlib.pyplot as plt  # For plotting
 import psutil
 
 # Import the benchmark function (ensure benchmark_functions is in your PYTHONPATH)
-from benchmark_functions import SampleWorldBenchmarkMetrics, benchmark_batch_size, benchmark_renderer_non_empty_world, benchmark_sample_world, benchmark_step_non_empty_world
+from benchmark_functions import SampleWorldBenchmarkMetrics, SimpleStepMetrics, benchmark_batch_size, benchmark_sample_world, benchmark_simple_step_empty_world, benchmark_step_non_empty_world
 from pylatex import Document, NoEscape
 
 
@@ -52,8 +54,8 @@ class BenchmarkScenario:
 BENCHMARKING_SCENARIOS: dict[str, BenchmarkScenario] = {
     "batched_step_performance": BenchmarkScenario(
         description="Batched step performance",
-        function=benchmark_step_non_empty_world,
-        parameters=[2**i for i in range(0, 9)],
+        function=benchmark_simple_step_empty_world,
+        parameters=[2**i for i in range(0, 2)],
     )
 }
 
@@ -256,7 +258,7 @@ def run_sample_world_benchmarks() -> dict[str, list[SampleWorldBenchmarkMetrics]
         results[scenario_name] = scenario_results
     return results
 
-def run_benchmarks() -> dict[str, list[BenchmarkMetrics]]:
+def run_benchmarks() -> dict[str, list[SimpleStepMetrics]]:
     """The BenchmarkMetrics list contains the metrics for each batch size in the scenario.
 
     Run benchmark scenarios and return a dictionary where each key is the
@@ -475,6 +477,28 @@ def plot_benchmark_results(
 # --------------------------------------------------------------------------------------
 # Main Report Creation Function
 # --------------------------------------------------------------------------------------
+
+def output_json() -> None:
+    # 1) Gather System Info
+    sys_info = gather_system_info()
+    print("System info:")
+    print(sys_info)
+
+    # 2) Run Benchmark Scenarios
+    benchmark_results = run_benchmarks()
+    # bench_results = run_sample_world_benchmarks()
+    print("Bench results")
+    print(benchmark_results)
+
+    output_dir = "scripts/benchmark_output/raw_data"
+    os.makedirs(output_dir, exist_ok=True)
+    for scenario_name, metrics_list in benchmark_results.items():
+        metrics_list = list(map(asdict, metrics_list))
+        with open(f"{output_dir}/{scenario_name}.json", "w") as f:
+            json.dump(metrics_list, f, indent=4) 
+
+
+
 def create_report(output_pdf: str = "scripts/benchmark_output/report") -> None:
     """Create a PDF report with system information, benchmark results, and plots."""
     # 1) Gather System Info
@@ -485,6 +509,7 @@ def create_report(output_pdf: str = "scripts/benchmark_output/report") -> None:
     # 2) Run Benchmark Scenarios
     bench_results = run_benchmarks()
     # bench_results = run_sample_world_benchmarks()
+
     print("Bench results")
     print(bench_results)
 
@@ -599,4 +624,5 @@ def create_report(output_pdf: str = "scripts/benchmark_output/report") -> None:
 
 
 if __name__ == "__main__":
-    create_report()
+    # create_report()
+    output_json()
