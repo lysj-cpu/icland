@@ -8,13 +8,13 @@ from icland.agent import step_agents
 from icland.constants import (
     ACTION_SPACE_DIM,
     AGENT_DOF_OFFSET,
-    AGENT_VARIABLES_DIM,
     BODY_OFFSET,
     PROP_DOF_MULTIPLIER,
     PROP_DOF_OFFSET,
     WALL_OFFSET,
 )
-from icland.renderer.renderer import generate_colormap, render
+from icland.presets import DEFAULT_VIEWSIZE
+from icland.renderer.renderer import generate_colormap, render, select_random_color
 from icland.types import *
 from icland.world_gen.converter import sample_spawn_points
 from icland.world_gen.JITModel import export, sample_world
@@ -26,14 +26,17 @@ def config(*args: tuple[int, ...]) -> ICLandConfig:
     """Smart constructor for ICLand config, initialising the base model on the fly."""
     # Unpack the arguments
     model, _ = generate_base_model(*args)
+    SPHERE_INDEX = 4
+    CUBE_INDEX = 5
+    no_props = args[SPHERE_INDEX] + args[CUBE_INDEX] == 0
 
-    return ICLandConfig(*args, model=model)
+    return ICLandConfig(*args, no_props=no_props, model=model)
 
 
-# Default configuration
+# Default global configuration
 DEFAULT_CONFIG = config(
-    2,
-    2,
+    5,
+    5,
     6,
     1,
     0,
@@ -67,6 +70,7 @@ def sample(key: jax.Array, config: ICLandConfig = DEFAULT_CONFIG) -> ICLandParam
         max_agent_count,
         max_sphere_count,
         max_cube_count,
+        no_props,
         model,
     ) = vars(config).values()
 
@@ -92,19 +96,23 @@ def sample(key: jax.Array, config: ICLandConfig = DEFAULT_CONFIG) -> ICLandParam
     )
 
     # Sample number of props and agents
-    max_object_count = max_agent_count + max_sphere_count + max_cube_count
-    max_prop_count = max_sphere_count + max_cube_count
+    max_prop_count = max_sphere_count + max_cube_count + no_props
+    max_object_count = max_agent_count + max_prop_count
 
     # Sample spawn points for objects
     spawnpoints = sample_spawn_points(
         key=key, tilemap=world_tilemap, num_objects=max_object_count
     )
+    key, _ = jax.random.split(key)
 
     # Update with randomised number of agents
-    num_agents = jax.random.randint(key, (1,), 1, max_agent_count)[0]
+    num_agents = jax.random.randint(key, (), 1, max_agent_count + 1)
+    jax.debug.print("Num agents: {}", num_agents)
 
     # Update with randomised number of props
-    num_props = jax.random.randint(key, (), 0, max_prop_count)
+    key, s = jax.random.split(key)
+    num_props = jax.random.randint(s, (), 0, max_prop_count + 1)
+    jax.debug.print("Num props: {}", num_props)
     spawnpoints = jax.lax.dynamic_update_slice_in_dim(
         spawnpoints,
         jax.vmap(lambda i: (i < num_agents) * spawnpoints[i])(
@@ -115,12 +123,18 @@ def sample(key: jax.Array, config: ICLandConfig = DEFAULT_CONFIG) -> ICLandParam
     )
     spawnpoints = jax.lax.dynamic_update_slice_in_dim(
         spawnpoints,
-        jax.vmap(lambda i: (i < num_props) * spawnpoints[i])(
+        jax.vmap(lambda i: (i < num_props) * spawnpoints[max_agent_count + i])(
             jnp.arange(max_prop_count)
         ),
         max_agent_count,
         axis=0,
     )
+
+    colors = jnp.array(
+        [[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 1, 0], [0, 1, 1], [1, 0, 1]]
+    )
+    key, s = jax.random.split(key)
+    agent_colors = select_random_color(key, colors=colors, num_colors=max_agent_count)
 
     # Generate the agent and prop information
     agent_info = ICLandAgentInfo(
@@ -131,15 +145,23 @@ def sample(key: jax.Array, config: ICLandConfig = DEFAULT_CONFIG) -> ICLandParam
         geom_ids=(jnp.arange(max_agent_count) + max_world_width * max_world_depth) * 2
         + WALL_OFFSET,
         dof_addresses=jnp.arange(max_agent_count) * AGENT_DOF_OFFSET,
-        colour=jnp.zeros((max_agent_count,), dtype="int32"),
+        colour=agent_colors,
     )
+
+    # For prop types, from 0 -> max_cube_count - 1, set to 1
+    # from max_cube_count -> max_cube_count + max_sphere_count - 1, set to 2
+    prop_types = jax.vmap(lambda x: (x >= max_cube_count) + 1)(
+        jnp.arange(max_prop_count)
+    ) * (1 - no_props)  # If no props = 1, zero the array.
+
+    prop_colors = select_random_color(s, colors=colors, num_colors=max_prop_count)
 
     # Generate the prop information
     prop_info = ICLandPropInfo(
         prop_count=num_props,
-        prop_types=jnp.zeros((max_prop_count,), dtype="int32"),
-        spawn_points=spawnpoints[max_agent_count:max_object_count],
-        spawn_rotations=jnp.zeros((max_prop_count,), dtype="float32"),
+        prop_types=prop_types,
+        spawn_points=spawnpoints[max_agent_count : max_agent_count + max_prop_count],
+        spawn_rotations=jnp.zeros((max_prop_count, 4), dtype="float32"),
         body_ids=BODY_OFFSET
         + max_agent_count
         + jnp.arange(max_prop_count, dtype="int32"),
@@ -148,7 +170,7 @@ def sample(key: jax.Array, config: ICLandConfig = DEFAULT_CONFIG) -> ICLandParam
         + WALL_OFFSET,
         dof_addresses=jnp.arange(max_prop_count, dtype="int32") * PROP_DOF_MULTIPLIER
         + PROP_DOF_OFFSET,
-        colour=jnp.zeros((max_prop_count,), dtype="float32"),
+        colour=prop_colors,
     )
 
     # Edit the model data for the specification
@@ -204,12 +226,16 @@ def init(icland_params: ICLandParams) -> ICLandState:
         mjx_data=mjx.make_data(icland_params.mjx_model),
         agent_variables=agent_variables,
         prop_variables=prop_variables,
+        observation=ICLandObservation(
+            jnp.zeros((max_agent_count, DEFAULT_VIEWSIZE[1], DEFAULT_VIEWSIZE[0], 3)), 0
+        ),
+        reward=jnp.zeros((max_agent_count,)),
     )
 
 
 @jax.jit
 def step(
-    state: ICLandState, params: ICLandParams, action_batch: ICLandAction
+    state: ICLandState, params: ICLandParams, action_batch: jax.Array
 ) -> tuple[ICLandState, ICLandObservation, jax.Array]:
     # Unpack state
     mjx_data = state.mjx_data
@@ -233,23 +259,31 @@ def step(
     )
 
     # Evaluate reward function
-    reward = 0  # params.reward_function(state)
+    reward = jnp.zeros(
+        (agent_info.spawn_points.shape[0],)
+    )  # params.reward_function(state)
 
     # Update state
     new_mjx_state = mjx.step(params.mjx_model, applied_agent_forces)
 
     # Update observation and render frames
+    # Do not render every step, only once every
     frames = render(
-        agent_info, agent_variables, prop_info, prop_variables, world, mjx_data
-    )
+            agent_info,
+            new_agent_variables,
+            prop_info,
+            prop_variables,
+            world,
+            new_mjx_state,)
+    # TODO: Update prop vars as well
     observation = ICLandObservation(frames, 0)
-    new_agent_variables = agent_vars
-    new_prop_variables = prop_vars
 
     new_icland_state = ICLandState(
         mjx_data=new_mjx_state,
         agent_variables=new_agent_variables,
         prop_variables=prop_variables,
+        observation=observation,
+        reward=reward,
     )
 
-    return new_icland_state, observation, reward
+    return new_icland_state

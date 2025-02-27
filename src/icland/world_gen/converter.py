@@ -295,8 +295,8 @@ def sample_spawn_points(
         )
 
     keys = jax.random.split(key, num_objects)
-
-    return jax.vmap(run_once)(keys)
+    spawnpoints = jax.vmap(run_once)(keys)
+    return spawnpoints
 
 
 def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
@@ -527,9 +527,7 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
         rear, queue, size = __enqueue(i, j, rear, queue, size)
 
         def body_fun(
-            args: tuple[
-                jax.Array, int, int, int, jax.Array, jax.Array
-            ],
+            args: tuple[jax.Array, int, int, int, jax.Array, jax.Array],
         ) -> tuple[jax.Array, int, int, int, jax.Array, jax.Array]:
             queue, front, rear, size, visited, spawnable = args
             item, front, size = __dequeue(front, queue, size)
@@ -542,9 +540,7 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
             def process_adj(
                 carry: tuple[jax.Array, int, jax.Array, int, jax.Array],
                 node: jax.Array,
-            ) -> tuple[
-                tuple[jax.Array, int, jax.Array, int, jax.Array], None
-            ]:
+            ) -> tuple[tuple[jax.Array, int, jax.Array, int, jax.Array], None]:
                 p, q = node
 
                 visited, rear, queue, size, combined = carry
@@ -617,4 +613,5 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
     spawnable = jnp.where(
         spawnable == jnp.argmax(jnp.bincount(spawnable.flatten(), length=w * h)), 1, 0
     )
+
     return spawnable

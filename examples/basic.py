@@ -5,7 +5,6 @@ import jax.numpy as jnp
 
 import icland
 from icland.types import *
-from icland.world_gen.model_editing import generate_base_model
 
 # Create a random key
 key = jax.random.PRNGKey(42)

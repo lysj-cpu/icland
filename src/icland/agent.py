@@ -28,7 +28,7 @@ def create_agent(
     # Define the agent's body.
     agent = specification.worldbody.add_body(
         name=f"agent{id}",
-        pos=pos[: (4 - 1)],
+        pos=pos[:3],
     )
 
     # Add transformational freedom.
@@ -58,7 +58,10 @@ def create_agent(
 
 @jax.jit
 def step_agents(
-    mjx_data: MjxStateType, actions: jax.Array, agents_data: ICLandAgentInfo, agent_variables: ICLandAgentVariables
+    mjx_data: MjxStateType,
+    actions: jax.Array,
+    agents_data: ICLandAgentInfo,
+    agent_variables: ICLandAgentVariables,
 ) -> tuple[MjxStateType, jax.Array]:
     """Update the agents in the physics environment based on the provided actions.
 
@@ -92,7 +95,6 @@ def step_agents(
         Any,  # force
         Any,  # new_pitch
     ]:
-        
         # (A) Determine local movement and rotate it to world frame.
         local_movement = action[:2]
         angle = mjx_data.qpos[dof + 3]
@@ -170,11 +172,11 @@ def step_agents(
         agents_data.geom_ids,
         agents_data.dof_addresses,
         agent_variables.pitch,
-        actions, 
-        contact_geom, 
-        contact_frame, 
-        contact_dist
-        )
+        actions,
+        contact_geom,
+        contact_frame,
+        contact_dist,
+    )
 
     # Combine per-agent updates into new simulation arrays.
     new_xfrc_applied = mjx_data.xfrc_applied.at[body_ids, :3].set(forces)

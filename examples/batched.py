@@ -1,11 +1,9 @@
 """Example of using the environment in a batched setting."""
 
 import jax
-import jax.numpy as jnp
 
 import icland
 from icland.types import *
-from icland.world_gen.model_editing import generate_base_model
 
 SEED = 42
 BATCH_SIZE = 8

@@ -9,11 +9,12 @@ from icland.agent import create_agent
 from icland.constants import (
     AGENT_DOF_OFFSET,
     BODY_OFFSET,
+    FPS,
     WALL_OFFSET,
     WORLD_LEVEL,
 )
 from icland.prop import PropType, create_prop
-from icland.types import ICLandAgentInfo, ICLandConfig, ICLandPropInfo, MjxModelType
+from icland.types import ICLandAgentInfo, ICLandPropInfo, MjxModelType
 
 
 def generate_base_model(
@@ -22,7 +23,7 @@ def generate_base_model(
     max_world_height: int,
     max_agent_count: int,
     max_sphere_count: int,
-    max_cube_count: int
+    max_cube_count: int,
 ) -> MjxModelType:  # pragma: no cover
     """Generates base MJX model from column meshes that form the world."""
     # This code is run entirely on CPU
@@ -120,13 +121,25 @@ def generate_base_model(
     for i in range(max_agent_count):
         create_agent(i, jnp.zeros((3,)), spec)  # default position
 
-    for i in range(max_sphere_count):
-        create_prop(i, jnp.zeros((3,)), spec, PropType.SPHERE)
+    max_prop_count = max_cube_count + max_sphere_count
+    if max_prop_count > 0:
+        curr_ind = 0
+        for _ in range(max_sphere_count):
+            create_prop(curr_ind, jnp.zeros((3,)), spec, PropType.SPHERE)
+            curr_ind += 1
 
-    for i in range(max_cube_count):
-        create_prop(i, jnp.zeros((3,)), spec, PropType.CUBE)
-    
+        for _ in range(max_cube_count):
+            create_prop(curr_ind, jnp.zeros((3,)), spec, PropType.CUBE)
+            curr_ind += 1
+    else:
+        # Create empty placeholder prop.
+        # This ensures the renderer and model editing functions can run
+        # as expected, as JAX dislikes empty arrays.
+        # See https://docs.jax.dev/en/latest/_autosummary/jax.numpy.empty.html
+        create_prop(0, jnp.zeros((3,)), spec, PropType.NONE)
+
     mj_model = spec.compile()
+    mj_model.opt.timestep = 1 / FPS
     mjx_model = mujoco.mjx.put_model(mj_model)
 
     return mjx_model, mj_model
@@ -138,13 +151,13 @@ def edit_model_data(
     base_model: MjxModelType,
     agent_info: ICLandAgentInfo,
     prop_info: ICLandPropInfo,
-    prop_spawns: jax.Array = jnp.array([]),  # shape (num_props, 3)
     max_world_height: int = WORLD_LEVEL,
 ) -> MjxModelType:
     """Edit the base model data such that the terrain matches that of the tilemap."""
     # Pre: the width and height of the tilemap MUST MATCH that of the base_model
     agent_spawns = agent_info.spawn_points
     prop_spawns = prop_info.spawn_points
+    jax.debug.print("{}", prop_spawns)
 
     RAMP_OFFSET = 13 / 3
     COL_OFFSET = 2
@@ -216,13 +229,14 @@ def edit_model_data(
         BODY_OFFSET + agent_count,
         axis=0,
     )
-    
+
     prop_spawns = prop_spawns.astype("float32").reshape((-1, 3))
 
     # Update props qsprings
-    prop_qpos = jax.vmap(lambda s: jnp.concatenate([s, jnp.array([1, 0, 0, 0])], axis=0))(
-        prop_spawns
-    )
+    prop_qpos = jax.vmap(
+        lambda s: jnp.concatenate([s, jnp.array([1, 0, 0, 0])], axis=0)
+    )(prop_spawns)
+    jax.debug.print("{}", prop_qpos)
 
     b_q_pos0 = jax.lax.dynamic_update_slice_in_dim(
         b_q_pos0,
@@ -238,9 +252,12 @@ def edit_model_data(
         axis=0,
     )
 
-
     return base_model.replace(
-        geom_pos=b_geom_xpos, geom_quat=b_geom_xquat, body_pos=b_pos
+        geom_pos=b_geom_xpos,
+        geom_quat=b_geom_xquat,
+        body_pos=b_pos,
+        qpos0=b_q_pos0,
+        qpos_spring=b_q_pos_spring,
     )
 
 

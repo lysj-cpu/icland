@@ -1,5 +1,7 @@
 """Prop generation code."""
 
+from enum import Enum
+
 import jax
 import mujoco
 
@@ -11,14 +13,13 @@ class PropType(Enum):
     CUBE = 1
     SPHERE = 2
 
-    @classmethod
     def _to_geom(cls):
         prop_to_geom = {
-            PropType.NONE: mujoco.mjtGeom.mjGEOM_NONE,
-            PropType.CUBE: mujoco.mjtGeom.mjGEOM_BOX,
-            PropType.SPHERE: mujoco.mjtGeom.mjGEOM_SPHERE,
+            PropType.NONE.value: mujoco.mjtGeom.mjGEOM_BOX,
+            PropType.CUBE.value: mujoco.mjtGeom.mjGEOM_BOX,
+            PropType.SPHERE.value: mujoco.mjtGeom.mjGEOM_SPHERE,
         }
-        return prop_to_geom[cls]
+        return prop_to_geom[cls.value]
 
 
 def create_prop(
@@ -37,7 +38,7 @@ def create_prop(
     """
     prop = spec.worldbody.add_body(
         name=f"prop{id}",
-        pos=pos[: (AGENT_COMPONENT_IDS_DIM - 1)],
+        pos=pos[:3],
     )
 
     prop.add_joint(type=mujoco.mjtJoint.mjJNT_FREE)

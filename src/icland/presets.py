@@ -27,8 +27,6 @@ Frames:
 
 import jax.numpy as jnp
 
-from icland.types import ICLandConfig
-
 # ========================
 # Policy Definitions
 # ========================
@@ -338,6 +336,7 @@ RAMP_60 = """
   </worldbody>
 </mujoco>
 """
+DEFAULT_VIEWSIZE: tuple[int, int] = (96, 72)
 
 TEST_TILEMAP_EMPTY_WORLD = jnp.array(
     [[[0, 0, 0, 0] for _ in range(10)] for _ in range(10)]

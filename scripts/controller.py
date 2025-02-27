@@ -16,7 +16,6 @@ This script is based on video_generator but instead of writing a video file, it 
 """
 
 import os
-import sys
 
 from icland.renderer.renderer import get_agent_camera_from_mjx, render_frame
 
@@ -245,4 +244,4 @@ if __name__ == "__main__":
     # if len(sys.argv) > 1 and sys.argv[1] == "-sdfr":
     #     sdfr_interactive_simulation(DEFAULT_CONFIG)
     # else:
-        interactive_simulation()
+    interactive_simulation()

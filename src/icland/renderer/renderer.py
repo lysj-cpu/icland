@@ -13,11 +13,28 @@ from jaxtyping import Array, Bool, Float, Int
 from mujoco.mjx._src.dataclasses import PyTreeNode
 
 from icland.constants import *
+from icland.presets import DEFAULT_VIEWSIZE
 from icland.renderer.sdfs import box_sdf, capsule_sdf, cube_sdf, ramp_sdf, sphere_sdf
 from icland.types import *
 
+
+class RenderAgentInfo(PyTreeNode):  # type: ignore[misc]
+    """Player info."""
+
+    pos: jax.Array
+    col: jax.Array
+
+
+class RenderPropInfo(PyTreeNode):  # type: ignore[misc]
+    """Prop info."""
+
+    prop_type: jax.Array
+    pos: jax.Array
+    rot: jax.Array
+    col: jax.Array
+
+
 # Constants
-DEFAULT_VIEWSIZE: tuple[int, int] = (92, 76)
 DEFAULT_COLOR: jax.Array = jnp.array([0.2588, 0.5294, 0.9607])
 DEFAULT_COLORS = jnp.array(
     [
@@ -27,6 +44,14 @@ DEFAULT_COLORS = jnp.array(
         [0.76235294, 0.5647059, 0.43607846],
     ]
 )
+# NO_PROPS = (  # Empty prop placeholder
+#     RenderPropInfo(
+#         prop_type=jnp.array([0]),
+#         pos=jnp.empty((1, 3)),
+#         rot=jnp.array([[1, 0, 0, 0]]),
+#         col=jnp.empty((1, 3)),
+#     ),
+# )
 WORLD_UP: jax.Array = jnp.array([0.0, 1.0, 0.0], dtype=jnp.float32)
 NUM_CHANNELS: int = 3
 
@@ -344,8 +369,8 @@ def __scene_sdf_with_objs(
             curr_type,
             [
                 lambda _: jnp.inf,
-                partial(cube_sdf, size=0.5),
-                partial(sphere_sdf, r=0.25),
+                partial(cube_sdf, size=0.2),
+                partial(sphere_sdf, r=0.1),
             ],
             jnp.matmul(
                 jnp.linalg.inv(get_transformation_matrix(curr_rot, curr_pos)),
@@ -468,20 +493,11 @@ def generate_colormap(
     return colormap
 
 
-class RenderAgentInfo(PyTreeNode):  # type: ignore[misc]
-    """Player info."""
-
-    pos: jax.Array
-    col: jax.Array
-
-
-class RenderPropInfo(PyTreeNode):  # type: ignore[misc]
-    """Prop info."""
-
-    prop_type: jax.Array
-    pos: jax.Array
-    rot: jax.Array
-    col: jax.Array
+def select_random_color(
+    key: jax.Array, colors: jax.Array, num_colors: int = 1
+) -> jax.Array:
+    """Generates an array of `num_colors` random colors from a set."""
+    return colors[jax.random.randint(key, (num_colors,), 0, colors.shape[0])]
 
 
 @partial(jax.jit, static_argnames=["view_width", "view_height"])
@@ -491,12 +507,7 @@ def render_frame_with_objects(
     tilemap: jax.Array,
     cmap: jax.Array,
     agents: RenderAgentInfo,
-    props: RenderPropInfo = RenderPropInfo(
-        prop_type=jnp.array([0]),
-        pos=jnp.empty((1, 3)),
-        rot=jnp.array([[1, 0, 0, 0]]),
-        col=jnp.empty((1, 3)),
-    ),
+    props: RenderPropInfo,
     light_dir: jax.Array = __normalize(jnp.array([5.0, 10.0, 5.0])),
     view_width: int = DEFAULT_VIEWSIZE[0],
     view_height: int = DEFAULT_VIEWSIZE[1],
@@ -592,6 +603,7 @@ def render(
     view_height: int = DEFAULT_VIEWSIZE[1],
 ) -> jax.Array:
     """Top-level render function."""
+
     def __get_props_info(
         mjx_data: MjxStateType,
         prop_info: ICLandPropInfo,
@@ -599,6 +611,7 @@ def render(
         max_world_width: int,
     ):
         max_prop_count = prop_info.spawn_points.shape[0]
+        max_agent_count = agent_info.spawn_points.shape[0]
         prop_count = prop_info.prop_count
         prop_indices = jnp.arange(max_prop_count)
 
@@ -606,30 +619,32 @@ def render(
 
         def __get_prop_data(prop_id: int):
             body_id = prop_info.body_ids[prop_id].astype(int)
-            prop_pos = (
-                jnp.array(
-                    [
-                        -mjx_data.xpos[body_id][0] + max_world_width,
-                        mjx_data.xpos[body_id][2],
-                        mjx_data.xpos[body_id][1],
-                    ]
-                )
-                * prop_mask[prop_id]
-            )
-            # Get rotation from the MJX data
             prop_dof = PROP_DOF_MULTIPLIER + 1
-            prop_quat = (
-                jax.lax.dynamic_slice_in_dim(
-                    mjx_data.qpos, prop_dof + prop_id * prop_dof, PROP_DOF_OFFSET
-                ),
+            prop_pos_index = AGENT_DOF_OFFSET * max_agent_count + prop_dof * prop_id
+            prop_pos = jnp.array(
+                [
+                    -mjx_data.qpos[prop_pos_index] + max_world_width,
+                    mjx_data.qpos[prop_pos_index + 2],
+                    mjx_data.qpos[prop_pos_index + 1],
+                ]
+            )
+
+            jax.debug.print("Prop {} pos {}", prop_id, prop_pos)
+            # Get rotation from the MJX data
+            prop_quat = jax.lax.dynamic_slice_in_dim(
+                mjx_data.qpos,
+                AGENT_DOF_OFFSET * max_agent_count
+                + prop_id * prop_dof
+                + PROP_DOF_OFFSET
+                - 1,
+                PROP_DOF_OFFSET,
             )
             # Transform quat to fit renderer coordinate system
             # (w, x, y, z) --> (w, -x, z, y)
-            prop_quat = (
-                jnp.array([prop_quat[0], -prop_quat[1], prop_quat[3], prop_quat[2]])
-                * prop_mask[prop_id]
+            prop_quat = jnp.array(
+                [prop_quat[0], -prop_quat[1], prop_quat[3], prop_quat[2]]
             )
-            prop_type = prop_info.prop_types[prop_id] * prop_mask[prop_id]
+            prop_type = prop_info.prop_types[prop_id]
             colour = prop_info.colour[prop_id] * prop_mask[prop_id]
 
             return RenderPropInfo(
@@ -682,10 +697,10 @@ def render(
                 * agent_mask[agent_id]
             )
 
-            camera_pos = agent_pos * agent_mask[agent_id]
+            agent_pos = agent_pos * agent_mask[agent_id]
             colour = agent_info.colour[agent_id] * agent_mask[agent_id]
 
-            return RenderAgentInfo(pos=camera_pos, col=colour), forward_dir
+            return RenderAgentInfo(pos=agent_pos, col=colour), forward_dir
 
         return jax.vmap(__get_agent_data)(agent_indices)
 
@@ -707,6 +722,18 @@ def render(
         ),
         in_axes=(0, 0),
     )(render_agent_info.pos, agent_dirs)
+    # )(
+    #     jnp.array(
+    #         [
+    #             [
+    #                 world.tilemap.shape[0] / 2,
+    #                 2 * (jnp.maximum(world.tilemap.shape[0], world.tilemap.shape[1])),
+    #                 world.tilemap.shape[1] / 2,
+    #             ]
+    #         ]
+    #     ),
+    #     jnp.array([[0.0, -1.0, 0.01]]),
+    # )
 
     return frames
 
@@ -962,10 +989,9 @@ if __name__ == "__main__":  # pragma: no cover
     )
     frames: list[Any] = []
     cmap = generate_colormap(jax.random.PRNGKey(0), 10, 10)
-    print(cmap.shape)
 
     agents = RenderAgentInfo(
-        pos=jnp.array([[8.5, 3, 1]]),
+        pos=jnp.array([[8.5, 5, 1]]),
         col=jnp.array([[1, 0, 0]]),
     )
     props = RenderPropInfo(
@@ -975,7 +1001,7 @@ if __name__ == "__main__":  # pragma: no cover
         col=jnp.array([[1.0, 1.0, 0.0]]),
     )
 
-    for i in range(72):
+    for i in range(24):
         # f = render_frame(
         # cam_pos=jnp.array([5.0, 10.0, -10.0 + (i * 10 / 72)]),
         # cam_dir=jnp.array([0.0, -0.5, 1.0]),
@@ -998,7 +1024,7 @@ if __name__ == "__main__":  # pragma: no cover
         print(f"Rendered frame {i}")
 
     imageio.mimsave(
-        f"tests/video_output/sdf_world_scene.mp4",
+        f"tests/video_output/sdf_world_scene_2.mp4",
         frames,
         fps=24,
         quality=8,

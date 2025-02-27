@@ -3,7 +3,7 @@
 It includes types for model parameters, state, and action sets used in the project.
 """
 
-from typing import Any, TypeAlias
+from typing import TypeAlias
 
 import jax
 import mujoco
@@ -37,6 +37,7 @@ class ICLandConfig(PyTreeNode):  # type: ignore[misc]
     max_agent_count: int
     max_sphere_count: int
     max_cube_count: int
+    no_props: int
     model: MjxModelType
 
     def __repr__(self) -> str:
@@ -66,6 +67,7 @@ class ICLandWorld(PyTreeNode):
     max_world_height: int
     cmap: jax.Array
 
+
 class ICLandAgentInfo(PyTreeNode):  # type: ignore[misc]
     """Information about agents in the ICLand environment.
 
@@ -79,7 +81,7 @@ class ICLandAgentInfo(PyTreeNode):  # type: ignore[misc]
         colour: Colour of agents.
     """
 
-    agent_count: int
+    agent_count: jax.Array
     spawn_points: jax.Array
     spawn_orientations: jax.Array
     body_ids: jax.Array
@@ -112,7 +114,7 @@ class ICLandPropInfo(PyTreeNode):
         colour: Colour of props.
     """
 
-    prop_count: int
+    prop_count: jax.Array
     spawn_points: jax.Array
     spawn_rotations: jax.Array
     prop_types: jax.Array
@@ -152,8 +154,8 @@ class ICLandAgentVariables(PyTreeNode):  # type: ignore[misc]
         is_tagged: Tag status of the agent.
     """
 
-    pitch: jax.Array # Shape (max_agent_count, )
-    is_tagged: jax.Array # Shape (max_agent_count, )
+    pitch: jax.Array  # Shape (max_agent_count, )
+    is_tagged: jax.Array  # Shape (max_agent_count, )
 
     def __repr__(self) -> str:
         """Return a string representation of the ICLandAgentVariables object."""
@@ -174,6 +176,24 @@ class ICLandPropVariables(PyTreeNode):  # type: ignore[misc]
         return f"ICLandPropVariables(prop_owner={self.prop_owner})"
 
 
+class ICLandObservation(PyTreeNode):  # type: ignore[misc]
+    """Observation set for the ICLand environment.
+
+    Attributes:
+        render: Render the environment.
+        is_grabbing: Is agent grabbing prop.
+    """
+
+    render: jax.Array
+    is_grabbing: jax.Array
+
+    def __repr__(self) -> str:
+        """Return a string representation of the ICLandObservation object."""
+        return (
+            f"ICLandObservation(render={self.render}, is_grabbing={self.is_grabbing})"
+        )
+
+
 class ICLandState(PyTreeNode):  # type: ignore[misc]
     """Information regarding the current step.
 
@@ -186,24 +206,9 @@ class ICLandState(PyTreeNode):  # type: ignore[misc]
     mjx_data: MjxStateType
     agent_variables: ICLandAgentVariables
     prop_variables: ICLandPropVariables
+    observation: ICLandObservation
+    reward: jax.Array
 
     def __repr__(self) -> str:
         """Return a string representation of the ICLandState object."""
         return f"ICLandState(mjx_data={self.mjx_data}, agent_variables={self.agent_variables}, prop_variables={self.prop_variables})"
-
-class ICLandObservation(PyTreeNode):  # type: ignore[misc]
-    """Observation set for the ICLand environment.
-
-    Attributes:
-        render: Render the environment. 
-        is_grabbing: Is agent grabbing prop.
-    """
-
-    render: jax.Array
-    is_grabbing: jax.Array
-
-    def __repr__(self) -> str:
-        """Return a string representation of the ICLandObservation object."""
-        return (
-            f"ICLandObservation(render={self.render}, is_grabbing={self.is_grabbing})"
-        )
