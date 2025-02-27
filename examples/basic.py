@@ -10,7 +10,15 @@ from icland.types import *
 key = jax.random.PRNGKey(42)
 
 # Sample initial conditions
-icland_params: ICLandParams = icland.sample(key)
+config = icland.config(
+    5,
+    5,
+    6,
+    1,
+    2,
+    2,
+)
+icland_params: ICLandParams = icland.sample(key, config)
 
 state = icland.init(icland_params)
 
@@ -19,9 +27,7 @@ agent_count = icland_params.agent_info.agent_count
 batched_action = jnp.array([1, 0, 0, 0, 0, 0])
 
 # Take a step in the environment
-while True:
-    state, obs, rew = icland.step(state, icland_params, batched_action)
-    print(state.mjx_data.time)
+state = icland.step(state, icland_params, batched_action)
 
 # Calculate the reward
 # if icland_params.reward_function is not None:

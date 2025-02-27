@@ -1,15 +1,14 @@
-from typing import Any  # noqa: D100
+"""Code to parallelize model editing in JAX given a base model."""
 
 import jax
 import jax.numpy as jnp
 import mujoco
-import numpy as np
 
 from icland.agent import create_agent
 from icland.constants import (
     AGENT_DOF_OFFSET,
     BODY_OFFSET,
-    FPS,
+    SPS,
     WALL_OFFSET,
     WORLD_LEVEL,
 )
@@ -25,9 +24,22 @@ def generate_base_model(
     max_sphere_count: int,
     max_cube_count: int,
 ) -> MjxModelType:  # pragma: no cover
-    """Generates base MJX model from column meshes that form the world."""
-    # This code is run entirely on CPU
+    """Generates base MJX model from column meshes that form the world.
 
+    This code is run entirely on CPU and should only be used in the
+    smart constructor of the `ICLandConfig` object.
+
+    Args:
+        max_world_width: The maximum width of the world.
+        max_world_depth: The maximum depth of the world.
+        max_world_height: The maximum height of the world.
+        max_agent_count: The maximum number of agents.
+        max_sphere_count: The maximum number of spheres.
+        max_cube_count: The maximum number of cubes.
+
+    Returns:
+        A tuple containing the MJX model and the MuJoCo model.
+    """
     spec = mujoco.MjSpec()
 
     spec.compiler.degree = 1
@@ -139,7 +151,7 @@ def generate_base_model(
         create_prop(0, jnp.zeros((3,)), spec, PropType.NONE)
 
     mj_model = spec.compile()
-    mj_model.opt.timestep = 1 / FPS
+    mj_model.opt.timestep = 1 / SPS
     mjx_model = mujoco.mjx.put_model(mj_model)
 
     return mjx_model, mj_model
@@ -153,8 +165,20 @@ def edit_model_data(
     prop_info: ICLandPropInfo,
     max_world_height: int = WORLD_LEVEL,
 ) -> MjxModelType:
-    """Edit the base model data such that the terrain matches that of the tilemap."""
-    # Pre: the width and height of the tilemap MUST MATCH that of the base_model
+    """Edit the base model data such that the terrain matches that of the tilemap.
+
+    **NOTE**: the width and deoth of the tilemap MUST MATCH that of the base_model.
+
+    Args:
+        tilemap: A JAX array representing the tilemap of the world.
+        base_model: The base MJX model to be edited.
+        agent_info: Information about the agents in the environment.
+        prop_info: Information about the props in the environment.
+        max_world_height: The maximum height of the world.
+
+    Returns:
+        The edited MJX model.
+    """
     agent_spawns = agent_info.spawn_points
     prop_spawns = prop_info.spawn_points
     jax.debug.print("{}", prop_spawns)
@@ -259,55 +283,3 @@ def edit_model_data(
         qpos0=b_q_pos0,
         qpos_spring=b_q_pos_spring,
     )
-
-
-def _edit_mj_model_data(
-    tilemap: jax.Array, base_model: mujoco.MjModel, max_world_height: int = WORLD_LEVEL
-) -> None:  # pragma: no cover
-    b_geom_xpos = base_model.geom_pos
-    b_geom_xquat = base_model.geom_quat
-    w, h = tilemap.shape[0], tilemap.shape[1]
-    RAMP_OFFSET = 13 / 3
-    COL_OFFSET = 2
-    WALL_OFFSET = 5
-
-    def rot_offset(i: jax.Array) -> jax.Array:
-        return 0.5 + jnp.cos(jnp.pi * i / 2) / 6
-
-    def process_tile(
-        i: int, tile: jax.Array
-    ) -> tuple[
-        np.ndarray[tuple[int, ...], Any],
-        np.ndarray[tuple[int, ...], Any],
-        jax.Array,
-    ]:
-        t_type, rot, _, to_h = tile
-        is_ramp = t_type % 2
-        offset = to_h - is_ramp - max_world_height - 1
-
-        x, y = i // w, i % w
-        quat_consts = jnp.array(
-            [
-                [0, 0.382683, 0, 0.92388],
-                [-0.653282, 0.270598, 0.270598, 0.653282],
-                [-0.92388, 0, 0.382683, 0],
-                [-0.653282, -0.270598, 0.270598, -0.653282],
-            ]
-        )
-        return (
-            np.array([x + 0.5, y + 0.5, offset + COL_OFFSET]),
-            np.array(
-                [
-                    x + rot_offset(rot),
-                    y + rot_offset(rot - 1),
-                    RAMP_OFFSET + offset + is_ramp,
-                ]
-            ).astype("float32"),
-            quat_consts[rot],
-        )
-
-    for i in range(w * h):
-        c, r, rq = process_tile(i, tilemap[i // w, i % w])
-        b_geom_xpos[2 * i + WALL_OFFSET] = c
-        b_geom_xpos[2 * i + WALL_OFFSET + 1] = r
-        b_geom_xquat[2 * i + WALL_OFFSET + 1] = rq

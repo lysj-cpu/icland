@@ -335,7 +335,7 @@ def __scene_sdf_with_objs(
         )
 
         return capsule_sdf(
-            jnp.matmul(transform, jnp.append(p, 1))[:3], 0.4, 0.06
+            jnp.matmul(transform, jnp.append(p, 1))[:3], AGENT_HEIGHT, AGENT_RADIUS
         ), curr_col
 
     def process_prop_sdf(i: Int[Array, ""]) -> tuple[jax.Array, jax.Array]:
@@ -356,7 +356,7 @@ def __scene_sdf_with_objs(
             transform = jnp.eye(4)  # Start with an identity matrix
             transform = transform.at[:3, :3].set(R)  # Set the rotation part
             transform = transform.at[:3, 3].set(
-                jnp.array(curr_pos) + jnp.array([0, 0.25, 0])
+                jnp.array(curr_pos)
             )  # Set the translation part
 
             return transform
@@ -496,7 +496,16 @@ def generate_colormap(
 def select_random_color(
     key: jax.Array, colors: jax.Array, num_colors: int = 1
 ) -> jax.Array:
-    """Generates an array of `num_colors` random colors from a set."""
+    """Sample the world and generate the initial parameters for the ICLand environment.
+
+    Args:
+        key: The random key for sampling.
+        colors: An array of shape `(num_colors, 3)` storing all possible colors.
+        num_colors: The number of randomized colors to be returned.
+
+    Returns:
+        The initial parameters for the ICLand environment.
+    """
     return colors[jax.random.randint(key, (num_colors,), 0, colors.shape[0])]
 
 
@@ -514,7 +523,26 @@ def render_frame_with_objects(
     camera_height: float = 0.4,
     camera_offset: float = 0.2,
 ) -> jax.Array:
-    """Renders one frame given camera position, direction, and world terrain."""
+    """Renders one frame given camera position, direction, and world terrain.
+
+    This function is used in the top-level `render()` call by `icland.step`.
+
+    Args:
+        cam_pos: The camera's position as a JAX array of shape (3,).
+        cam_dir: The camera's direction as a JAX array of shape (3,).
+        tilemap: A JAX array representing the tilemap of the world.
+        cmap: A JAX array representing the color map of the world.
+        agents: Information about the agents to render, as a RenderAgentInfo namedtuple.
+        props: Information about the props to render, as a RenderPropInfo namedtuple.
+        light_dir: The direction of the light source, as a JAX array of shape (3,). Defaults to a normalized vector.
+        view_width: The width of the rendered frame in pixels. Defaults to the first element of DEFAULT_VIEWSIZE.
+        view_height: The height of the rendered frame in pixels. Defaults to the second element of DEFAULT_VIEWSIZE.
+        camera_height: The height of the camera above the agent, as a float. Defaults to 0.4.
+        camera_offset: The offset of the camera from the agent, as a float. Defaults to 0.2.
+
+    Returns:
+        A JAX array representing the rendered frame, with shape (view_height, view_width, NUM_CHANNELS).
+    """
     agent_pos = agents.pos
     agent_col = agents.col
     prop_pos = props.pos
@@ -522,7 +550,7 @@ def render_frame_with_objects(
     prop_col = props.col
     prop_types = props.prop_type
 
-    cam_pos = cam_pos.at[1].subtract(0.4 - camera_height)
+    cam_pos = cam_pos.at[1].subtract(AGENT_HEIGHT - camera_height)
     cam_pos = cam_pos + camera_offset * cam_dir
 
     # Ray casting
@@ -602,7 +630,23 @@ def render(
     view_width: int = DEFAULT_VIEWSIZE[0],
     view_height: int = DEFAULT_VIEWSIZE[1],
 ) -> jax.Array:
-    """Top-level render function."""
+    """Top-level render function.
+
+    Called by `icland.step` once every `FPS / Physics steps per second` physical steps.
+
+    Args:
+        agent_info: Information about the agents to render, as an `ICLandAgentInfo` namedtuple.
+        agent_vars: Variables associated with the agents, as an `ICLandAgentVariables` namedtuple.
+        prop_info: Information about the props to render, as an `ICLandPropInfo` namedtuple.
+        prop_vars: Variables associated with the props, as an `ICLandPropVariables` namedtuple.
+        world: The ICLand world information, as an `ICLandWorld` namedtuple.
+        mjx_data: The current state of the MuJoCo simulation, as an `MjxStateType`.
+        view_width: The width of the rendered frame in pixels. Defaults to the first element of `DEFAULT_VIEWSIZE`.
+        view_height: The height of the rendered frame in pixels. Defaults to the second element of `DEFAULT_VIEWSIZE`.
+
+    Returns:
+        A JAX array representing the rendered frames, with shape (num_agents, view_height, view_width, NUM_CHANNELS).
+    """
 
     def __get_props_info(
         mjx_data: MjxStateType,

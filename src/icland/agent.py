@@ -9,8 +9,6 @@ import mujoco
 from .constants import *
 from .types import *
 
-AGENT_HEIGHT = 0.4
-
 
 def create_agent(
     id: int, pos: jax.Array, specification: mujoco.MjSpec
@@ -202,51 +200,3 @@ def step_agents(
 
     return new_mjx_data, new_agents_variables
 
-
-@jax.jit
-def collect_body_scene_info(component_ids: jnp.ndarray, mjx_data: MjxStateType) -> None:
-    # """Collects information about the bodies in the scene including position and rotation.
-
-    # Args:
-    #     component_ids: Array of shape (num_bodies, 3) with rows [body_id, geom_id, dof_address].
-    #     mjx_data: Simulation state with attributes:
-    #               - xpos: jnp.ndarray of shape (num_bodies, 3), global positions.
-    #               - qpos: jnp.ndarray (used here to extract rotation info).
-
-    # Returns:
-    #     A dictionary with:
-    #         - "pos": jnp.ndarray of positions for the requested bodies.
-    #         - "rot": jnp.ndarray of rotations extracted from qpos.
-    # """
-    # # Extract the indices (making sure they are integers)
-    # body_ids = component_ids[:, 0].astype(jnp.int32)
-    # dof_addresses = component_ids[:, 2].astype(jnp.int32)
-
-    # # Vectorized indexing into the simulation state arrays.
-    # # This gathers the positions and the corresponding rotations.
-    # positions = mjx_data.xpos[body_ids]
-    # velocities = jnp.stack(
-    #     [
-    #         mjx_data.qvel[dof_addresses],
-    #         mjx_data.qvel[dof_addresses + 1],
-    #         mjx_data.qvel[dof_addresses + 2],
-    #         mjx_data.qvel[dof_addresses + 3],
-    #     ],
-    #     axis=1,
-    # )
-    # rotations = mjx_data.qpos[
-    #     dof_addresses + 3
-    # ]  # Adjusting index for rotation extraction.
-
-    # return ICLandInfo(
-    #     agents=[
-    #         Agent(position=positions[i], velocity=velocities[i], rotation=rotations[i])
-    #         for i in range(len(body_ids))
-    #     ]
-    # )
-    pass
-    # return ICLandInfo(
-    #     agent_positions=positions,
-    #     agent_rotations=rotations,
-    #     agent_velocities=velocities,
-    # )

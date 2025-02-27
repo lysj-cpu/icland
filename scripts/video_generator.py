@@ -23,9 +23,7 @@ from typing import Any
 import imageio
 import jax
 import jax.numpy as jnp
-import mujoco
 import numpy as np
-from mujoco import mjx
 
 # N.B. These need to be set before the MuJoCo imports
 os.environ["MUJOCO_GL"] = "egl"
@@ -48,7 +46,7 @@ from icland.renderer.renderer import (
 )
 from icland.types import *
 from icland.world_gen.JITModel import export, sample_world
-from icland.world_gen.model_editing import _edit_mj_model_data, generate_base_model
+from icland.world_gen.model_editing import generate_base_model
 from icland.world_gen.tile_data import TILECODES
 
 # ---------------------------------------------------------------------------
@@ -364,84 +362,6 @@ def render_video_multi_agent(
 
     # Save the combined video
     imageio.mimsave(video_name, agent_frames, fps=FPS, quality=8)
-
-
-def render_video(
-    key: jax.Array,
-    tilemap: jax.Array,
-    policy: jax.Array,
-    duration: int,
-    video_name: str,
-    agent_count: int = 1,
-) -> None:
-    """Renders a video of a simulation using the given model and policy.
-
-    Args:
-        key (jax.Array): Random key for initialization.
-        tilemap (jax.Array): Tilemap of the world terrain.
-        policy (callable): Policy function to determine the agent's actions.
-        duration (float): Duration of the video in seconds.
-        video_name (str): Name of the output video file.
-        agent_count (int): Number of agents in the simulation.
-
-    Returns:
-        None
-    """
-    config = ICLandConfig(10, 10, 1, {}, 6)
-    mjx_model, mj_model = generate_base_model(config)
-    icland_params = ICLandParams(
-        world=tilemap,
-        reward_function=None,
-        agent_spawns=jnp.array([[1.5, 1, 4]]),
-        world_level=6,
-    )
-
-    icland_state = icland.init(key, icland_params, mjx_model)
-    icland_state = icland.step(key, icland_state, icland_params, policy)
-    mjx_data = icland_state.pipeline_state.mjx_data
-    _edit_mj_model_data(
-        tilemap=tilemap,
-        base_model=mj_model,
-        max_world_height=config.max_world_height,
-    )
-
-    third_person_frames: list[Any] = []
-    cam = mujoco.MjvCamera()
-    mujoco.mjv_defaultCamera(cam)
-    cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
-    cam.trackbodyid = icland_state.pipeline_state.component_ids[0, 0]
-    cam.distance = 1.5
-    cam.azimuth = 90.0
-    cam.elevation = -40.0
-
-    opt = mujoco.MjvOption()
-    opt.flags[mujoco.mjtVisFlag.mjVIS_JOINT] = True
-    opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = True
-
-    print(f"Starting simulation: {video_name}")
-    last_printed_time = -0.1
-
-    with mujoco.Renderer(mj_model) as renderer:
-        while mjx_data.time < duration:
-            if int(mjx_data.time * 10) != int(last_printed_time * 10):
-                print(f"Time: {mjx_data.time:.1f}")
-                last_printed_time = mjx_data.time
-            icland_state = icland.step(key, icland_state, icland_params, policy)
-            mjx_data = icland_state.pipeline_state.mjx_data
-            if len(third_person_frames) < mjx_data.time * 30:
-                mj_data = mjx.get_data(mj_model, mjx_data)
-                mujoco.mjv_updateScene(
-                    mj_model,
-                    mj_data,
-                    opt,
-                    None,
-                    cam,
-                    mujoco.mjtCatBit.mjCAT_ALL,
-                    renderer.scene,
-                )
-                third_person_frames.append(renderer.render())
-
-    imageio.mimsave(video_name, third_person_frames, fps=30, quality=8)
 
 
 def render_video_from_world_with_policies(

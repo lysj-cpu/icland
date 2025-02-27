@@ -5,14 +5,7 @@ import jax.numpy as jnp
 from mujoco import mjx
 
 from icland.agent import step_agents
-from icland.constants import (
-    ACTION_SPACE_DIM,
-    AGENT_DOF_OFFSET,
-    BODY_OFFSET,
-    PROP_DOF_MULTIPLIER,
-    PROP_DOF_OFFSET,
-    WALL_OFFSET,
-)
+from icland.constants import *
 from icland.presets import DEFAULT_VIEWSIZE
 from icland.renderer.renderer import generate_colormap, render, select_random_color
 from icland.types import *
@@ -23,7 +16,30 @@ from icland.world_gen.tile_data import TILECODES
 
 
 def config(*args: tuple[int, ...]) -> ICLandConfig:
-    """Smart constructor for ICLand config, initialising the base model on the fly."""
+    """Smart constructor for ICLand config, initialising the base model on the fly.
+
+    This function is the recommended way to create ICLandConfig objects.
+    Direct instantiation of ICLandConfig should be avoided.
+
+    Currently, due to the constraints imposed by the MuJoCo-XLA (MJX) engine,
+    only spheres and cubes are supported.
+
+    Args:
+        *args: A tuple of integers representing the configuration parameters:
+            - max_world_width: The maximum width of the world.
+            - max_world_depth: The maximum depth of the world.
+            - max_world_height: The maximum height of the world.
+            - max_agent_count: The maximum number of agents.
+            - max_sphere_count: The maximum number of spheres.
+            - max_cube_count: The maximum number of cubes.
+
+    Returns:
+        An ICLandConfig object.
+
+    Example:
+        >>> config(5, 5, 6, 1, 0, 0)
+        ICLandConfig(max_world_width=5, max_world_depth=5, max_world_height=6, max_agent_count=1, max_sphere_count=0, max_cube_count=0, no_props=True, model=MjModel(...))
+    """
     # Unpack the arguments
     model, _ = generate_base_model(*args)
     SPHERE_INDEX = 4
@@ -236,7 +252,28 @@ def init(icland_params: ICLandParams) -> ICLandState:
 @jax.jit
 def step(
     state: ICLandState, params: ICLandParams, action_batch: jax.Array
-) -> tuple[ICLandState, ICLandObservation, jax.Array]:
+) -> tuple[ICLandState, jax.Array]:
+    """Step the ICLand environment forward in time.
+
+    Args:
+        state: The current state of the ICLand environment.
+        params: The parameters of the ICLand environment.
+        action_batch: The batch of actions to apply to the agents.
+                      Should be of shape (num_agents, ACTION_SPACE_DIM).
+
+    Returns:
+        A tuple containing the new state (with observation), and reward.
+
+    Example:
+        >>> import icland
+        >>> import jax
+        >>> import jax.numpy as jnp
+        >>> key = jax.random.PRNGKey(42)
+        >>> params = icland.sample(key)
+        >>> state = icland.init(params)
+        >>> actions = jnp.zeros((params.agent_info.agent_count, icland.constants.ACTION_SPACE_DIM))
+        >>> new_state, reward = icland.step(state, params, actions)
+    """
     # Unpack state
     mjx_data = state.mjx_data
     agent_variables = state.agent_variables
@@ -267,14 +304,20 @@ def step(
     new_mjx_state = mjx.step(params.mjx_model, applied_agent_forces)
 
     # Update observation and render frames
-    # Do not render every step, only once every
-    frames = render(
+    # Do not render every step, only once every SPS / FPS steps.
+    frames = jax.lax.cond(
+        jnp.mod(jnp.floor(mjx_data.time * SPS), jnp.floor(SPS / FPS)) == 0,
+        lambda _: render(
             agent_info,
             new_agent_variables,
             prop_info,
             prop_variables,
             world,
-            new_mjx_state,)
+            new_mjx_state,
+        ),
+        lambda _: state.observation.render,
+        None,
+    )
     # TODO: Update prop vars as well
     observation = ICLandObservation(frames, 0)
 
@@ -283,7 +326,7 @@ def step(
         agent_variables=new_agent_variables,
         prop_variables=prop_variables,
         observation=observation,
-        reward=reward,
+        reward=reward
     )
 
     return new_icland_state

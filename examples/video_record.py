@@ -2,18 +2,20 @@
 
 from typing import Any
 
-import cv2  # For displaying frames and capturing window events.
+# import cv2  # For displaying frames and capturing window events.
 import imageio
 import jax
 import jax.numpy as jnp
-import keyboard  # For polling the state of multiple keys simultaneously.
+
+# import keyboard  # For polling the state of multiple keys simultaneously.
 import numpy as np
 
 import icland
+from icland.constants import FPS
 from icland.types import *
 
 # Create a random key
-key = jax.random.PRNGKey(420)
+key = jax.random.PRNGKey(2004)
 
 # Sample initial conditions
 config = icland.config(
@@ -31,7 +33,7 @@ state = icland.init(icland_params)
 agent_count = icland_params.agent_info.agent_count
 
 batched_action = jax.vmap(
-    lambda k: jnp.concatenate([jax.random.randint(k, (3,), -1, 2), jnp.zeros((3,))])
+    lambda k: jnp.concatenate([jax.random.randint(k, (2,), -1, 2), jnp.zeros((4,))])
 )(jax.random.split(key, 4))
 
 # Take a step in the environment
@@ -98,11 +100,11 @@ while state.mjx_data.time < TIME:
     # Render the frame using the SDF rendering callback.
     frame = state.observation.render
     frame_rgb = np.nan_to_num(frame)
-    frame_rgb_combined = __combine_frames(frame_rgb)
+    frame_rgb_combined = __combine_frames(frame_rgb[:agent_count])
     # Frame is of shape (w, h, 3) with values in [0, 1].
     # We repace all NaN values with 0 for OpenCV compatibility
     # frames = __combine_frames(frames_list=frame)
-    if len(agent_frames) < state.mjx_data.time * 30:
+    if len(agent_frames) < state.mjx_data.time * FPS:
         print("Time:", state.mjx_data.time)
         agent_frames.append(frame_rgb_combined)
     # Convert the frame from RGB to BGR for OpenCV.
@@ -112,7 +114,9 @@ while state.mjx_data.time < TIME:
     timestep += 1
 
 # cv2.destroyWindow(window_name)
-imageio.mimsave("tests/video_output/ICLand_FPS_ma.mp4", agent_frames, fps=30, quality=8)
+imageio.mimsave(
+    "tests/video_output/ICLand_FPS_ma.mp4", agent_frames, fps=FPS, quality=8
+)
 print("ICLand video ended.")
 
 # Calculate the reward

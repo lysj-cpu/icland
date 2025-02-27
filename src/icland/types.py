@@ -201,6 +201,7 @@ class ICLandState(PyTreeNode):  # type: ignore[misc]
         mjx_data: MJX data
         agent_variables: Variables for agents.
         prop_variables: Variables for props.
+        observation: Internal agent observation.
     """
 
     mjx_data: MjxStateType
