@@ -29,7 +29,8 @@ SEED = 42
 # # jax.config.update("jax_debug_nans", True)  # Check for NaNs
 # jax.config.update("jax_log_compiles", True)  # Log compilations
 # # jax.config.update("jax_debug_infs", True)  # Check for infinities
-# jax.config.update("jax_platform_name", "gpu")   # Use GPU
+os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
+jax.config.update("jax_platform_name", "gpu")   # Use GPU
 
 @dataclass
 class SimpleStepMetrics:

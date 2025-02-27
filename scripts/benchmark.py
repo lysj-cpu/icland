@@ -53,21 +53,21 @@ class BenchmarkScenario:
 
 
 BENCHMARKING_SCENARIOS: dict[str, BenchmarkScenario] = {
-    "step_gpu_1_agent": BenchmarkScenario(
+    "step_gpu_1_agent_complex": BenchmarkScenario(
         description="Batched step performance",
         function=partial(benchmark_complex_step_empty_world, agent_count=1),
-        parameters=[2**i for i in range(0, 5)],
+        parameters=[2**i for i in range(0, 25)],
     ),
-    # "step_gpu_2_agents": BenchmarkScenario(
-    #     description="Batched step performance",
-    #     function=partial(benchmark_simple_step_empty_world, agent_count=2),
-    #     parameters=[2**i for i in range(0, 20)],
-    # ),
-    # "step_gpu_4_agents": BenchmarkScenario(
-    #     description="Batched step performance",
-    #     function=partial(benchmark_simple_step_empty_world, agent_count=4),
-    #     parameters=[2**i for i in range(0, 18)],
-    # ),
+    "step_gpu_2_agents_complex": BenchmarkScenario(
+        description="Batched step performance",
+        function=partial(benchmark_simple_step_empty_world, agent_count=2),
+        parameters=[2**i for i in range(0, 25)],
+    ),
+    "step_gpu_4_agents_complex": BenchmarkScenario(
+        description="Batched step performance",
+        function=partial(benchmark_simple_step_empty_world, agent_count=4),
+        parameters=[2**i for i in range(0, 25)],
+    ),
 }
 
 
@@ -389,6 +389,106 @@ def plot_sample_world_benchmark_results(
 
     return plots
 
+def plot_benchmark_results_log(
+    scenario_name: str, metrics_list: list[ComplexStepMetrics], output_dir: str
+) -> dict[str, str]:
+    """Generate plots for each metric against batch size and save them to output_dir.
+
+    Returns a dictionary mapping plot descriptions to file paths.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    plots = {}
+
+    # Prepare common x-axis data (batch sizes)
+    batch_sizes = [m.batch_size for m in metrics_list]
+
+    # 1. Batched Steps Per Second
+    steps = [m.total_time for m in metrics_list]
+    plt.figure()
+    plt.plot(batch_sizes, steps, marker="o")
+    plt.xscale("log", base=2)
+    plt.xlabel("Batch Size (log scale)")
+    plt.ylabel("Total time")
+    plt.title(f"Total time (20 steps) vs Batch Size ({scenario_name})")
+    plt.grid(True)
+    plot_path = os.path.join(
+        output_dir, f"{scenario_name}_batched_steps_per_second.png"
+    )
+    plt.savefig(plot_path, bbox_inches="tight")
+    plt.close()
+    plots["Batched Steps per Second"] = plot_path
+
+    # 2. Max Memory Usage (MB)
+    mem_usage = [m.max_memory_usage_mb for m in metrics_list]
+    plt.figure()
+    plt.plot(batch_sizes, mem_usage, marker="o", color="orange")
+    plt.xscale("log", base=2)
+    plt.xlabel("Batch Size")
+    plt.ylabel("Max Memory Usage (MB)")
+    plt.title(f"Max Memory Usage vs Batch Size ({scenario_name})")
+    plt.grid(True)
+    plot_path = os.path.join(output_dir, f"{scenario_name}_max_memory_usage_mb.png")
+    plt.savefig(plot_path, bbox_inches="tight")
+    plt.close()
+    plots["Max Memory Usage (MB)"] = plot_path
+
+    # 3. Max CPU Usage Percent
+    cpu_usage = [m.max_cpu_usage_percent for m in metrics_list]
+    plt.figure()
+    plt.plot(batch_sizes, cpu_usage, marker="o", color="green")
+    plt.xscale("log", base=2)
+    plt.xlabel("Batch Size")
+    plt.ylabel("Max CPU Usage (%)")
+    plt.title(f"Max CPU Usage vs Batch Size ({scenario_name})")
+    plt.grid(True)
+    plot_path = os.path.join(output_dir, f"{scenario_name}_max_cpu_usage_percent.png")
+    plt.savefig(plot_path, bbox_inches="tight")
+    plt.close()
+    plots["Max CPU Usage (%)"] = plot_path
+
+    # 4. Max GPU Usage Percent (if available)
+    if metrics_list and metrics_list[0].max_gpu_usage_percent:
+        n_gpus = len(metrics_list[0].max_gpu_usage_percent)
+        plt.figure()
+        for i in range(n_gpus):
+            gpu_usage = [m.max_gpu_usage_percent[i] for m in metrics_list]
+            plt.plot(batch_sizes, gpu_usage, marker="o", label=f"GPU {i + 1}")
+        plt.xscale("log", base=2)
+        plt.xlabel("Batch Size")
+        plt.ylabel("Max GPU Usage (%)")
+        plt.title(f"Max GPU Usage vs Batch Size ({scenario_name})")
+        plt.legend()
+        plt.grid(True)
+        plot_path = os.path.join(
+            output_dir, f"{scenario_name}_max_gpu_usage_percent.png"
+        )
+        plt.savefig(plot_path, bbox_inches="tight")
+        plt.close()
+        plots["Max GPU Usage (%)"] = plot_path
+
+    # 5. Max GPU Memory Usage (MB) (if available)
+    if metrics_list and metrics_list[0].max_gpu_memory_usage_mb:
+        n_gpus = len(metrics_list[0].max_gpu_memory_usage_mb)
+        plt.figure()
+        for i in range(n_gpus):
+            gpu_mem = [m.max_gpu_memory_usage_mb[i] for m in metrics_list]
+            plt.plot(batch_sizes, gpu_mem, marker="o", label=f"GPU {i + 1}")
+        plt.xscale("log", base=2)
+        plt.xlabel("Batch Size")
+        plt.ylabel("Max GPU Memory Usage (MB)")
+        plt.title(f"Max GPU Memory Usage vs Batch Size ({scenario_name})")
+        plt.legend()
+        plt.grid(True)
+        plot_path = os.path.join(
+            output_dir, f"{scenario_name}_max_gpu_memory_usage_mb.png"
+        )
+        plt.savefig(plot_path, bbox_inches="tight")
+        plt.close()
+        plots["Max GPU Memory Usage (MB)"] = plot_path
+
+    return plots
+
+
 
 def plot_benchmark_results(
     scenario_name: str, metrics_list: list[ComplexStepMetrics], output_dir: str
@@ -408,8 +508,8 @@ def plot_benchmark_results(
     plt.figure()
     plt.plot(batch_sizes, steps, marker="o")
     plt.xlabel("Batch Size")
-    plt.ylabel("Batched Steps per Second")
-    plt.title(f"Batched Steps per Second vs Batch Size ({scenario_name})")
+    plt.ylabel("Total time")
+    plt.title(f"Total time (20 steps) vs Batch Size ({scenario_name})")
     plt.grid(True)
     plot_path = os.path.join(
         output_dir, f"{scenario_name}_batched_steps_per_second.png"
@@ -564,7 +664,7 @@ def create_report(input_json_path: str, output_pdf: str = "scripts/benchmark_out
 
         # Generate plots for the current scenario.
         # plots_dict = plot_benchmark_results(scenario_name, metrics_list, output_dir)
-        plots_dict = plot_benchmark_results(scenario_name, metrics_list, output_dir)
+        plots_dict = plot_benchmark_results_log(scenario_name, metrics_list, output_dir)
         plot_items = list(plots_dict.items())
 
         # If there is at least one plot, print the first one full-width.
@@ -632,10 +732,11 @@ def create_report(input_json_path: str, output_pdf: str = "scripts/benchmark_out
     os.makedirs(os.path.dirname(output_pdf), exist_ok=True)
     doc.generate_pdf(filepath=output_pdf)
 
-    print(f".tex generated at: {output_pdf}.tex")
+    print(f"pdf generated at: {output_pdf}.pdf")
 
 
 if __name__ == "__main__":
     # create_report()
-    # output_json('step_gpu_1_agent')
-    create_report('scripts/benchmark_output/raw_data/step_gpu_1_agent.json')
+    output_json('step_gpu_complex')
+    # create_report('scripts/benchmark_output/raw_data/step_gpu_1_agent_complex.json')
+
