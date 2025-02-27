@@ -388,8 +388,6 @@ def benchmark_simple_step_empty_world(batch_size: int, agent_count: int) -> Simp
     # Batched step function
     batched_step = jax.vmap(icland.step, in_axes=(0, 0, None, 0))
 
-    icland_states = batched_step(keys, icland_states, icland_params, actions)
-
     def scan_step(carry, i):
         icland_states, icland_params, actions = carry
 
@@ -397,10 +395,11 @@ def benchmark_simple_step_empty_world(batch_size: int, agent_count: int) -> Simp
 
         return (icland_states, icland_params, actions), None
     
-    initial_carry = (icland_states, icland_params, actions)  # Starting total_time as 0
+    steps = jax.numpy.arange(NUM_STEPS-1)
 
-    steps = jax.numpy.arange(NUM_STEPS)
     start_time = time.time()
+    icland_states = batched_step(keys, icland_states, icland_params, actions)
+    initial_carry = (icland_states, icland_params, actions)  # Starting total_time as 0
     output = jax.lax.scan(scan_step, initial_carry, (steps,))
     jax.tree_util.tree_map(
       lambda x: x.block_until_ready(), output
@@ -433,8 +432,6 @@ def benchmark_complex_step_empty_world(batch_size: int, agent_count: int) -> Sim
     # Batched step function
     batched_step = jax.vmap(icland.step, in_axes=(0, 0, None, 0))
 
-    icland_states = batched_step(keys, icland_states, icland_params, actions)
-    
     process = psutil.Process()
     max_memory_usage_mb = 0.0
     max_cpu_usage_percent = 0.0
@@ -450,16 +447,13 @@ def benchmark_complex_step_empty_world(batch_size: int, agent_count: int) -> Sim
         gpu_available = False
         max_gpu_usage_percent = []
         max_gpu_memory_usage_mb = []
-
-    def scan_step(carry):
-        icland_states, 
-        icland_params, 
-        actions, 
-        max_memory_usage_mb, 
-        max_cpu_usage_percent,
-        max_gpu_usage_percent,
-        max_gpu_memory_usage_mb,
-        total_time = carry
+    
+    # Timed run
+    total_time = 0
+    for i in range(NUM_STEPS):
+        # The elements in each of the four arrays are the same, except for those in keys
+        
+        print(f'Start of batched step {i}')
 
         step_start_time = time.time()
         icland_states = batched_step(keys, icland_states, icland_params, actions)
@@ -486,30 +480,15 @@ def benchmark_complex_step_empty_world(batch_size: int, agent_count: int) -> Sim
                     max_gpu_memory_usage_mb[i], gpu_mem_usage_mb
                 )
 
-        icland_states.block_until_ready()
+        jax.tree_util.tree_map(lambda x: x.block_until_ready(), icland_states)
         step_time = time.time() - step_start_time
         total_time += step_time
 
-        return (
-            icland_states, 
-            icland_params, 
-            actions, 
-            max_memory_usage_mb, 
-            max_cpu_usage_percent,
-            max_gpu_usage_percent,
-            max_gpu_memory_usage_mb,
-            total_time)
-
-    initial_carry = (icland_states)  # Starting total_time as 0
-
-    steps = jax.numpy.arange(NUM_STEPS)
-    final_carry = jax.lax.scan(scan_step, initial_carry, steps)
-
-    print(f"Total time taken: {total_time}")
+        print(f'End of batched step {i}. Time taken: {step_time}')
+        
 
     if gpu_available:
         pynvml.nvmlShutdown()
-
 
     return ComplexStepMetrics(
         batch_size=batch_size,

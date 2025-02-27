@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt  # For plotting
 import psutil
 
 # Import the benchmark function (ensure benchmark_functions is in your PYTHONPATH)
-from benchmark_functions import SampleWorldBenchmarkMetrics, SimpleStepMetrics, benchmark_batch_size, benchmark_complex_step_empty_world, benchmark_sample_world, benchmark_simple_step_empty_world, benchmark_step_non_empty_world
+from benchmark_functions import ComplexStepMetrics, SampleWorldBenchmarkMetrics, SimpleStepMetrics, benchmark_batch_size, benchmark_complex_step_empty_world, benchmark_sample_world, benchmark_simple_step_empty_world, benchmark_step_non_empty_world
 from pylatex import Document, NoEscape
 
 
@@ -56,7 +56,7 @@ BENCHMARKING_SCENARIOS: dict[str, BenchmarkScenario] = {
     "step_gpu_1_agent": BenchmarkScenario(
         description="Batched step performance",
         function=partial(benchmark_complex_step_empty_world, agent_count=1),
-        parameters=[2**i for i in range(0, 10)],
+        parameters=[2**i for i in range(0, 5)],
     ),
     # "step_gpu_2_agents": BenchmarkScenario(
     #     description="Batched step performance",
@@ -391,7 +391,7 @@ def plot_sample_world_benchmark_results(
 
 
 def plot_benchmark_results(
-    scenario_name: str, metrics_list: list[BenchmarkMetrics], output_dir: str
+    scenario_name: str, metrics_list: list[ComplexStepMetrics], output_dir: str
 ) -> dict[str, str]:
     """Generate plots for each metric against batch size and save them to output_dir.
 
@@ -404,7 +404,7 @@ def plot_benchmark_results(
     batch_sizes = [m.batch_size for m in metrics_list]
 
     # 1. Batched Steps Per Second
-    steps = [m.batched_steps_per_second for m in metrics_list]
+    steps = [m.total_time for m in metrics_list]
     plt.figure()
     plt.plot(batch_sizes, steps, marker="o")
     plt.xlabel("Batch Size")
@@ -489,40 +489,39 @@ def plot_benchmark_results(
 # Main Report Creation Function
 # --------------------------------------------------------------------------------------
 
-def output_json() -> None:
-    # 1) Gather System Info
+def output_json(json_filename: str) -> None:
     sys_info = gather_system_info()
     print("System info:")
     print(sys_info)
 
-    # 2) Run Benchmark Scenarios
-    benchmark_results = run_benchmarks()
+    results = run_benchmarks()
     # bench_results = run_sample_world_benchmarks()
     print("Bench results")
-    print(benchmark_results)
+    print(results)
+    benchmark_results = {}
+    for scenario_name, metrics_list in results.items():
+        benchmark_results[scenario_name] = list(map(asdict, metrics_list))
 
     output_dir = "scripts/benchmark_output/raw_data"
     os.makedirs(output_dir, exist_ok=True)
-    for scenario_name, metrics_list in benchmark_results.items():
-        metrics_list = list(map(asdict, metrics_list))
-        with open(f"{output_dir}/{scenario_name}.json", "w") as f:
-            json.dump(metrics_list, f, indent=4) 
+    raw_data = {
+        'system_info': asdict(sys_info),
+        'benchmark_results': benchmark_results
+    }
+
+    with open(f"{output_dir}/{json_filename}.json", "w") as f:
+        json.dump(raw_data, f, indent=4) 
 
 
+def create_report(input_json_path: str, output_pdf: str = "scripts/benchmark_output/report") -> None:
+    """Create a PDF report from json file"""
 
-def create_report(output_pdf: str = "scripts/benchmark_output/report") -> None:
-    """Create a PDF report with system information, benchmark results, and plots."""
-    # 1) Gather System Info
-    sys_info = gather_system_info()
-    print("System info:")
-    print(sys_info)
+    with open(input_json_path, "r") as file:
+        data = json.load(file)
 
-    # 2) Run Benchmark Scenarios
-    bench_results = run_benchmarks()
-    # bench_results = run_sample_world_benchmarks()
+    sys_info = data['system_info']
 
-    print("Bench results")
-    print(bench_results)
+    benchmark_results = data['benchmark_results']
 
     # 3) Build LaTeX document
     doc = Document()
@@ -542,7 +541,7 @@ def create_report(output_pdf: str = "scripts/benchmark_output/report") -> None:
 
     # 4) Device Information Section
     doc.append(NoEscape(r"\section*{Device Information}"))
-    for section_title, section_data in sys_info.__dict__.items():
+    for section_title, section_data in sys_info.items():
         table_tex = generate_latex_table(section_title, section_data)
         doc.append(NoEscape(table_tex))
 
@@ -551,8 +550,10 @@ def create_report(output_pdf: str = "scripts/benchmark_output/report") -> None:
     output_dir = os.path.join(os.path.dirname(output_pdf), "plots")
     os.makedirs(output_dir, exist_ok=True)
 
-    for scenario_name, metrics_list in bench_results.items():
+    for scenario_name, metrics_list in benchmark_results.items():
         # Insert a section header for the scenario.
+        metrics_list = [ComplexStepMetrics(**m) for m in metrics_list]
+
         doc.append(
             NoEscape(
                 r"\section*{Benchmarking Results: "
@@ -629,11 +630,12 @@ def create_report(output_pdf: str = "scripts/benchmark_output/report") -> None:
 
     # 6) Generate final PDF
     os.makedirs(os.path.dirname(output_pdf), exist_ok=True)
-    doc.generate_tex(filepath=output_pdf)
+    doc.generate_pdf(filepath=output_pdf)
 
     print(f".tex generated at: {output_pdf}.tex")
 
 
 if __name__ == "__main__":
     # create_report()
-    output_json()
+    # output_json('step_gpu_1_agent')
+    create_report('scripts/benchmark_output/raw_data/step_gpu_1_agent.json')
