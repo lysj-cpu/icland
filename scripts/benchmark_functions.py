@@ -29,6 +29,7 @@ SEED = 42
 # # jax.config.update("jax_debug_nans", True)  # Check for NaNs
 # jax.config.update("jax_log_compiles", True)  # Log compilations
 # # jax.config.update("jax_debug_infs", True)  # Check for infinities
+# jax.config.update("jax_platform_name", "gpu")   # Use GPU
 
 @dataclass
 class SimpleStepMetrics:
@@ -367,12 +368,12 @@ def benchmark_step_non_empty_world(batch_size: int) -> ComplexStepMetrics:
         max_gpu_memory_usage_mb=max_gpu_memory_usage_mb,
     )
 
-def benchmark_simple_step_empty_world(batch_size: int) -> SimpleStepMetrics:
+def benchmark_simple_step_empty_world(batch_size: int, agent_count: int) -> SimpleStepMetrics:
     """Benchmark the performance of our step with varying batch sizes, in an empty world."""
     NUM_STEPS = 20
 
     key = jax.random.PRNGKey(SEED)
-    icland_params = icland.sample(key)
+    icland_params = icland.sample(agent_count, key)
     init_state = icland.init(key, icland_params)
 
     # Prepare batch
@@ -392,9 +393,7 @@ def benchmark_simple_step_empty_world(batch_size: int) -> SimpleStepMetrics:
     def scan_step(carry, i):
         icland_states, icland_params, actions = carry
 
-        step_start_time = time.time()
         icland_states = batched_step(keys, icland_states, icland_params, actions)
-        step_time = time.time() - step_start_time
 
         return (icland_states, icland_params, actions), None
     
@@ -413,6 +412,113 @@ def benchmark_simple_step_empty_world(batch_size: int) -> SimpleStepMetrics:
         batch_size=batch_size,
         num_steps=NUM_STEPS,
         total_time=total_time,
+    )
+
+def benchmark_complex_step_empty_world(batch_size: int, agent_count: int) -> SimpleStepMetrics:
+    NUM_STEPS = 20
+
+    key = jax.random.PRNGKey(SEED)
+    icland_params = icland.sample(agent_count, key)
+    init_state = icland.init(key, icland_params)
+
+    # Prepare batch
+    def replicate(x):
+        return jnp.broadcast_to(x, (batch_size,) + x.shape)
+
+    icland_states = jax.tree_map(replicate, init_state)
+    actions = jnp.tile(jnp.array([1, 0, 0]), (batch_size, 1))
+
+    keys = jax.random.split(key, batch_size)
+
+    # Batched step function
+    batched_step = jax.vmap(icland.step, in_axes=(0, 0, None, 0))
+
+    icland_states = batched_step(keys, icland_states, icland_params, actions)
+    
+    process = psutil.Process()
+    max_memory_usage_mb = 0.0
+    max_cpu_usage_percent = 0.0
+
+    # Attempt to initialize NVML for GPU usage
+    gpu_available = True
+    try:
+        pynvml.nvmlInit()
+        num_gpus = pynvml.nvmlDeviceGetCount()
+        max_gpu_usage_percent: list[float] = [0.0] * num_gpus
+        max_gpu_memory_usage_mb: list[float] = [0.0] * num_gpus
+    except pynvml.NVMLError:
+        gpu_available = False
+        max_gpu_usage_percent = []
+        max_gpu_memory_usage_mb = []
+
+    def scan_step(carry):
+        icland_states, 
+        icland_params, 
+        actions, 
+        max_memory_usage_mb, 
+        max_cpu_usage_percent,
+        max_gpu_usage_percent,
+        max_gpu_memory_usage_mb,
+        total_time = carry
+
+        step_start_time = time.time()
+        icland_states = batched_step(keys, icland_states, icland_params, actions)
+
+        # CPU Memory & Usage
+        memory_usage_mb = process.memory_info().rss / (1024**2)  # in MB
+        cpu_usage_percent = process.cpu_percent(interval=None) / psutil.cpu_count()
+        max_memory_usage_mb = max(max_memory_usage_mb, memory_usage_mb)
+        max_cpu_usage_percent = max(max_cpu_usage_percent, cpu_usage_percent)
+
+        # GPU Usage & Memory
+        if gpu_available:
+            for i in range(num_gpus):
+                handle = pynvml.nvmlDeviceGetHandleByIndex(i)
+                util_rates = pynvml.nvmlDeviceGetUtilizationRates(handle)
+                mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+
+                gpu_util_percent = util_rates.gpu
+                gpu_mem_usage_mb = mem_info.used / (1024**2)
+                max_gpu_usage_percent[i] = max(
+                    max_gpu_usage_percent[i], gpu_util_percent
+                )
+                max_gpu_memory_usage_mb[i] = max(
+                    max_gpu_memory_usage_mb[i], gpu_mem_usage_mb
+                )
+
+        icland_states.block_until_ready()
+        step_time = time.time() - step_start_time
+        total_time += step_time
+
+        return (
+            icland_states, 
+            icland_params, 
+            actions, 
+            max_memory_usage_mb, 
+            max_cpu_usage_percent,
+            max_gpu_usage_percent,
+            max_gpu_memory_usage_mb,
+            total_time)
+
+    initial_carry = (icland_states)  # Starting total_time as 0
+
+    steps = jax.numpy.arange(NUM_STEPS)
+    final_carry = jax.lax.scan(scan_step, initial_carry, steps)
+
+    print(f"Total time taken: {total_time}")
+
+    if gpu_available:
+        pynvml.nvmlShutdown()
+
+
+    return ComplexStepMetrics(
+        batch_size=batch_size,
+        num_steps=NUM_STEPS,
+        total_time=total_time,
+        max_memory_usage_mb=max_memory_usage_mb,
+        max_cpu_usage_percent=max_cpu_usage_percent,
+        max_gpu_usage_percent=max_gpu_usage_percent,
+        max_gpu_memory_usage_mb=max_gpu_memory_usage_mb,
     )
 
 

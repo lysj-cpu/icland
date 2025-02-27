@@ -11,7 +11,7 @@ from .game import generate_game
 from .types import *
 
 
-def sample(key: jax.Array) -> ICLandParams:
+def sample(agent_count: int, key: jax.Array) -> ICLandParams:
     """Sample a new set of environment parameters using 'key'.
 
     Returns:
@@ -32,8 +32,6 @@ def sample(key: jax.Array) -> ICLandParams:
     # agent_count = int(
     #     jax.random.randint(key, (), WORL_MIN_AGENT_COUNT, WORLD_MAX_AGENT_COUNT)
     # )
-
-    agent_count = 4
     print(f'agent count is: {agent_count}')
 
     # Create the Mujoco model

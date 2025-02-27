@@ -4,6 +4,7 @@ This module provides functions to get system information such as CPU, memory,
 storage, OS, Python, and GPU, and generates a benchmark report with plots.
 """
 
+from functools import partial
 import os
 import platform
 import shutil
@@ -21,7 +22,7 @@ import matplotlib.pyplot as plt  # For plotting
 import psutil
 
 # Import the benchmark function (ensure benchmark_functions is in your PYTHONPATH)
-from benchmark_functions import SampleWorldBenchmarkMetrics, SimpleStepMetrics, benchmark_batch_size, benchmark_sample_world, benchmark_simple_step_empty_world, benchmark_step_non_empty_world
+from benchmark_functions import SampleWorldBenchmarkMetrics, SimpleStepMetrics, benchmark_batch_size, benchmark_complex_step_empty_world, benchmark_sample_world, benchmark_simple_step_empty_world, benchmark_step_non_empty_world
 from pylatex import Document, NoEscape
 
 
@@ -52,11 +53,21 @@ class BenchmarkScenario:
 
 
 BENCHMARKING_SCENARIOS: dict[str, BenchmarkScenario] = {
-    "batched_step_performance": BenchmarkScenario(
+    "step_gpu_1_agent": BenchmarkScenario(
         description="Batched step performance",
-        function=benchmark_simple_step_empty_world,
-        parameters=[2**i for i in range(0, 2)],
-    )
+        function=partial(benchmark_complex_step_empty_world, agent_count=1),
+        parameters=[2**i for i in range(0, 10)],
+    ),
+    # "step_gpu_2_agents": BenchmarkScenario(
+    #     description="Batched step performance",
+    #     function=partial(benchmark_simple_step_empty_world, agent_count=2),
+    #     parameters=[2**i for i in range(0, 20)],
+    # ),
+    # "step_gpu_4_agents": BenchmarkScenario(
+    #     description="Batched step performance",
+    #     function=partial(benchmark_simple_step_empty_world, agent_count=4),
+    #     parameters=[2**i for i in range(0, 18)],
+    # ),
 }
 
 
