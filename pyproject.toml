@@ -1,6 +1,6 @@
 [project]
 name = "icland"
-version = "0.1.0a1"
+version = "0.1.0a2"
 description = "Recreating Google DeepMind's XLand RL environment in JAX"
 readme = "README.md"
 authors = []
