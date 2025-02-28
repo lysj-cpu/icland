@@ -3,6 +3,11 @@ name: Deploy Sphinx documentation to Pages
 on:
   push:
     branches: [main]
+    paths:
+      - "src/**.py"
+      - "pyproject.toml"
+      - ".github/workflows/deploy-docs.yml"
+      - "docs/**"
 
 env:
   UV_SYSTEM_PYTHON: 1

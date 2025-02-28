@@ -1,5 +1,15 @@
 name: Tests
-on: [ push, pull_request ]
+on:
+  push:
+    paths:
+      - "**.py"
+      - "pyproject.toml"
+      - ".github/workflows/tests.yml"
+  pull_request:
+    paths:
+      - "**.py"
+      - "pyproject.toml"
+      - ".github/workflows/tests.yml"
 
 jobs:
   tests:
