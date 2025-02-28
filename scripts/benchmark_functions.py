@@ -255,34 +255,33 @@ def benchmark_sample_world(batch_size: int) -> SampleWorldBenchmarkMetrics:
         gpu_memory_usage_mb=gpu_memory_usage_mb,
     )
 
-def benchmark_step_non_empty_world(batch_size: int) -> ComplexStepMetrics:
-    NUM_STEPS = 20
+def benchmark_simple_step_non_empty_world(batch_size: int, agent_count: int, num_steps: int) -> SimpleStepMetrics:
+    """Benchmark the performance of our step with varying batch sizes, in an empty world."""
     height = 2
     width = 2
     key = jax.random.key(SEED)
     keys = jax.random.split(key, batch_size)
-    agent_count = 4
     print(f"Benchmarking non-empty world of size {height}x{width}, with agent count of {agent_count}")
 
-    # Maybe switch to use np ops instead of list comprehension
-    print(f"Before sample_world...")
+    print("Batched sample_world...")
     batched_sample_world = jax.vmap(sample_world, in_axes=(None, None, None, 0, None, None))
     models = batched_sample_world(height, width, 1000, keys, True, 1) 
 
-    print(f"Before export...")
+    print("Batched export...")
     batched_export = jax.vmap(export, in_axes=(0, None, None, None))
     tilemaps = batched_export(models, TILECODES, height, width)
 
-    print(f"Before generate_base_model...")
+    print("Batched generate_base_model...")
     mjx_model, mj_model = generate_base_model(height, width, agent_count)
     agent_components = icland.collect_agent_components(mj_model, agent_count)
     
+    print("Batched edit_model_data...")
     batch = jax.jit(jax.vmap(edit_model_data, in_axes=(0, None)))(
         tilemaps,
         mjx_model,
     )
 
-    # Batched mjx data
+    print("Batched make mjx_data...")
     batch_data = jax.vmap(mujoco.mjx.make_data)(batch)
     
     icland_params = ICLandParams(
@@ -300,74 +299,33 @@ def benchmark_step_non_empty_world(batch_size: int) -> ComplexStepMetrics:
             collect_body_scene_info(agent_components, mjx_data)
         )
 
-    # Emulate our own step and run once
-    icland_states = jax.vmap(create_icland_state, in_axes=(0, 0))(batch, batch_data)   # batched_step = jax.vmap(icland.step, in_axes=(None, 0, None, 0))
+    icland_states = jax.vmap(create_icland_state, in_axes=(0, 0))(batch, batch_data)
 
-    batched_step = jax.vmap(icland.step, in_axes=(None, 0, None, 0))
+    batched_step = jax.vmap(icland.step, in_axes=(0, 0, None, 0))
+
+    def scan_step(carry, i):
+        icland_states, icland_params, actions = carry
+
+        icland_states = batched_step(keys, icland_states, icland_params, actions)
+
+        return (icland_states, icland_params, actions), None
+    
+    steps = jax.numpy.arange(num_steps)
+
     print(f"Starting simulation...")
+    start_time = time.time()
+    # icland_states = batched_step(keys, icland_states, icland_params, actions)
+    initial_carry = (icland_states, icland_params, actions)  # Starting total_time as 0
+    output = jax.lax.scan(scan_step, initial_carry, (steps,))
+    jax.tree_util.tree_map(
+      lambda x: x.block_until_ready(), output
+    )
+    total_time = time.time() - start_time
 
-    process = psutil.Process()
-    max_memory_usage_mb = 0.0
-    max_cpu_usage_percent = 0.0
-
-    # Attempt to initialize NVML for GPU usage
-    gpu_available = True
-    try:
-        pynvml.nvmlInit()
-        num_gpus = pynvml.nvmlDeviceGetCount()
-        max_gpu_usage_percent: list[float] = [0.0] * num_gpus
-        max_gpu_memory_usage_mb: list[float] = [0.0] * num_gpus
-    except pynvml.NVMLError:
-        gpu_available = False
-        max_gpu_usage_percent = []
-        max_gpu_memory_usage_mb = []
-
-    # Timed run
-    total_time = 0
-    for i in range(NUM_STEPS):
-        # The elements in each of the four arrays are the same, except for those in keys
-        
-        print(f'Start of batched step {i}')
-        step_start_time = time.time()
-        icland_states = batched_step(None, icland_states, icland_params, actions)
-        step_time = time.time() - step_start_time
-        total_time += step_time
-
-        print(f'End of batched step {i}. Time taken: {step_time}')
-        
-        # CPU Memory & Usage
-        memory_usage_mb = process.memory_info().rss / (1024**2)  # in MB
-        cpu_usage_percent = process.cpu_percent(interval=None) / psutil.cpu_count()
-        max_memory_usage_mb = max(max_memory_usage_mb, memory_usage_mb)
-        max_cpu_usage_percent = max(max_cpu_usage_percent, cpu_usage_percent)
-
-        # GPU Usage & Memory
-        if gpu_available:
-            for i in range(num_gpus):
-                handle = pynvml.nvmlDeviceGetHandleByIndex(i)
-                util_rates = pynvml.nvmlDeviceGetUtilizationRates(handle)
-                mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
-
-                gpu_util_percent = util_rates.gpu
-                gpu_mem_usage_mb = mem_info.used / (1024**2)
-                max_gpu_usage_percent[i] = max(
-                    max_gpu_usage_percent[i], gpu_util_percent
-                )
-                max_gpu_memory_usage_mb[i] = max(
-                    max_gpu_memory_usage_mb[i], gpu_mem_usage_mb
-                )
-
-    if gpu_available:
-        pynvml.nvmlShutdown()
-
-    return ComplexStepMetrics(
+    return SimpleStepMetrics(
         batch_size=batch_size,
-        num_steps=NUM_STEPS,
+        num_steps=num_steps,
         total_time=total_time,
-        max_memory_usage_mb=max_memory_usage_mb,
-        max_cpu_usage_percent=max_cpu_usage_percent,
-        max_gpu_usage_percent=max_gpu_usage_percent,
-        max_gpu_memory_usage_mb=max_gpu_memory_usage_mb,
     )
 
 def benchmark_simple_step_empty_world(batch_size: int, agent_count: int, num_steps: int) -> SimpleStepMetrics:
