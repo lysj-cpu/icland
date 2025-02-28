@@ -29,8 +29,9 @@ SEED = 42
 # # jax.config.update("jax_debug_nans", True)  # Check for NaNs
 # jax.config.update("jax_log_compiles", True)  # Log compilations
 # # jax.config.update("jax_debug_infs", True)  # Check for infinities
-os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
-jax.config.update("jax_platform_name", "gpu")   # Use GPU
+
+print("JAX devices:")
+print(jax.devices())
 
 @dataclass
 class SimpleStepMetrics:
@@ -369,10 +370,8 @@ def benchmark_step_non_empty_world(batch_size: int) -> ComplexStepMetrics:
         max_gpu_memory_usage_mb=max_gpu_memory_usage_mb,
     )
 
-def benchmark_simple_step_empty_world(batch_size: int, agent_count: int) -> SimpleStepMetrics:
+def benchmark_simple_step_empty_world(batch_size: int, agent_count: int, num_steps: int) -> SimpleStepMetrics:
     """Benchmark the performance of our step with varying batch sizes, in an empty world."""
-    NUM_STEPS = 20
-
     key = jax.random.PRNGKey(SEED)
     icland_params = icland.sample(agent_count, key)
     init_state = icland.init(key, icland_params)
@@ -396,7 +395,7 @@ def benchmark_simple_step_empty_world(batch_size: int, agent_count: int) -> Simp
 
         return (icland_states, icland_params, actions), None
     
-    steps = jax.numpy.arange(NUM_STEPS-1)
+    steps = jax.numpy.arange(num_steps-1)
 
     start_time = time.time()
     icland_states = batched_step(keys, icland_states, icland_params, actions)
@@ -410,13 +409,11 @@ def benchmark_simple_step_empty_world(batch_size: int, agent_count: int) -> Simp
 
     return SimpleStepMetrics(
         batch_size=batch_size,
-        num_steps=NUM_STEPS,
+        num_steps=num_steps,
         total_time=total_time,
     )
 
-def benchmark_complex_step_empty_world(batch_size: int, agent_count: int) -> SimpleStepMetrics:
-    NUM_STEPS = 20
-
+def benchmark_complex_step_empty_world(batch_size: int, agent_count: int, num_steps: int) -> SimpleStepMetrics:
     key = jax.random.PRNGKey(SEED)
     icland_params = icland.sample(agent_count, key)
     init_state = icland.init(key, icland_params)
@@ -451,10 +448,10 @@ def benchmark_complex_step_empty_world(batch_size: int, agent_count: int) -> Sim
     
     # Timed run
     total_time = 0
-    for i in range(NUM_STEPS):
+    for s in range(num_steps):
         # The elements in each of the four arrays are the same, except for those in keys
         
-        print(f'Start of batched step {i}')
+        print(f'Start of batched step {s}')
 
         step_start_time = time.time()
         icland_states = batched_step(keys, icland_states, icland_params, actions)
@@ -485,7 +482,7 @@ def benchmark_complex_step_empty_world(batch_size: int, agent_count: int) -> Sim
         step_time = time.time() - step_start_time
         total_time += step_time
 
-        print(f'End of batched step {i}. Time taken: {step_time}')
+        print(f'End of batched step {s}. Time taken: {step_time}')
         
 
     if gpu_available:
@@ -493,7 +490,7 @@ def benchmark_complex_step_empty_world(batch_size: int, agent_count: int) -> Sim
 
     return ComplexStepMetrics(
         batch_size=batch_size,
-        num_steps=NUM_STEPS,
+        num_steps=num_steps,
         total_time=total_time,
         max_memory_usage_mb=max_memory_usage_mb,
         max_cpu_usage_percent=max_cpu_usage_percent,
