@@ -40,6 +40,7 @@ ANTI_CLOCKWISE_POLICY = jnp.array([0, 0, -1, 0, 0, 0])
 CLOCKWISE_POLICY = jnp.array([0, 0, 1, 0, 0, 0])
 LOOK_UP_POLICY = jnp.array([0, 0, 0, 1, 0, 0])
 LOOK_DOWN_POLICY = jnp.array([0, 0, 0, -1, 0, 0])
+TAG_AGENT_POLICY = jnp.array([0, 0, 0, 0, 1, 0])
 
 # ========================
 # World Definitions

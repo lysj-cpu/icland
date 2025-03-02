@@ -100,6 +100,7 @@ def __generate_mjcf_spec(
                 euler=[0, 0, 90 * rot],
                 meshname=f"{t_type_str}{to_h}",
                 pos=[i + 0.5, j + 0.5, 0],
+                material="default",
             )
 
     # TODO: Add agents

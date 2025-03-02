@@ -8,7 +8,7 @@ from icland.agent import create_agent
 from icland.constants import (
     AGENT_DOF_OFFSET,
     BODY_OFFSET,
-    SPS,
+    TIMESTEP,
     WALL_OFFSET,
     WORLD_LEVEL,
 )
@@ -43,6 +43,10 @@ def generate_base_model(
     spec = mujoco.MjSpec()
 
     spec.compiler.degree = 1
+    spec.add_material(
+        name="default",
+        rgba=[0.8, 0.8, 0.8, 1],
+    )
 
     # Add assets
     # Ramp
@@ -72,7 +76,7 @@ def generate_base_model(
 
     # Add the ground
     spec.worldbody.add_geom(
-        type=mujoco.mjtGeom.mjGEOM_PLANE, size=[0, 0, 0.01], rgba=[1, 1, 1, 1]
+        type=mujoco.mjtGeom.mjGEOM_PLANE, size=[0, 0, 0.01], rgba=[1, 1, 1, 1], material="default"
     )
 
     # Add the walls
@@ -83,6 +87,7 @@ def generate_base_model(
             quat=[0.5, -0.5, -0.5, 0.5],
             pos=[max_world_width, max_world_depth / 2, 10],
             rgba=[0, 0, 0, 0],
+            material="default",
         )
 
         spec.worldbody.add_geom(
@@ -91,6 +96,7 @@ def generate_base_model(
             quat=[0.5, 0.5, 0.5, 0.5],
             pos=[0, max_world_depth / 2, 10],
             rgba=[0, 0, 0, 0],
+            material="default",
         )
 
         spec.worldbody.add_geom(
@@ -99,6 +105,7 @@ def generate_base_model(
             quat=[0.5, -0.5, 0.5, 0.5],
             pos=[max_world_width / 2, 0, 10],
             rgba=[0, 0, 0, 0],
+            material="default",
         )
 
         spec.worldbody.add_geom(
@@ -107,6 +114,7 @@ def generate_base_model(
             quat=[0.5, 0.5, -0.5, 0.5],
             pos=[max_world_width / 2, max_world_depth, 10],
             rgba=[0, 0, 0, 0],
+            material="default",
         )
 
     # Default constants
@@ -121,11 +129,13 @@ def generate_base_model(
                 type=mujoco.mjtGeom.mjGEOM_BOX,
                 pos=[i + 0.5, j + 0.5, max_world_height - COLUMN_HEIGHT],
                 size=[0.5, 0.5, 3],
+                material="default",
             )
             spec.worldbody.add_geom(
                 type=mujoco.mjtGeom.mjGEOM_MESH,
                 meshname="ramp",
                 pos=[i + 0.5, j + 0.5, max_world_height - RAMP_HEIGHT],
+                material="default",
             )
 
     # Add agents
@@ -151,7 +161,7 @@ def generate_base_model(
         create_prop(0, jnp.zeros((3,)), spec, PropType.NONE)
 
     mj_model = spec.compile()
-    mj_model.opt.timestep = 1 / SPS
+    mj_model.opt.timestep = TIMESTEP
     mjx_model = mujoco.mjx.put_model(mj_model)
 
     return mjx_model, mj_model

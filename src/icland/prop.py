@@ -47,6 +47,7 @@ def create_prop(
         type=type._to_geom(),
         size=[0.1, 0.1, 0.1],
         mass=1,
+        material="default",
     )
 
     return spec

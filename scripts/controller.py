@@ -16,6 +16,9 @@ This script is based on video_generator but instead of writing a video file, it 
 """
 
 import os
+import sys
+
+import imageio
 
 from icland.renderer.renderer import get_agent_camera_from_mjx, render_frame
 
@@ -52,10 +55,10 @@ def interactive_simulation() -> None:
         tilemap.shape[0], tilemap.shape[1], 6, 1, 0, 0
     )
 
-    for field in mjx.Model.fields():
-        if field.type in [jax.Array, np.ndarray]:
-            value = getattr(mjx_model, field.name)
-            setattr(mj_model, field.name, value)
+    # for field in mjx.Model.fields():
+    #     if field.type in [jax.Array, np.ndarray]:
+    #         value = getattr(mjx_model, field.name)
+    #         setattr(mj_model, field.name, value)
 
     jax_key = jax.random.PRNGKey(42)
     icland_state = icland.init(icland_params)
@@ -83,6 +86,9 @@ def interactive_simulation() -> None:
     # Create a window using OpenCV.
     window_name = "Interactive Simulation"
     cv2.namedWindow(window_name)
+
+    frame_rate = 30
+    frames = []
 
     # Create the renderer.
     with mujoco.Renderer(mj_model) as renderer:
@@ -124,7 +130,7 @@ def interactive_simulation() -> None:
                 print(f"Time {mjx_data.time:.2f}: {current_policy}")
 
             # Step the simulation using the current_policy.
-            icland_state = icland.step(icland_state, icland_params, current_policy)
+            icland_state, = icland.step(icland_state, icland_params, current_policy)
             # (Optional) Update the JAX random key.
             jax_key, _ = jax.random.split(jax_key)
 
@@ -148,14 +154,19 @@ def interactive_simulation() -> None:
             # Convert the frame from RGB to BGR for OpenCV.
             frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
+            if len(frames) < mjx_data.time * frame_rate:
+                frames.append(frame_bgr)
+
             # Display the frame.
             cv2.imshow(window_name, frame_bgr)
 
     cv2.destroyWindow(window_name)
     print("Interactive simulation ended.")
+    print(f"Exporting video: {"controller.mp4"} number of frame {len(frames)}")
+    imageio.mimsave("scripts/video_output/controller.mp4", frames, fps=frame_rate, quality=8)
 
 
-def sdfr_interactive_simulation(config: ICLandConfig) -> None:
+def sdfr_interactive_simulation() -> None:
     """Runs an interactive SDF simulation using a generated world and SDF rendering."""
     # Set up the JAX random key.
     jax_key = jax.random.PRNGKey(42)
@@ -169,33 +180,28 @@ def sdfr_interactive_simulation(config: ICLandConfig) -> None:
 
     # Create the MuJoCo model using an EMPTY_WORLD MJCF string.
     # (Assumes EMPTY_WORLD is imported from icland.presets)
-    jax_key = jax.random.PRNGKey(42)
+    jax_key = jax.random.PRNGKey(0)
     icland_params = icland.sample(jax_key)
 
     icland_state = icland.init(icland_params)
+
     # Take an initial step with the default (no-op) policy.
     current_policy = NOOP_POLICY
-    icland_state = icland.step(
-        jax_key, icland_state, icland_params, jnp.array([current_policy])
-    )
 
     # Set up default agent and world width for camera parameters.
     default_agent = 0
     tilemap = icland_params.world.tilemap
     max_world_width = tilemap.shape[1]
 
-    # Define the frame callback using the SDF rendering functions.
-    frame_callback = lambda state: render_frame(
-        *get_agent_camera_from_mjx(state, max_world_width, default_agent),
-        tilemap,
-        view_width=96,
-        view_height=72,
-    )
-
     # Set up an OpenCV window.
     window_name = "SDF Interactive Simulation"
     cv2.namedWindow(window_name)
     print("Starting SDF interactive simulation. Press 'q' to quit.")
+
+    framerate = 30
+    frames = []
+
+    controlling = 0;
 
     while True:
         # Process any pending OpenCV window events.
@@ -224,6 +230,11 @@ def sdfr_interactive_simulation(config: ICLandConfig) -> None:
             new_policy += LOOK_UP_POLICY
         if keyboard.is_pressed("down"):
             new_policy += LOOK_DOWN_POLICY
+        if keyboard.is_pressed("1"):
+            new_policy += TAG_AGENT_POLICY
+        if keyboard.is_pressed("0"):
+            controlling += 1
+            controlling = controlling % 2
 
         # Update the current policy if it has changed.
         if not jnp.array_equal(new_policy, current_policy):
@@ -231,24 +242,29 @@ def sdfr_interactive_simulation(config: ICLandConfig) -> None:
             print(f"Current policy updated: {current_policy}")
 
         # Step the simulation using the current policy.
-        icland_state = icland.step(jax_key, icland_state, icland_params, current_policy)
-        jax_key, _ = jax.random.split(jax_key)
+        icland_state, obs, _ = icland.step(icland_state, icland_params, jnp.array([current_policy, NOOP_POLICY] if controlling == 0 else [NOOP_POLICY, current_policy]))
 
         # Render the frame using the SDF rendering callback.
-        frame = frame_callback(icland_state)  # type: ignore
+        frame = obs.render[controlling]
         # Frame is of shape (w, h, 3) with values in [0, 1].
         # We repace all NaN values with 0 for OpenCV compatibility
         frame = np.nan_to_num(frame)
+        resized_frame = cv2.resize(frame, (960, 720), interpolation=cv2.INTER_NEAREST)
         # Convert the frame from RGB to BGR for OpenCV.
-        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        frame_bgr = cv2.cvtColor(resized_frame, cv2.COLOR_RGB2BGR)
+        
+        if len(frames) < icland_state.mjx_data.time * framerate:
+            frames.append(frame_bgr)
+
         cv2.imshow(window_name, frame_bgr)
 
     cv2.destroyWindow(window_name)
     print("SDF interactive simulation ended.")
-
+    print(f"Exporting video: {"controller.mp4"} number of frame {len(frames)}")
+    imageio.mimsave("scripts/video_output/controller.mp4", frames, fps=framerate, quality=8)
 
 if __name__ == "__main__":
-    # if len(sys.argv) > 1 and sys.argv[1] == "-sdfr":
-    #     sdfr_interactive_simulation(DEFAULT_CONFIG)
-    # else:
-    interactive_simulation()
+    if len(sys.argv) > 1 and sys.argv[1] == "-sdfr":
+        sdfr_interactive_simulation()
+    else:
+        interactive_simulation()

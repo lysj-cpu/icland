@@ -51,16 +51,16 @@ def config(*args: int) -> ICLandConfig:
 
 # Default global configuration
 DEFAULT_CONFIG = config(
-    5,
-    5,
+    2,
+    2,
     6,
-    1,
+    2,
     0,
     0,
 )
 
 
-@jax.jit
+# @jax.jit
 def sample(key: jax.Array, config: ICLandConfig = DEFAULT_CONFIG) -> ICLandParams:
     """Sample the world and generate the initial parameters for the ICLand environment.
 
@@ -229,7 +229,7 @@ def init(icland_params: ICLandParams) -> ICLandState:
 
     agent_variables = ICLandAgentVariables(
         pitch=jnp.zeros((max_agent_count,), dtype="float32"),
-        is_tagged=jnp.zeros((max_agent_count,), dtype="int32"),
+        time_of_tag=jnp.full((max_agent_count,), -AGENT_TAG_SECS_OUT, dtype="float32"),
     )
 
     prop_variables = ICLandPropVariables(
@@ -239,18 +239,14 @@ def init(icland_params: ICLandParams) -> ICLandState:
     return ICLandState(
         mjx_data=mjx.make_data(icland_params.mjx_model),
         agent_variables=agent_variables,
-        prop_variables=prop_variables,
-        observation=ICLandObservation(
-            jnp.zeros((max_agent_count, DEFAULT_VIEWSIZE[1], DEFAULT_VIEWSIZE[0], 3)), 0
-        ),
-        reward=jnp.zeros((max_agent_count,)),
+        prop_variables=prop_variables
     )
 
 
 @jax.jit
 def step(
     state: ICLandState, params: ICLandParams, action_batch: jax.Array
-) -> tuple[ICLandState, jax.Array]:
+) -> tuple[ICLandState, ICLandObservation, jax.Array]:
     """Step the ICLand environment forward in time.
 
     Args:
@@ -288,43 +284,41 @@ def step(
     # Ensure parameters are in correct shape
     action_batch = action_batch.reshape(-1, ACTION_SPACE_DIM)
 
-    # Step through each agent
-    applied_agent_forces, new_agent_variables = step_agents(
-        mjx_data, action_batch, agent_info, agent_variables
-    )
 
+    def physics_step(carry, _):
+        mjx_data, agent_variables = carry
+        # Step through each agent
+        mjx_data, agent_variables = step_agents(mjx_data, mjx_model, action_batch, agent_info, agent_variables)
+        # Update state
+        mjx_data = mjx.step(params.mjx_model, mjx_data)
+        return (mjx_data, agent_variables), None
+
+    # Scan over 5 iterations; we ignore the output per iteration (_)
+    (mjx_data, agent_variables), _ = jax.lax.scan(physics_step, (mjx_data, agent_variables), None, length=PHYS_PER_CTRL_STEP)
+    
     # Evaluate reward function
     reward = jnp.zeros(
         (agent_info.spawn_points.shape[0],)
     )  # params.reward_function(state)
 
-    # Update state
-    new_mjx_state = mjx.step(params.mjx_model, applied_agent_forces)
-
     # Update observation and render frames
     # Do not render every step, only once every SPS / FPS steps.
-    frames = jax.lax.cond(
-        jnp.mod(jnp.floor(mjx_data.time * SPS), jnp.floor(SPS / FPS)) == 0,
-        lambda _: render(
+    frames = render(
             agent_info,
-            new_agent_variables,
+            agent_variables,
             prop_info,
             prop_variables,
             world,
-            new_mjx_state,
-        ),
-        lambda _: state.observation.render,
-        None,
-    )
+            mjx_data,
+        )
+    
     # TODO: Update prop vars as well
     observation = ICLandObservation(frames, 0)
 
     new_icland_state = ICLandState(
-        mjx_data=new_mjx_state,
-        agent_variables=new_agent_variables,
-        prop_variables=prop_variables,
-        observation=observation,
-        reward=reward,
+        mjx_data=mjx_data,
+        agent_variables=agent_variables,
+        prop_variables=prop_variables
     )
 
-    return new_icland_state
+    return new_icland_state, observation, reward
