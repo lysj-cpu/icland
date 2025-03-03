@@ -1,5 +1,15 @@
 name: Tests
-on: [ push, pull_request ]
+on:
+  push:
+    paths:
+      - "**.py"
+      - "pyproject.toml"
+      - ".github/workflows/tests.yml"
+  pull_request:
+    paths:
+      - "**.py"
+      - "pyproject.toml"
+      - ".github/workflows/tests.yml"
 
 jobs:
   tests:
@@ -15,10 +25,16 @@ jobs:
         run: uv sync --all-extras --dev
 
       - name: Run pytest
-        run: uv run pytest --cov-report=xml:coverage.xml --doctest-modules --cov icland src tests
+        run: uv run pytest --cov-report=xml:coverage.xml --junitxml=junit.xml --doctest-modules --cov icland src tests
 
       - name: Run mypy
         run: uv run mypy --strict .
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
 
       - uses: codecov/codecov-action@v5
         with:

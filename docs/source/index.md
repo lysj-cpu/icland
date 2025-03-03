@@ -9,11 +9,14 @@ og:title: icland
 :child-align: center
 <div align="center">
     <h1>ICLand</h1>
+    <a href="https://pypi.org/project/icland/">
+        <img alt="PyPI - Version" src="https://img.shields.io/pypi/v/icland?style=flat-square&logo=pypi&logoColor=white&color=blue">
+    </a>
     <a href="https://github.com/lysj-cpu/icland/actions/workflows/tests.yml">
-        <img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/lysj-cpu/icland/tests.yml?style=flat-square">
+        <img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/lysj-cpu/icland/tests.yml?style=flat-square&logo=github">
     </a>
     <a href="https://app.codecov.io/github/lysj-cpu/icland">
-        <img alt="Codecov" src="https://img.shields.io/codecov/c/github/lysj-cpu/icland?style=flat-square">
+        <img alt="Codecov" src="https://img.shields.io/codecov/c/github/lysj-cpu/icland?style=flat-square&logo=codecov">
     </a>
 </div>
 :::
@@ -69,6 +72,7 @@ quickstart
 
 contributing/installation
 contributing/documentation
+contributing/new_version
 ```
 ```{toctree}
 :caption: 📖 Reference
