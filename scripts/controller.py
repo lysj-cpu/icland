@@ -16,7 +16,6 @@ This script is based on video_generator but instead of writing a video file, it 
 """
 
 import os
-import sys
 
 from icland.renderer.renderer import get_agent_camera_from_mjx, render_frame
 
@@ -44,21 +43,29 @@ from icland.types import *
 from icland.world_gen.model_editing import generate_base_model
 
 
-def interactive_simulation(config: ICLandConfig) -> None:
+def interactive_simulation() -> None:
     """Runs an interactive simulation where you can change the agent's policy via keyboard input."""
     # Create the MuJoCo model from the .
-    icland_params = icland.sample(jax.random.PRNGKey(42), DEFAULT_CONFIG)
-    mjx_model, mj_model = generate_base_model(DEFAULT_CONFIG)
+    icland_params = icland.sample(jax.random.PRNGKey(42))
+    tilemap = icland_params.world.tilemap
+    mjx_model, mj_model = generate_base_model(
+        tilemap.shape[0], tilemap.shape[1], 6, 1, 0, 0
+    )
+
+    for field in mjx.Model.fields():
+        if field.type in [jax.Array, np.ndarray]:
+            value = getattr(mjx_model, field.name)
+            setattr(mj_model, field.name, value)
 
     jax_key = jax.random.PRNGKey(42)
-    icland_state = icland.init(jax_key, icland_params, mjx_model)
+    icland_state = icland.init(icland_params)
 
     # Set up the camera.
     cam = mujoco.MjvCamera()
     mujoco.mjv_defaultCamera(cam)
     cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
     # Use the first component id (e.g. the first agent's body) as the track target.
-    cam.trackbodyid = icland_state.pipeline_state.component_ids[0, 0]
+    cam.trackbodyid = icland_params.agent_info.body_ids[0]
     cam.distance = 1.5
     cam.azimuth = 0.0
     cam.elevation = -30.0
@@ -84,7 +91,7 @@ def interactive_simulation(config: ICLandConfig) -> None:
             cv2.waitKey(1)
 
             # Stop if simulation time exceeds the duration.
-            mjx_data = icland_state.pipeline_state.mjx_data
+            mjx_data = icland_state.mjx_data
 
             # Quit if 'q' is pressed.
             if keyboard.is_pressed("q"):
@@ -117,14 +124,12 @@ def interactive_simulation(config: ICLandConfig) -> None:
                 print(f"Time {mjx_data.time:.2f}: {current_policy}")
 
             # Step the simulation using the current_policy.
-            icland_state = icland.step(
-                jax_key, icland_state, icland_params, current_policy
-            )
+            icland_state = icland.step(icland_state, icland_params, current_policy)
             # (Optional) Update the JAX random key.
             jax_key, _ = jax.random.split(jax_key)
 
             # Get the latest simulation data.
-            mjx_data = icland_state.pipeline_state.mjx_data
+            mjx_data = icland_state.mjx_data
             mj_data = mjx.get_data(mj_model, mjx_data)
 
             # Update the scene.
@@ -161,26 +166,27 @@ def sdfr_interactive_simulation(config: ICLandConfig) -> None:
     # Sample the world (we follow render_sdfr's approach).
     # model = sample_world(height, width, 1000, jax_key, True, 1)
     # Create a dummy tilemap (all zeros) as in render_sdfr.
-    tilemap = jnp.zeros((width, height, 4), dtype=np.int32)
 
     # Create the MuJoCo model using an EMPTY_WORLD MJCF string.
     # (Assumes EMPTY_WORLD is imported from icland.presets)
-    icland_params = icland.sample(jax.random.PRNGKey(42), DEFAULT_CONFIG)
-    mjx_model, mj_model = generate_base_model(DEFAULT_CONFIG)
-
     jax_key = jax.random.PRNGKey(42)
-    icland_state = icland.init(jax_key, icland_params, mjx_model)
+    icland_params = icland.sample(jax_key)
+
+    icland_state = icland.init(icland_params)
     # Take an initial step with the default (no-op) policy.
     current_policy = NOOP_POLICY
-    icland_state = icland.step(jax_key, icland_state, icland_params, current_policy)
+    icland_state = icland.step(
+        jax_key, icland_state, icland_params, jnp.array([current_policy])
+    )
 
     # Set up default agent and world width for camera parameters.
     default_agent = 0
-    world_width = tilemap.shape[1]
+    tilemap = icland_params.world.tilemap
+    max_world_width = tilemap.shape[1]
 
     # Define the frame callback using the SDF rendering functions.
     frame_callback = lambda state: render_frame(
-        *get_agent_camera_from_mjx(state, world_width, default_agent),
+        *get_agent_camera_from_mjx(state, max_world_width, default_agent),
         tilemap,
         view_width=96,
         view_height=72,
@@ -242,7 +248,7 @@ def sdfr_interactive_simulation(config: ICLandConfig) -> None:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "-sdfr":
-        sdfr_interactive_simulation(DEFAULT_CONFIG)
-    else:
-        interactive_simulation(DEFAULT_CONFIG)
+    # if len(sys.argv) > 1 and sys.argv[1] == "-sdfr":
+    #     sdfr_interactive_simulation(DEFAULT_CONFIG)
+    # else:
+    interactive_simulation()

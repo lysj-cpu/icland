@@ -3,14 +3,10 @@
 It includes types for model parameters, state, and action sets used in the project.
 """
 
-import dataclasses
-import inspect
-from collections.abc import Callable
-from typing import Any, TypeAlias
+from typing import TypeAlias
 
 import jax
 import mujoco
-from jaxtyping import Array, Float
 from mujoco.mjx._src.dataclasses import PyTreeNode
 
 """Type variables from external modules."""
@@ -23,150 +19,253 @@ MjxModelType: TypeAlias = mujoco.mjx._src.types.Model  # noqa: UP040
 """Type aliases for ICLand project."""
 
 
-class PipelineState(PyTreeNode):  # type: ignore[misc]
-    """State of the ICLand environment.
+class ICLandConfig(PyTreeNode):  # type: ignore[misc]
+    """Global configuration object for the ICLand environment.
 
     Attributes:
-        mjx_model: JAX-compatible Mujoco model.
-        mjx_data: JAX-compatible Mujoco data.
-        component_ids: Array of body and geometry IDs for agents. (agent_count, [body_ids, geom_ids])
-        world: The world tilemap.
+        max_world_width: Width of the world tilemap.
+        max_world_depth: Depth of the world tilemap.
+        max_world_height: Maximum level of the world (in terms of 3D height).
+        max_agent_count: Maximum number of agents in the environment.
+        max_sphere_count: Maximum number of spheres in the environment.
+        max_cube_count: Maximum number of cubes in the environment.
+        no_props: Flag indicating whether props are disabled (1) or enabled (0).
+        model: MJX model of the environment.
     """
 
-    mjx_model: MjxModelType
-    mjx_data: MjxStateType
-    component_ids: jax.Array
-    world: jax.Array
+    max_world_width: int
+    max_world_depth: int
+    max_world_height: int
+    max_agent_count: int
+    max_sphere_count: int
+    max_cube_count: int
+    no_props: int
+    model: MjxModelType
 
     def __repr__(self) -> str:
-        """Return a string representation of the PipelineState object."""
-        return f"PipelineState(mjx_model={type(self.mjx_model).__name__}, mjx_data={type(self.mjx_data).__name__}, component_ids={self.component_ids}, world=World(width: {self.world.shape[0]}, height: {self.world.shape[1]}))"
+        """Return a string representation of the ICLandConfig object.
+
+        Returns:
+            A string with the key configuration parameters.
+
+        Examples:
+            >>> from icland.types import ICLandConfig
+            >>> config = ICLandConfig(10, 10, 6, 1, 1, 1, 0, None)
+            >>> repr(config)
+            'ICLandConfig(max_world_width=10, max_world_depth=10, max_world_height=6, max_agent_count=1, max_sphere_count=1, max_cube_count=1, no_props=0)'
+        """
+        return f"ICLandConfig(max_world_width={self.max_world_width}, max_world_depth={self.max_world_depth}, max_world_height={self.max_world_height}, max_agent_count={self.max_agent_count}, max_sphere_count={self.max_sphere_count}, max_cube_count={self.max_cube_count}, no_props={self.no_props})"
 
 
-class Agent(PyTreeNode):  # type: ignore[misc]
-    """Information about an agent in the ICLand environment."""
-
-    position: Float[Array, "3"]
-    velocity: Float[Array, "4"]
-    rotation: Float[Array, "1"] | Float[Array, ""]
-
-
-class Prop(PyTreeNode):  # type: ignore[misc]
-    """Information about a prop in the ICLand environment."""
-
-    centre_of_mass: Float[Array, "3"]
-
-
-class ICLandInfo(PyTreeNode):  # type: ignore[misc]
-    """Information about the ICLand environment.
+class ICLandWorld(PyTreeNode):  # type: ignore[misc]
+    """Object storing world information for the ICLand environment.
 
     Attributes:
-        agent_positions: [[x, y, z]] of agent positions, indexed by agent's body ID.
-        agent_velocities: [[x, y, z]] of agent velocities, indexed by agent's body ID.
-        agent_rotations: Quat of agent rotations, indexed by agent's body ID.
+        tilemap: World tilemap array representing the layout.
+        max_world_width: Width of the world tilemap.
+        max_world_depth: Depth of the world tilemap.
+        max_world_height: Maximum level of the world (in terms of 3D height).
+        cmap: Tile colormap of the world for rendering.
     """
 
-    agents: list[Agent]
-    # TODO: Initialise values of props
-    props: list[Prop] = dataclasses.field(default_factory=list)
-
-    # TODO: Add prop data
-
-
-class ICLandState(PyTreeNode):  # type: ignore[misc]
-    """Information regarding the current step.
-
-    Attributes:
-        pipeline_state: State of the ICLand environment.
-        observation: Observation of the environment.
-        reward: Reward of the environment.
-        done: Flag indicating if the episode is done.
-        metrics: Dictionary of metrics for the environment.
-        info: Dictionary of additional information.
-    """
-
-    pipeline_state: PipelineState
-    obs: jax.Array
-    data: ICLandInfo
+    tilemap: jax.Array
+    max_world_width: int
+    max_world_depth: int
+    max_world_height: int
+    cmap: jax.Array
 
     def __repr__(self) -> str:
-        """Return a string representation of the ICLandState object."""
-        return f"ICLandState(pipeline_state={self.pipeline_state}, observation={self.obs}, data={self.data})"
+        """Return a string representation of the ICLandWorld object.
+
+        Returns:
+            A string with world dimensions and array shapes.
+        """
+        return f"ICLandWorld(tilemap.shape={self.tilemap.shape}, max_world_width={self.max_world_width}, max_world_depth={self.max_world_depth}, max_world_height={self.max_world_height}, cmap.shape={self.cmap.shape})"
+
+
+class ICLandAgentInfo(PyTreeNode):  # type: ignore[misc]
+    """Information about agents in the ICLand environment.
+
+    Attributes:
+        agent_count: Actual number of agents active in the environment.
+        spawn_points: Array of spawn points for agents, shape (max_agent_count, 3).
+        spawn_orientations: Array of spawn orientations for agents, shape (max_agent_count,).
+        body_ids: Array of body IDs for agents in the MJX model.
+        geom_ids: Array of geometry IDs for agents in the MJX model.
+        dof_addresses: Array of degrees of freedom addresses for agents.
+        colour: Array of RGB colors for agents, shape (max_agent_count, 3).
+    """
+
+    agent_count: jax.Array
+    spawn_points: jax.Array
+    spawn_orientations: jax.Array
+    body_ids: jax.Array
+    geom_ids: jax.Array
+    dof_addresses: jax.Array
+    colour: jax.Array
+
+    def __repr__(self) -> str:
+        """Return a string representation of the ICLandAgentInfo object.
+
+        Returns:
+            A string with agent count and array shapes.
+
+        Examples:
+            >>> import jax.numpy as jnp
+            >>> from icland.types import ICLandAgentInfo
+            >>> agent_info = ICLandAgentInfo(
+            ...     jnp.array(1),
+            ...     jnp.array([[0.0, 0.0, 0.0]]),
+            ...     jnp.array([0.0]),
+            ...     jnp.array([0]),
+            ...     jnp.array([0]),
+            ...     jnp.array([0]),
+            ...     jnp.array([[1.0, 0.0, 0.0]]),
+            ... )
+            >>> repr(agent_info)
+            'ICLandAgentInfo(agent_count=1, spawn_points.shape=(1, 3), body_ids.shape=(1,), colour.shape=(1, 3))'
+        """
+        return f"ICLandAgentInfo(agent_count={self.agent_count}, spawn_points.shape={self.spawn_points.shape}, body_ids.shape={self.body_ids.shape}, colour.shape={self.colour.shape})"
+
+
+class ICLandPropInfo(PyTreeNode):  # type: ignore[misc]
+    """Information about props in the ICLand environment.
+
+    Attributes:
+        prop_count: Actual number of props active in the environment.
+        spawn_points: Array of spawn points for props, shape (max_prop_count, 3).
+        spawn_rotations: Array of spawn rotations for props as quaternions, shape (max_prop_count, 4).
+        prop_types: Array of types for props (1=cube, 2=sphere).
+        body_ids: Array of body IDs for props in the MJX model.
+        geom_ids: Array of geometry IDs for props in the MJX model.
+        dof_addresses: Array of degrees of freedom addresses for props.
+        colour: Array of RGB colors for props, shape (max_prop_count, 3).
+    """
+
+    prop_count: jax.Array
+    spawn_points: jax.Array
+    spawn_rotations: jax.Array
+    prop_types: jax.Array
+    body_ids: jax.Array
+    geom_ids: jax.Array
+    dof_addresses: jax.Array
+    colour: jax.Array
+
+    def __repr__(self) -> str:
+        """Return a string representation of the ICLandPropInfo object.
+
+        Returns:
+            A string with prop count, types, and array shapes.
+        """
+        return f"ICLandPropInfo(prop_count={self.prop_count}, prop_types.shape={self.prop_types.shape}, spawn_points.shape={self.spawn_points.shape}, body_ids.shape={self.body_ids.shape}, colour.shape={self.colour.shape})"
 
 
 class ICLandParams(PyTreeNode):  # type: ignore[misc]
     """Parameters for the ICLand environment.
 
     Attributes:
-        world: World tilemap array.
-        reward_function: Reward function for the environment
-        agent_count: Number of agents in the environment.
-        world_level: World level.
+        world: The ICLandWorld object defining the environment layout.
+        agent_info: ICLandAgentInfo containing constant information about agents.
+        prop_info: ICLandPropInfo containing constant information about props.
+        reward_function: Reward function (or None if not specified).
+        mjx_model: MJX model of the environment physics.
     """
 
-    world: jax.Array
-    reward_function: Callable[[ICLandInfo], jax.Array] | None
-    agent_spawns: jax.Array
-    # TODO(Iajedi): Prop spawns
-    # prop_spawns: jax.Array
-    world_level: int
+    world: ICLandWorld
+    agent_info: ICLandAgentInfo
+    prop_info: ICLandPropInfo
+    reward_function: int
+    mjx_model: MjxModelType
 
-    # Without this, model is model=<mujoco._structs.MjModel object at 0x7b61fb18dc70>
-    # For some arbitrary memory address. __repr__ provides cleaner output
-    # for users and for testing.
     def __repr__(self) -> str:
         """Return a string representation of the ICLandParams object.
 
-        Examples:
-            >>> from icland.types import ICLandParams, ICLandState
-            >>> import jax
-            >>> def example_reward_function(state: ICLandState) -> jax.Array:
-            ...     return jax.numpy.array(0)
-            >>> ICLandParams(jax.numpy.array([[[0, 0, 0, 1]]]), example_reward_function, jax.numpy.array([[0, 0, 0]]), 6)
-            ICLandParams(world=ArrayImpl, reward_function=example_reward_function(state: icland.types.ICLandState) -> jax.Array, agent_spawns=[[0 0 0]], world_level=6)
-            >>> ICLandParams(jax.numpy.array([[[0, 0, 0, 1]]]), lambda state: jax.numpy.array(0), jax.numpy.array([[0, 0, 0]]), 6)
-            ICLandParams(world=ArrayImpl, reward_function=lambda function(state), agent_spawns=[[0 0 0]], world_level=6)
+        Returns:
+            A string with the world, agent_info, prop_info, and reward_function.
         """
-        if (
-            self.reward_function
-            and hasattr(self.reward_function, "__name__")
-            and self.reward_function.__name__ != "<lambda>"
-        ):
-            reward_function_name = self.reward_function.__name__
-        else:
-            reward_function_name = "lambda function"
-
-        reward_function_signature = ""
-        if self.reward_function is not None:
-            reward_function_signature = str(inspect.signature(self.reward_function))
-
-        return f"ICLandParams(world={type(self.world).__name__}, reward_function={reward_function_name}{reward_function_signature}, agent_spawns={self.agent_spawns}, world_level={self.world_level})"
+        return f"ICLandParams(world={self.world}, agent_info={self.agent_info}, prop_info={self.prop_info}, reward_function={self.reward_function})"
 
 
-class ICLandConfig(PyTreeNode):  # type: ignore[misc]
-    """Global configuration object for the ICLand environment.
+class ICLandAgentVariables(PyTreeNode):  # type: ignore[misc]
+    """Variables for agents in the ICLand environment that change during simulation.
 
     Attributes:
-        world_width: Width of the world tilemap.
-        world_height: Height of the world tilemap.
-        max_agent_count: Maximum of agents in the environment.
-        prop_counts (TODO): Dictionary storing the number of each prop.
-        max_world_level: Maximum level of the world (in terms of 3D height).
+        pitch: Pitch angle of each agent, shape (max_agent_count,).
+        is_tagged: Tag status of each agent (1=tagged, 0=not tagged), shape (max_agent_count,).
     """
 
-    world_width: int
-    world_height: int
-    max_agent_count: int
-    prop_counts: dict[Any, Any]
-    max_world_level: int
+    pitch: jax.Array  # Shape (max_agent_count, )
+    is_tagged: jax.Array  # Shape (max_agent_count, )
 
     def __repr__(self) -> str:
-        """Return a string representation of the ICLandConfig object.
+        """Return a string representation of the ICLandAgentVariables object.
 
-        Examples:
-            >>> from icland.types import ICLandConfig
-            >>> import jax
-            >>> ICLandConfig(10, 10, 1, {}, 6)
-            ICLandConfig(width=10, height=10, max_agent_count=1, max_world_level=6)
+        Returns:
+            A string with the pitch and is_tagged array shapes.
         """
-        return f"ICLandConfig(width={self.world_width}, height={self.world_height}, max_agent_count={self.max_agent_count}, max_world_level={self.max_world_level})"
+        return f"ICLandAgentVariables(pitch.shape={self.pitch.shape}, is_tagged.shape={self.is_tagged.shape})"
+
+
+class ICLandPropVariables(PyTreeNode):  # type: ignore[misc]
+    """Variables for props in the ICLand environment that change during simulation.
+
+    Attributes:
+        prop_owner: ID of agent grabbing each prop (0=not grabbed), shape (max_prop_count,).
+    """
+
+    prop_owner: jax.Array  # Shape (max_prop_count, )
+
+    def __repr__(self) -> str:
+        """Return a string representation of the ICLandPropVariables object.
+
+        Returns:
+            A string with the prop_owner array shape.
+        """
+        return f"ICLandPropVariables(prop_owner.shape={self.prop_owner.shape})"
+
+
+class ICLandObservation(PyTreeNode):  # type: ignore[misc]
+    """Observation set for the ICLand environment.
+
+    Attributes:
+        render: Rendered frames for each agent's viewpoint,
+                shape (max_agent_count, height, width, 3).
+        is_grabbing: Boolean indicator for whether each agent is grabbing a prop.
+    """
+
+    render: jax.Array
+    is_grabbing: jax.Array
+
+    def __repr__(self) -> str:
+        """Return a string representation of the ICLandObservation object.
+
+        Returns:
+            A string with the render array shape and is_grabbing value.
+        """
+        return f"ICLandObservation(render.shape={self.render.shape}, is_grabbing={self.is_grabbing})"
+
+
+class ICLandState(PyTreeNode):  # type: ignore[misc]
+    """Current state of the ICLand environment.
+
+    Attributes:
+        mjx_data: MJX physics state data.
+        agent_variables: Variables for agents that change during simulation.
+        prop_variables: Variables for props that change during simulation.
+        observation: Agent observations of the environment.
+        reward: Current reward values for all agents, shape (max_agent_count,).
+    """
+
+    mjx_data: MjxStateType
+    agent_variables: ICLandAgentVariables
+    prop_variables: ICLandPropVariables
+    observation: ICLandObservation
+    reward: jax.Array
+
+    def __repr__(self) -> str:
+        """Return a string representation of the ICLandState object.
+
+        Returns:
+            A string with mjx_data, agent_variables, prop_variables, and observation.
+        """
+        return f"ICLandState(agent_variables={self.agent_variables}, prop_variables={self.prop_variables}, observation={self.observation}, reward.shape={self.reward.shape})"

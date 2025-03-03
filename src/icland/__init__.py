@@ -1,262 +1,330 @@
 """Recreating Google DeepMind's XLand RL environment in JAX."""
 
-# Enforce runtime type-checking.
-# See: https://beartype.readthedocs.io/en/latest/api_claw/
-# Allow lossy conversion of integers to floating-point numbers
-# https://beartype.readthedocs.io/en/latest/api_decor/#beartype.BeartypeConf.is_pep484_tower
-# beartype_this_package(conf=BeartypeConf(is_pep484_tower=True))
 import jax
 import jax.numpy as jnp
-import mujoco
-
-# from beartype import BeartypeConf
-# from beartype.claw import beartype_this_package
 from mujoco import mjx
 
-from .agent import collect_body_scene_info, step_agents
-from .constants import *
+from icland.agent import step_agents
+from icland.constants import *
+from icland.presets import DEFAULT_VIEWSIZE
+from icland.renderer.renderer import generate_colormap, render, select_random_color
+from icland.types import *
+from icland.world_gen.converter import sample_spawn_points
+from icland.world_gen.JITModel import export, sample_world
+from icland.world_gen.model_editing import edit_model_data, generate_base_model
+from icland.world_gen.tile_data import TILECODES
 
-# from .game import generate_game
-from .types import *
-from .world_gen.converter import sample_spawn_points
-from .world_gen.JITModel import export, sample_world
-from .world_gen.model_editing import edit_model_data
-from .world_gen.tile_data import TILECODES
 
+def config(*args: int) -> ICLandConfig:
+    """Smart constructor for ICLand config, initialising the base model on the fly.
 
-def sample(key: jax.Array, config: ICLandConfig) -> ICLandParams:  # pragma: no cover
-    """Sample a new set of environment parameters using 'key'.
+    This function is the recommended way to create ICLandConfig objects.
+    Direct instantiation of ICLandConfig should be avoided.
+
+    Currently, due to the constraints imposed by the MuJoCo-XLA (MJX) engine,
+    only spheres and cubes are supported.
+
+    Args:
+        *args: A tuple of integers representing the configuration parameters:
+            - max_world_width: The maximum width of the world.
+            - max_world_depth: The maximum depth of the world.
+            - max_world_height: The maximum height of the world.
+            - max_agent_count: The maximum number of agents.
+            - max_sphere_count: The maximum number of spheres.
+            - max_cube_count: The maximum number of cubes.
 
     Returns:
-        ICLandParams: Parameters for the ICLand environment.
+        An ICLandConfig object.
 
-        - mj_model: Mujoco model of the environment.
-        - reward_function: Reward function for the environment.
-        - agent_count: Number of agents in the environment.
-
-    Examples:
-        >>> from icland import sample
-        >>> from icland.world_gen.model_editing import generate_base_model
-        >>> import jax
-        >>> key = jax.random.key(42)
-        >>> config = ICLandConfig(1, 1, 1, {}, 6)
-        >>> base_model, _ = generate_base_model(config)
-        >>> sample(key, config)
-        ICLandParams(world=ArrayImpl, reward_function=lambda function, agent_spawns=[[0.5 0.5 4. ]], world_level=6)
+    Example:
+        >>> config(5, 5, 6, 1, 0, 0)
+        ICLandConfig(max_world_width=5, max_world_depth=5, max_world_height=6, max_agent_count=1, max_sphere_count=0, max_cube_count=0, no_props=True)
     """
-    # Sample the number of agents in the environment
-    # TODO(Iajedi): communicate with harens, add global config (max agent count, world width/height, etc.)
-    agent_count = config.max_agent_count
+    # Unpack the arguments
+    model, _ = generate_base_model(*args)
+    SPHERE_INDEX = 4
+    CUBE_INDEX = 5
+    no_props = args[SPHERE_INDEX] + args[CUBE_INDEX] == 0
 
-    # Sample the world based on config, using the WFC model (for now)
-    MAX_STEPS = 1000
+    return ICLandConfig(*args, no_props=no_props, model=model)
+
+
+# Default global configuration
+DEFAULT_CONFIG = config(
+    5,
+    5,
+    6,
+    1,
+    0,
+    0,
+)
+
+
+@jax.jit
+def sample(key: jax.Array, config: ICLandConfig = DEFAULT_CONFIG) -> ICLandParams:
+    """Sample the world and generate the initial parameters for the ICLand environment.
+
+    Args:
+        key: The random key for sampling.
+        config: The configuration for the ICLand environment.
+
+    Returns:
+        The initial parameters for the ICLand environment.
+
+    Example:
+        >>> import jax
+        >>> import icland
+        >>> key = jax.random.PRNGKey(42)
+        >>> icland.sample(key)
+        ICLandParams(world=ICLandWorld(tilemap.shape=(5, 5, 4), max_world_width=5, max_world_depth=5, max_world_height=6, cmap.shape=(5, 5, 3)), agent_info=ICLandAgentInfo(agent_count=1, spawn_points.shape=(1, 3), body_ids.shape=(1,), colour.shape=(1, 3)), prop_info=ICLandPropInfo(prop_count=1, prop_types.shape=(1,), spawn_points.shape=(1, 3), body_ids.shape=(1,), colour.shape=(1, 3)), reward_function=None)
+    """
+    # Unpack config
+    (
+        max_world_width,
+        max_world_depth,
+        max_world_height,
+        max_agent_count,
+        max_sphere_count,
+        max_cube_count,
+        no_props,
+        model,
+    ) = vars(config).values()
+
+    # Define constants
+    USE_PERIOD = True
+    HEURISTIC = 1
+
+    # Sample the world via wave function collapse
     wfc_model = sample_world(
-        config.world_width, config.world_height, MAX_STEPS, key, True, 1
+        width=max_world_width,
+        height=max_world_depth,
+        key=key,
+        periodic=USE_PERIOD,
+        heuristic=HEURISTIC,
     )
+
+    # Export the world tilemap
     world_tilemap = export(
-        wfc_model, TILECODES, config.world_width, config.world_height
+        model=wfc_model,
+        tilemap=TILECODES,
+        width=max_world_width,
+        height=max_world_depth,
     )
 
-    # Generate the reward function
-    # TODO: Adapt for JIT-ted manner
-    # reward_function = generate_game(key, agent_count)
-    reward_function = None
+    # Sample number of props and agents
+    max_prop_count = max_sphere_count + max_cube_count + no_props
+    max_object_count = max_agent_count + max_prop_count
 
-    # Generate the spawn points for each object
-    # TODO: Add prop spawns as well
-    key, subkey = jax.random.split(key)
-    num_objects = config.max_agent_count
-    spawnpoints = sample_spawn_points(subkey, world_tilemap, num_objects)
+    # Sample spawn points for objects
+    spawnpoints = sample_spawn_points(
+        key=key, tilemap=world_tilemap, num_objects=max_object_count
+    )
+    key, _ = jax.random.split(key)
 
+    # Update with randomised number of agents
+    num_agents = jax.random.randint(key, (), 1, max_agent_count + 1)
+
+    # Update with randomised number of props
+    key, s = jax.random.split(key)
+    num_props = jax.random.randint(s, (), 0, max_prop_count + 1)
+    spawnpoints = jax.lax.dynamic_update_slice_in_dim(
+        spawnpoints,
+        jax.vmap(lambda i: (i < num_agents) * spawnpoints[i])(
+            jnp.arange(max_agent_count)
+        ),
+        0,
+        axis=0,
+    )
+    spawnpoints = jax.lax.dynamic_update_slice_in_dim(
+        spawnpoints,
+        jax.vmap(lambda i: (i < num_props) * spawnpoints[max_agent_count + i])(
+            jnp.arange(max_prop_count)
+        ),
+        max_agent_count,
+        axis=0,
+    )
+
+    colors = jnp.array(
+        [[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 1, 0], [0, 1, 1], [1, 0, 1]]
+    )
+    key, s = jax.random.split(key)
+    agent_colors = select_random_color(key, colors=colors, num_colors=max_agent_count)
+
+    # Generate the agent and prop information
+    agent_info = ICLandAgentInfo(
+        agent_count=num_agents,
+        spawn_points=spawnpoints[:max_agent_count],
+        spawn_orientations=jnp.zeros((max_agent_count,), dtype="float32"),
+        body_ids=jnp.arange(BODY_OFFSET, max_agent_count + BODY_OFFSET, dtype="int32"),
+        geom_ids=(jnp.arange(max_agent_count) + max_world_width * max_world_depth) * 2
+        + WALL_OFFSET,
+        dof_addresses=jnp.arange(max_agent_count) * AGENT_DOF_OFFSET,
+        colour=agent_colors,
+    )
+
+    # For prop types, from 0 -> max_cube_count - 1, set to 1
+    # from max_cube_count -> max_cube_count + max_sphere_count - 1, set to 2
+    prop_types = jax.vmap(lambda x: (x >= max_cube_count) + 1)(
+        jnp.arange(max_prop_count)
+    ) * (1 - no_props)  # If no props = 1, zero the array.
+
+    prop_colors = select_random_color(s, colors=colors, num_colors=max_prop_count)
+
+    # Generate the prop information
+    prop_info = ICLandPropInfo(
+        prop_count=num_props,
+        prop_types=prop_types,
+        spawn_points=spawnpoints[max_agent_count : max_agent_count + max_prop_count],
+        spawn_rotations=jnp.zeros((max_prop_count, 4), dtype="float32"),
+        body_ids=BODY_OFFSET
+        + max_agent_count
+        + jnp.arange(max_prop_count, dtype="int32"),
+        geom_ids=(max_agent_count + max_world_width * max_world_depth) * 2
+        + jnp.arange(max_prop_count, dtype="int32")
+        + WALL_OFFSET,
+        dof_addresses=jnp.arange(max_prop_count, dtype="int32") * PROP_DOF_MULTIPLIER
+        + PROP_DOF_OFFSET,
+        colour=prop_colors,
+    )
+
+    # Edit the model data for the specification
+    model = edit_model_data(world_tilemap, model, agent_info, prop_info)
+    cmap = generate_colormap(key, max_world_width, max_world_depth)
+
+    icland_world = ICLandWorld(
+        tilemap=world_tilemap,
+        max_world_width=max_world_width,
+        max_world_depth=max_world_depth,
+        max_world_height=max_world_height,
+        cmap=cmap,
+    )
+
+    # Return the parameters
     return ICLandParams(
-        world_tilemap, reward_function, spawnpoints, config.max_world_level
+        world=icland_world,
+        agent_info=agent_info,
+        prop_info=prop_info,
+        reward_function=None,
+        mjx_model=model,
     )
 
 
-def init(key: jax.Array, params: ICLandParams, base_model: MjxModelType) -> ICLandState:
-    """Initialize the environment state from params.
+def init(icland_params: ICLandParams) -> ICLandState:
+    """Initialise the ICLand environment.
+
+    Args:
+        icland_params: The parameters for the ICLand environment.
 
     Returns:
-        ICLandState: State of the ICLand environment.
+        The initial state of the ICLand environment.
 
-        - mjx_model: JAX-compatible Mujoco model.
-        - mjx_data: JAX-compatible Mujoco data.
-        - agent_data: Body and geometry IDs for agents.
-
-    Examples:
-        >>> from icland import sample, init
-        >>> from icland.presets import DEFAULT_CONFIG
-        >>> from icland.world_gen.model_editing import generate_base_model
-        >>> import jax
-        >>> base_model, _ = generate_base_model(DEFAULT_CONFIG)
-        >>> key = jax.random.key(42)
-        >>> params = sample(key, DEFAULT_CONFIG)
-        >>> init(key, params, base_model) # doctest:+ELLIPSIS
-        ICLandState(pipeline_state=PipelineState(mjx_model=Model, mjx_data=Data, component_ids=[[  1 205   0   0]], world=World(width: 10, height: 10)), observation=[0. 0. 0. 0.], data=ICLandInfo(agents=[Agent(...)], props=[]))
+    Example:
+        >>> import icland
+        >>> icland_params = icland.sample(jax.random.PRNGKey(42))
+        >>> icland.init(icland_params)
+        ICLandState(agent_variables=ICLandAgentVariables(pitch.shape=(1,), is_tagged.shape=(1,)), prop_variables=ICLandPropVariables(prop_owner.shape=(1,)), observation=ICLandObservation(render.shape=(1, 72, 96, 3), is_grabbing=0), reward.shape=(1,))
     """
-    # Unpack params
-    world_tilemap = params.world
-    agent_count = params.agent_spawns.shape[0]
+    max_agent_count = icland_params.agent_info.spawn_points.shape[0]
+    max_prop_count = icland_params.prop_info.spawn_points.shape[0]
 
-    # Put Mujoco model and data into JAX-compatible format
-    mjx_model = edit_model_data(
-        world_tilemap,
-        base_model,
-        params.agent_spawns,
-        jnp.array([]),
-        params.world_level,
+    agent_variables = ICLandAgentVariables(
+        pitch=jnp.zeros((max_agent_count,), dtype="float32"),
+        is_tagged=jnp.zeros((max_agent_count,), dtype="int32"),
     )
-    mjx_data = mjx.make_data(mjx_model)
 
-    agent_components = collect_agent_components_mjx(
-        mjx_model, world_tilemap.shape[0], world_tilemap.shape[1], agent_count
+    prop_variables = ICLandPropVariables(
+        prop_owner=jnp.zeros((max_prop_count,), dtype="int32"),
     )
-    pipeline_state = PipelineState(mjx_model, mjx_data, agent_components, world_tilemap)
 
     return ICLandState(
-        pipeline_state,
-        jnp.zeros(AGENT_OBSERVATION_DIM),
-        collect_body_scene_info(agent_components, mjx_data),
+        mjx_data=mjx.make_data(icland_params.mjx_model),
+        agent_variables=agent_variables,
+        prop_variables=prop_variables,
+        observation=ICLandObservation(
+            jnp.zeros((max_agent_count, DEFAULT_VIEWSIZE[1], DEFAULT_VIEWSIZE[0], 3)), 0
+        ),
+        reward=jnp.zeros((max_agent_count,)),
     )
-
-
-def __collect_agent_components(
-    mj_model: mujoco.MjModel, agent_count: int
-) -> jax.Array:  # pragma: no cover
-    agent_components = jnp.empty(
-        (agent_count, AGENT_COMPONENT_IDS_DIM), dtype=jnp.float16
-    )
-
-    for agent_id in range(agent_count):
-        body_id = mujoco.mj_name2id(
-            mj_model, mujoco.mjtObj.mjOBJ_BODY, f"agent{agent_id}"
-        )
-
-        geom_id = mujoco.mj_name2id(
-            mj_model, mujoco.mjtObj.mjOBJ_GEOM, f"agent{agent_id}_geom"
-        )
-
-        dof_address = mj_model.body_dofadr[body_id]
-
-        agent_components = agent_components.at[agent_id].set(
-            [body_id, geom_id, dof_address, 0]
-        )
-
-    return agent_components
-
-
-def __collect_prop_components(
-    mj_model: mujoco.MjModel, prop_count: int
-) -> jax.Array:  # pragma: no cover
-    agent_components = jnp.empty((prop_count, AGENT_COMPONENT_IDS_DIM), dtype=jnp.int32)
-
-    for prop_id in range(prop_count):
-        print(f"prop{prop_id}", f"prop{prop_id}_geom")
-        body_id = mujoco.mj_name2id(
-            mj_model, mujoco.mjtObj.mjOBJ_BODY, f"prop{prop_id}"
-        )
-
-        geom_id = mujoco.mj_name2id(
-            mj_model, mujoco.mjtObj.mjOBJ_GEOM, f"prop{prop_id}_geom"
-        )
-
-        dof_address = mj_model.body_dofadr[body_id]
-
-        agent_components = agent_components.at[prop_id].set(
-            [body_id, geom_id, dof_address]
-        )
-
-    return agent_components
-
-
-def collect_agent_components_mjx(
-    mjx_model: mjx.Model, width: int, height: int, agent_count: int
-) -> jax.Array:
-    """Collect object IDs for all agents in a GPU-optimized way using mjx.Model."""
-
-    def get_components_aux(agent_id: jax.Array) -> jax.Array:
-        body_id = agent_id + BODY_OFFSET
-        geom_id = (agent_id + width * height) * 2 + WALL_OFFSET
-        dof_address = agent_id * 4
-        return jnp.array([body_id, geom_id, dof_address, 0])
-
-    agent_components = jax.vmap(get_components_aux)(jnp.arange(agent_count)).astype(
-        "int32"
-    )
-
-    return agent_components
-
-
-def collect_prop_components_mjx(
-    mjx_model: mjx.Model, width: int, height: int, prop_count: int, agent_count: int
-) -> jax.Array:  # pragma: no cover
-    """Collect prop components in a GPU-optimized way using mjx.Model."""
-
-    def get_components_aux(prop_id: jax.Array) -> jax.Array:
-        body_id = prop_id + BODY_OFFSET + agent_count
-        geom_id = (
-            agent_count * 2 + (prop_id + agent_count + width * height) + WALL_OFFSET
-        )
-        dof_address = PROP_DOF_OFFSET + prop_id * PROP_DOF_MULTIPLIER
-        return jnp.array([body_id, geom_id, dof_address])
-
-    prop_components = jax.vmap(get_components_aux)(jnp.arange(prop_count)).astype(
-        "int32"
-    )
-
-    return prop_components
 
 
 @jax.jit
 def step(
-    key: jax.Array,
-    state: ICLandState,
-    params: ICLandParams,
-    actions: jax.Array,
-) -> ICLandState:
-    """Advance environment one step for all agents.
+    state: ICLandState, params: ICLandParams, action_batch: jax.Array
+) -> tuple[ICLandState, jax.Array]:
+    """Step the ICLand environment forward in time.
+
+    Args:
+        state: The current state of the ICLand environment.
+        params: The parameters of the ICLand environment.
+        action_batch: The batch of actions to apply to the agents.
+                      Should be of shape (num_agents, ACTION_SPACE_DIM).
 
     Returns:
-        ICLandState: State of the ICLand environment.
+        A tuple containing the new state (with observation), and reward.
 
-        - mjx_model: JAX-compatible Mujoco model.
-        - mjx_data: JAX-compatible Mujoco data.
-        - agent_data: Body and geometry IDs for agents.
-
-    Examples:
-        >>> from icland import sample, init, step
+    Example:
+        >>> import icland
         >>> import jax
         >>> import jax.numpy as jnp
-        >>> forward_policy = jnp.array([1, 0, 0, 0])
-        >>> from icland.presets import DEFAULT_CONFIG
-        >>> from icland.world_gen.model_editing import generate_base_model
-        >>> base_model, _ = generate_base_model(DEFAULT_CONFIG)
-        >>> key = jax.random.key(42)
-        >>> params = sample(key, DEFAULT_CONFIG)
-        >>> state = init(key, params, base_model)
-        >>> step(key, state, params, forward_policy) # doctest:+ELLIPSIS
-        ICLandState(pipeline_state=PipelineState(mjx_model=Model, mjx_data=Data, component_ids=[[  1 205   0   0]], world=World(width: 10, height: 10)), observation=[...], data=ICLandInfo(agents=[Agent(...)], props=[]))
+        >>> key = jax.random.PRNGKey(42)
+        >>> params = icland.sample(key)
+        >>> state = icland.init(params)
+        >>> actions = jnp.zeros((params.agent_info.agent_count, icland.constants.ACTION_SPACE_DIM))
+        >>> new_state = icland.step(state, params, actions)
     """
     # Unpack state
-    pipeline_state = state.pipeline_state
-    mjx_model = pipeline_state.mjx_model
-    mjx_data = pipeline_state.mjx_data
-    agent_components = pipeline_state.component_ids
+    mjx_data = state.mjx_data
+    agent_variables = state.agent_variables
+    prop_variables = state.prop_variables
 
-    # Ensure actions are in the correct shape
-    actions = actions.reshape(-1, AGENT_ACTION_SPACE_DIM)
+    # Unpack params
+    mjx_model = params.mjx_model
+    agent_info = params.agent_info
+    prop_info = params.prop_info
+    world = params.world
 
-    # Use vmap to step through each agent.
-    updated_data, updated_agent_components = step_agents(
-        mjx_data, actions, agent_components
+    # Unpack actions
+
+    # Ensure parameters are in correct shape
+    action_batch = action_batch.reshape(-1, ACTION_SPACE_DIM)
+
+    # Step through each agent
+    applied_agent_forces, new_agent_variables = step_agents(
+        mjx_data, action_batch, agent_info, agent_variables
     )
 
-    # Step the environment after applying all agent actions
-    updated_data = mjx.step(mjx_model, updated_data)
-    new_pipeline_state = PipelineState(
-        mjx_model, updated_data, agent_components, pipeline_state.world
-    )
-    data: ICLandInfo = collect_body_scene_info(agent_components, mjx_data)
-    observation = updated_data.qpos
+    # Evaluate reward function
+    reward = jnp.zeros(
+        (agent_info.spawn_points.shape[0],)
+    )  # params.reward_function(state)
 
-    return ICLandState(new_pipeline_state, observation, data)
+    # Update state
+    new_mjx_state = mjx.step(params.mjx_model, applied_agent_forces)
+
+    # Update observation and render frames
+    # Do not render every step, only once every SPS / FPS steps.
+    frames = jax.lax.cond(
+        jnp.mod(jnp.floor(mjx_data.time * SPS), jnp.floor(SPS / FPS)) == 0,
+        lambda _: render(
+            agent_info,
+            new_agent_variables,
+            prop_info,
+            prop_variables,
+            world,
+            new_mjx_state,
+        ),
+        lambda _: state.observation.render,
+        None,
+    )
+    # TODO: Update prop vars as well
+    observation = ICLandObservation(frames, 0)
+
+    new_icland_state = ICLandState(
+        mjx_data=new_mjx_state,
+        agent_variables=new_agent_variables,
+        prop_variables=prop_variables,
+        observation=observation,
+        reward=reward,
+    )
+
+    return new_icland_state

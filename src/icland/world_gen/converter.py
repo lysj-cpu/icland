@@ -5,267 +5,13 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
-import numpy as np
-from stl import mesh
-from stl.base import RemoveDuplicates
 
 from icland.world_gen.XMLReader import TileType
-
-# Previous constants (BLOCK_VECTORS, RAMP_VECTORS, ROTATION_MATRICES) remain the same...
-# Optimization: Pre-compute block and ramp vectors as constants
-BLOCK_VECTORS = jnp.array(
-    [
-        # Bottom face
-        [[0, 0, 0], [1, 0, 0], [0, 1, 0]],
-        [[1, 0, 0], [1, 1, 0], [0, 1, 0]],
-        # Top face
-        [[0, 0, 1], [0, 1, 1], [1, 0, 1]],
-        [[1, 0, 1], [0, 1, 1], [1, 1, 1]],
-        # Front face
-        [[0, 0, 0], [0, 0, 1], [1, 0, 0]],
-        [[1, 0, 0], [0, 0, 1], [1, 0, 1]],
-        # Back face
-        [[0, 1, 0], [1, 1, 0], [0, 1, 1]],
-        [[1, 1, 0], [1, 1, 1], [0, 1, 1]],
-        # Left face
-        [[0, 0, 0], [0, 1, 0], [0, 0, 1]],
-        [[0, 1, 0], [0, 1, 1], [0, 0, 1]],
-        # Right face
-        [[1, 0, 0], [1, 0, 1], [1, 1, 0]],
-        [[1, 1, 0], [1, 0, 1], [1, 1, 1]],
-    ]
-)  # pragma: no cover
-
-RAMP_VECTORS = jnp.array(
-    [
-        # Bottom face
-        [[1, 0, 0], [0, 1, 0], [0, 0, 0]],
-        [[0, 1, 0], [1, 0, 0], [1, 1, 0]],
-        # Side face
-        [[1, 1, 1], [1, 0, 0], [1, 1, 0]],
-        [[1, 0, 0], [1, 1, 1], [1, 0, 1]],
-        # Right side
-        [[1, 0, 1], [0, 0, 0], [1, 0, 0]],
-        # Left side
-        [[0, 1, 0], [1, 1, 1], [1, 1, 0]],
-        # Top ramp face
-        [[1, 1, 1], [0, 0, 0], [0, 1, 0]],
-        [[0, 0, 0], [1, 1, 1], [1, 0, 1]],
-    ]
-)  # pragma: no cover
-
-
-# Optimization: Pre-compute rotation matrices
-def __get_rotation_matrix(rotation: jax.Array) -> jax.Array:
-    angle = -jnp.pi * rotation / 2
-    cos_t = jnp.cos(angle)
-    sin_t = jnp.sin(angle)
-    return jnp.array([[cos_t, -sin_t, 0], [sin_t, cos_t, 0], [0, 0, 1]])
-
-
-ROTATION_MATRICES = jnp.stack(
-    [__get_rotation_matrix(jnp.array(r, dtype=jnp.int32)) for r in range(4)]
-)  # pragma: no cover
-
-# Maximum number of triangles per column
-MAX_TRIANGLES = 72  # pragma: no cover
-
-
-def __make_block_column(  # pragma: no cover
-    x: jax.Array, y: jax.Array, level: jax.Array
-) -> tuple[jax.Array, jax.Array]:
-    """Block column generation with fixed output size."""
-    return (
-        jnp.array(
-            [
-                # Bottom face
-                [[0, 0, 0], [1, 0, 0], [0, 1, 0]],
-                [[1, 0, 0], [1, 1, 0], [0, 1, 0]],
-                # Top face
-                [[0, 0, level], [0, 1, level], [1, 0, level]],
-                [[1, 0, level], [0, 1, level], [1, 1, level]],
-                # Front face
-                [[0, 0, 0], [0, 0, level], [1, 0, 0]],
-                [[1, 0, 0], [0, 0, level], [1, 0, level]],
-                # Back face
-                [[0, 1, 0], [1, 1, 0], [0, 1, level]],
-                [[1, 1, 0], [1, 1, level], [0, 1, level]],
-                # Left face
-                [[0, 0, 0], [0, 1, 0], [0, 0, level]],
-                [[0, 1, 0], [0, 1, level], [0, 0, level]],
-                # Right face
-                [[1, 0, 0], [1, 0, level], [1, 1, 0]],
-                [[1, 1, 0], [1, 0, level], [1, 1, level]],
-            ]
-        )
-        + jnp.array([x, y, 0])[None, None, :]
-    ), jnp.zeros((12, 3, 3))
-
-
-def __make_ramp_column(  # pragma: no cover
-    x: jax.Array, y: jax.Array, level: jax.Array, rotation: jax.Array
-) -> tuple[jax.Array, jax.Array]:
-    """Ramp generation with fixed output size."""
-    centered = (
-        jnp.array(
-            [
-                # Bottom face
-                [[0, 0, 0], [1, 0, 0], [0, 1, 0]],
-                [[1, 0, 0], [1, 1, 0], [0, 1, 0]],
-                # Top face
-                [[1, 1, level], [0, 0, level - 1], [0, 1, level - 1]],
-                [[0, 0, level - 1], [1, 1, level], [1, 0, level]],
-                # Front face
-                [[0, 0, 0], [0, 0, level - 1], [1, 0, 0]],
-                [[1, 0, 0], [0, 0, level - 1], [1, 0, level]],
-                # Back face
-                [[0, 1, 0], [1, 1, 0], [0, 1, level - 1]],
-                [[1, 1, 0], [1, 1, level], [0, 1, level - 1]],
-                # Left face
-                [[0, 0, 0], [0, 1, 0], [0, 0, level - 1]],
-                [[0, 1, 0], [0, 1, level - 1], [0, 0, level - 1]],
-                # Right face
-                [[1, 0, 0], [1, 0, level], [1, 1, 0]],
-                [[1, 1, 0], [1, 0, level], [1, 1, level]],
-            ]
-        )
-        - 0.5
-    )
-    rotated = jnp.einsum("ijk,kl->ijl", centered, ROTATION_MATRICES[rotation])
-    final_ramp = rotated + 0.5
-    return (final_ramp + jnp.array([x, y, 0])[None, None, :]), jnp.zeros((12, 3, 3))
-
-
-def __make_vramp_column(  # pragma: no cover
-    x: jax.Array,
-    y: jax.Array,
-    from_level: jax.Array,
-    to_level: jax.Array,
-    rotation: jax.Array,
-) -> tuple[jax.Array, jax.Array]:
-    """Vertical ramp generation with fixed output size."""
-    vramp_count = to_level - from_level + 1
-    column = __make_block_column(x, y, from_level)[0]
-    centered = (
-        jnp.array(
-            [
-                # Bottom face
-                [[1, 0, 0], [0, vramp_count, 0], [0, 0, 0]],
-                [[0, vramp_count, 0], [1, 0, 0], [1, vramp_count, 0]],
-                # Side face
-                [[1, vramp_count, 1], [1, 0, 0], [1, vramp_count, 0]],
-                [[1, 0, 0], [1, vramp_count, 1], [1, 0, 1]],
-                # Right side
-                [[1, 0, 0], [0, 0, 0], [1, 0, 1]],
-                # Left side
-                [[1, vramp_count, 0], [1, vramp_count, 1], [0, vramp_count, 0]],
-                # Top ramp face
-                [[1, vramp_count, 1], [0, 0, 0], [0, vramp_count, 0]],
-                [[0, 0, 0], [1, vramp_count, 1], [1, 0, 1]],
-            ]
-        )
-        - 0.5
-    )
-    x_rotation = jnp.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]])
-    vertical = jnp.einsum("ijk,kl->ijl", centered, x_rotation)
-    rotated = jnp.einsum("ijk,kl->ijl", vertical, ROTATION_MATRICES[(rotation - 1) % 4])
-    vramp = (
-        jnp.zeros((12, 3, 3))
-        .at[:8]
-        .set(rotated + 0.5 + jnp.array([x, y, from_level - 1])[None, None, :])
-    )
-    return column, vramp
-
-
-def create_world(tile_map: jax.Array) -> jax.Array:  # pragma: no cover
-    """World generation with consistent shapes."""
-    i_indices, j_indices = jnp.meshgrid(
-        jnp.arange(tile_map.shape[0]), jnp.arange(tile_map.shape[1]), indexing="ij"
-    )
-    i_indices = i_indices[..., jnp.newaxis]  # Shape: (w, h, 1)
-    j_indices = j_indices[..., jnp.newaxis]  # Shape: (w, h, 1)
-
-    coords = jnp.concatenate([i_indices, j_indices, tile_map], axis=-1)
-
-    def process_tile(entry: jax.Array) -> tuple[jax.Array, jax.Array]:
-        x, y, block, rotation, frm, to = entry
-        if block == TileType.SQUARE.value:
-            return __make_block_column(x, y, to)
-        elif block == TileType.RAMP.value:
-            return __make_ramp_column(x, y, to, rotation)
-        elif block == TileType.VRAMP.value:
-            return __make_vramp_column(x, y, frm, to, rotation)
-        else:
-            raise RuntimeError("Unknown tile type. Please check XMLReader")
-
-    pieces = jnp.zeros((tile_map.shape[0] * tile_map.shape[1], 12, 3, 3))
-    tile_start = 0
-    while tile_start < tile_map.shape[0] * tile_map.shape[1]:
-        i = tile_start // tile_map.shape[0]
-        j = tile_start % tile_map.shape[1]
-        a, _ = process_tile(coords.at[i, j].get())
-        pieces = pieces.at[tile_start].set(a)
-        tile_start += 1
-
-    return pieces
-
-
-def export_stl(pieces: jax.Array, filename: str) -> mesh.Mesh:  # pragma: no cover
-    """Convert JAX array to numpy array in the correct format for STL export."""
-    # # Helper function to filter out padding after JIT compilation
-    pieces_reshaped = pieces.reshape(-1, *pieces.shape[-2:])
-    # Convert from JAX array to numpy
-    triangles = np.array(pieces_reshaped)
-    # Invert the normals
-    triangles = triangles[:, ::-1, :]
-
-    # Ensure the array is contiguous and in float32 format
-    # numpy-stl expects float32 data
-    triangles = np.ascontiguousarray(triangles, dtype=np.float32)
-
-    # Create the mesh data structure
-    world_mesh = mesh.Mesh(
-        np.zeros(len(triangles), dtype=mesh.Mesh.dtype),
-        remove_duplicate_polygons=RemoveDuplicates.NONE,
-    )
-
-    # Assign vectors to the mesh
-    world_mesh.vectors = triangles
-    world_mesh.save(filename)
-
-    return world_mesh
-
-
-def export_stls(pieces: jax.Array, file_prefix: str) -> None:  # pragma: no cover
-    """Export each piece as an stl."""
-    # # Helper function to filter out padding after JIT compilation
-    pieces_reshaped = pieces.reshape(-1, *pieces.shape[-2:])
-    # Convert from JAX array to numpy
-    triangles = np.array(pieces_reshaped)
-    # Invert the normals
-    triangles = triangles[:, ::-1, :]
-
-    triangles = np.ascontiguousarray(triangles, dtype=np.float32)
-
-    print(triangles.shape)
-
-    n_pieces = pieces.shape[0]
-    n_triangles = len(triangles) // n_pieces
-    for i in range(0, n_pieces):
-        # Create the mesh data structure
-        world_mesh = mesh.Mesh(
-            np.zeros(n_triangles, dtype=mesh.Mesh.dtype),
-            remove_duplicate_polygons=RemoveDuplicates.NONE,
-        )
-        world_mesh.vectors = triangles[
-            (n_triangles * i) : (n_triangles * i + n_triangles)
-        ]
-        world_mesh.save(file_prefix + "_" + str(i) + ".stl")
 
 
 @partial(jax.jit, static_argnums=[2])
 def sample_spawn_points(
-    key: jax.Array, tilemap: jax.Array, num_objects: jnp.int32 = 1
+    key: jax.Array, tilemap: jax.Array, num_objects: int = 1
 ) -> jax.Array:  # pragma: no cover
     """Sample num_objects spawn points from the tilemap."""
     TILE_DATA_HEIGHT_INDEX = 3
@@ -277,14 +23,16 @@ def sample_spawn_points(
 
     def run_once(key: jax.Array) -> jax.Array:
         def pick(
-            item: tuple[jnp.int32, jax.Array],
-        ) -> tuple[jnp.int32, jax.Array]:
+            item: tuple[jax.Array, jax.Array],
+        ) -> tuple[jax.Array, jax.Array]:
             _, key = item
             key, subkey = jax.random.split(key)
             choice = jax.random.choice(subkey, nonzero_indices)
             return choice, key
 
-        random_index, key = jax.lax.while_loop(lambda x: x[0] < 0, pick, (-1, key))
+        random_index, key = jax.lax.while_loop(
+            lambda x: x[0] < 0, pick, (jnp.array(-1), key)
+        )
 
         # Convert the flat index back to 2D coordinates
         row = random_index // spawn_map.shape[0]
@@ -295,12 +43,12 @@ def sample_spawn_points(
         )
 
     keys = jax.random.split(key, num_objects)
-
-    return jax.vmap(run_once)(keys)
+    spawnpoints = jax.vmap(run_once)(keys)
+    return spawnpoints
 
 
 def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
-    combined = combined.astype(jnp.int32)
+    combined = combined.astype(int)
     w, h = combined.shape[0], combined.shape[1]
 
     # Initialize arrays with JAX functions
@@ -308,17 +56,17 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
     NUM_ROTATIONS = 4
     NUM_COORDS = 2
     visited = jax.lax.full((w, h), False, dtype=jnp.bool)
-    spawnable = jax.lax.full((w, h), 0, dtype=jnp.int32)
+    spawnable = jax.lax.full((w, h), 0, dtype=int)
 
-    def __adj_jit(i: jnp.int32, j: jnp.int32, combined: jax.Array) -> jax.Array:
+    def __adj_jit(i: int, j: int, combined: jax.Array) -> jax.Array:
         slots = jnp.full((TILE_DATA_SIZE, NUM_COORDS), -1)
         dx = jnp.array([-1, 0, 1, 0])
         dy = jnp.array([0, 1, 0, -1])
 
         def process_square(
             combined: jax.Array,
-            i: jnp.int32,
-            j: jnp.int32,
+            i: int,
+            j: int,
             slots: jax.Array,
             dx: jax.Array,
             dy: jax.Array,
@@ -390,8 +138,8 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
 
         def process_ramp(
             combined: jax.Array,
-            i: jnp.int32,
-            j: jnp.int32,
+            i: int,
+            j: int,
             slots: jax.Array,
             dx: jax.Array,
             dy: jax.Array,
@@ -492,9 +240,9 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
         return slots
 
     def __bfs(
-        i: jnp.int32,
-        j: jnp.int32,
-        ind: jnp.int32,
+        i: jax.Array,
+        j: jax.Array,
+        ind: jax.Array,
         visited: jax.Array,
         spawnable: jax.Array,
         combined: jax.Array,
@@ -504,20 +252,20 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
         front, rear, size = 0, 0, 0
 
         def __enqueue(
-            i: jnp.int32,
-            j: jnp.int32,
-            rear: jnp.int32,
+            i: jax.Array,
+            j: jax.Array,
+            rear: int,
             queue: jax.Array,
-            size: jnp.int32,
-        ) -> tuple[jnp.int32, jax.Array, jnp.int32]:
+            size: int,
+        ) -> tuple[int, jax.Array, int]:
             queue = queue.at[rear].set(jnp.array([i, j]))
             rear = (rear + 1) % capacity
             size += 1
             return rear, queue, size
 
         def __dequeue(
-            front: jnp.int32, queue: jax.Array, size: jnp.int32
-        ) -> tuple[jax.Array, jax.Array, jnp.int32]:
+            front: int, queue: jax.Array, size: int
+        ) -> tuple[jax.Array, int, int]:
             res = queue[front]
             front = (front + 1) % capacity
             size -= 1
@@ -527,44 +275,40 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
         rear, queue, size = __enqueue(i, j, rear, queue, size)
 
         def body_fun(
-            args: tuple[
-                jax.Array, jnp.int32, jnp.int32, jnp.int32, jax.Array, jax.Array
-            ],
-        ) -> tuple[jax.Array, jnp.int32, jnp.int32, jnp.int32, jax.Array, jax.Array]:
+            args: tuple[jax.Array, int, int, int, jax.Array, jax.Array],
+        ) -> tuple[jax.Array, int, int, int, jax.Array, jax.Array]:
             queue, front, rear, size, visited, spawnable = args
             item, front, size = __dequeue(front, queue, size)
-            x, y = item.astype(jnp.int32)
+            x, y = item.astype(int)
 
             # PROCESS
             spawnable = spawnable.at[x, y].set(ind)
 
             # Find next nodes
             def process_adj(
-                carry: tuple[jax.Array, jnp.int32, jax.Array, jnp.int32, jax.Array],
+                carry: tuple[jax.Array, int, jax.Array, int, jax.Array],
                 node: jax.Array,
-            ) -> tuple[
-                tuple[jax.Array, jnp.int32, jax.Array, jnp.int32, jax.Array], None
-            ]:
+            ) -> tuple[tuple[jax.Array, int, jax.Array, int, jax.Array], None]:
                 p, q = node
 
                 visited, rear, queue, size, combined = carry
 
                 def process_node(
                     visited: jax.Array,
-                    rear: jnp.int32,
+                    rear: int,
                     queue: jax.Array,
-                    size: jnp.int32,
-                ) -> tuple[jax.Array, jnp.int32, jax.Array, jnp.int32]:
+                    size: int,
+                ) -> tuple[jax.Array, int, jax.Array, int]:
                     visited = visited.at[p, q].set(True)
                     rear, queue, size = __enqueue(p, q, rear, queue, size)
                     return visited, rear, queue, size
 
                 def process_node_identity(
                     visited: jax.Array,
-                    rear: jnp.int32,
+                    rear: int,
                     queue: jax.Array,
-                    size: jnp.int32,
-                ) -> tuple[jax.Array, jnp.int32, jax.Array, jnp.int32]:
+                    size: int,
+                ) -> tuple[jax.Array, int, jax.Array, int]:
                     return visited, rear, queue, size
 
                 visited, rear, queue, size = jax.lax.cond(
@@ -597,7 +341,7 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
         return visited, spawnable
 
     def scan_body(
-        carry: tuple[jax.Array, jax.Array], ind: jnp.int32
+        carry: tuple[jax.Array, jax.Array], ind: jax.Array
     ) -> tuple[tuple[jax.Array, jax.Array], None]:
         visited, spawnable = carry
         i = ind // w
@@ -617,4 +361,5 @@ def __get_spawn_map(combined: jax.Array) -> jax.Array:  # pragma: no cover
     spawnable = jnp.where(
         spawnable == jnp.argmax(jnp.bincount(spawnable.flatten(), length=w * h)), 1, 0
     )
+
     return spawnable
