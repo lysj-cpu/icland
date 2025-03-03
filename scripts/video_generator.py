@@ -41,7 +41,6 @@ from icland.renderer.renderer import (
     RenderPropInfo,
     generate_colormap,
     get_agent_camera_from_mjx,
-    render_frame,
     render_frame_with_objects,
 )
 from icland.types import *
@@ -110,37 +109,6 @@ def _simulate_frames(
 # ---------------------------------------------------------------------------
 # Rendering Functions
 # ---------------------------------------------------------------------------
-def render_sdfr(
-    key: jax.Array,
-    policy: jax.Array,
-    duration: int,
-    video_name: str,
-    height: int = 10,
-    width: int = 10,
-) -> None:
-    """Renders a video using an SDF function."""
-    config = icland.config(width, height, 6, 1, 0, 0)
-    icland_params = icland.sample(key, config)
-
-    icland_state = icland.init(icland_params)
-    icland_state = icland.step(key, icland_state, icland_params, jnp.array([policy]))
-
-    default_agent = 0
-    tilemap = icland_params.world.tilemap
-    # get_camera_info = jax.jit(get_agent_camera_from_mjx)
-    frame_callback = lambda state: render_frame(
-        *get_agent_camera_from_mjx(state, width, default_agent),
-        tilemap,
-        view_width=96,
-        view_height=72,
-    )
-
-    print(f"Starting simulation: {video_name}")
-    frames = _simulate_frames(
-        key, icland_state, icland_params, duration, frame_callback, policy
-    )
-    print(f"Exporting video: {video_name} number of frame {len(frames)}")
-    imageio.mimsave(video_name, frames, fps=30, quality=8)
 
 
 def __combine_frames(
@@ -271,71 +239,6 @@ def render_video_multi_agent(
     imageio.mimsave(video_name, agent_frames, fps=FPS, quality=8)
 
 
-def render_video_from_world_with_policies(
-    key: jax.Array,
-    policies: list[jax.Array],
-    switch_intervals: list[float],
-    duration: int,
-    video_name: str,
-) -> None:
-    """Renders a video where the agent follows multiple policies sequentially.
-
-    The policy is switched at the times specified in `switch_intervals`.
-    """
-    print(f"Sampling world with key {key}")
-    width, height = 10, 10
-    config = icland.config(width, height, 6, 1, 0, 0)
-    icland_params = icland.sample(key)
-
-    icland_state = icland.init(icland_params)
-
-    mjx_data = icland_state.mjx_data
-    frames: list[Any] = []
-
-    current_policy_idx = 0
-    policy = policies[current_policy_idx]
-
-    print(f"Starting simulation: {video_name}")
-    last_printed_time = -0.1
-
-    default_agent = 0
-    max_world_width = width
-    get_camera_info = jax.jit(get_agent_camera_from_mjx)
-    frame_callback = lambda state: render_frame(
-        *get_camera_info(state, max_world_width, default_agent),
-        icland_params.world.tilemap,
-    )
-
-    # Setup policy switching using a closure.
-    current_policy_idx = 0
-    current_policy = policies[current_policy_idx]
-
-    def policy_switcher(time: float, current: jax.Array) -> jax.Array:
-        nonlocal current_policy_idx
-        if (
-            current_policy_idx < len(switch_intervals)
-            and time >= switch_intervals[current_policy_idx]
-        ):
-            current_policy_idx += 1
-            if current_policy_idx < len(policies):
-                print(f"Switching policy at {time:.1f}s")
-                return policies[current_policy_idx]
-        return current
-
-    print(f"Starting simulation: {video_name}")
-    frames = _simulate_frames(
-        key,
-        icland_state,
-        icland_params,
-        duration,
-        frame_callback,
-        current_policy,
-        policy_switcher=policy_switcher,
-    )
-
-    imageio.mimsave(video_name, frames, fps=30, quality=8)
-
-
 # ---------------------------------------------------------------------------
 # Main Execution
 # ---------------------------------------------------------------------------
@@ -352,23 +255,3 @@ if __name__ == "__main__":
             [FORWARD_POLICY, CLOCKWISE_POLICY, BACKWARD_POLICY, ANTI_CLOCKWISE_POLICY],
             f"tests/video_output/world_convex_ma_{k[1]}_mjx.mp4",
         )
-    # for i, preset in enumerate(SIMULATION_PRESETS):
-    #     print(f"Running preset {i + 1}/{len(SIMULATION_PRESETS)}: {preset['name']}")
-    #     render_video(
-    #         jax.random.PRNGKey(42),
-    #         preset["world"],
-    #         preset["policy"],
-    #         preset["duration"],
-    #         f"scripts/video_output/{preset['name']}.mp4",
-    #         agent_count=preset.get("agent_count", 1),
-    #     )
-    # for i, preset in enumerate(SIMULATION_PRESETS):
-    #     print(f"Running preset {i + 1}/{len(SIMULATION_PRESETS)}: {preset['name']}")
-    #     render_video(
-    #         jax.random.PRNGKey(42),
-    #         preset["world"],
-    #         preset["policy"],
-    #         preset["duration"],
-    #         f"tests/video_output/{preset['name']}.mp4",
-    #         agent_count=preset.get("agent_count", 1),
-    #     )

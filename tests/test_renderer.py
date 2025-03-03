@@ -8,6 +8,7 @@ import jax.numpy as jnp
 import icland.renderer.sdfs as Sdf
 from icland.presets import (
     TEST_FRAME,
+    TEST_FRAME_WITH_PROPS,
     TEST_TILEMAP_BUMP,
     TEST_TILEMAP_FLAT,
 )
@@ -69,7 +70,6 @@ def test_generate_colormap() -> None:
 
 def test_render_frame_with_objects() -> None:
     """Test if the render_frame_with_objects can correctly render one frame with props."""
-    key = jax.random.PRNGKey(42)
     players = RenderAgentInfo(jnp.array([[8.5, 3, 1]]), jnp.array([[1.0, 0.0, 1.0]]))
     props = RenderPropInfo(
         jnp.array([1]),
@@ -81,11 +81,16 @@ def test_render_frame_with_objects() -> None:
         jnp.array([0, 5.0, -10]),
         jnp.array([0, -0.5, 1.0]),
         TEST_TILEMAP_BUMP,
-        generate_colormap(key, 10, 10),
+        jnp.array([[[0, 1, 0] for _ in range(10)] for _ in range(10)]),
         players,
         props,
         view_width=10,
         view_height=10,
     )
-    # assert not jnp.any(jnp.isclose(frame[1:6, :5].flatten(), TEST_FRAME_WITH_PROPS[1:6, :5].flatten()))
-    assert True
+    assert (
+        jnp.linalg.norm(
+            frame[1:6, :5].flatten() - TEST_FRAME_WITH_PROPS[1:6, :5].flatten(),
+            ord=jnp.inf,
+        )
+        < 0.1
+    )
