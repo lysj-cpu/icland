@@ -7,7 +7,6 @@ import jax.numpy as jnp
 
 import icland.renderer.sdfs as Sdf
 from icland.presets import (
-    TEST_FRAME,
     TEST_FRAME_WITH_PROPS,
     TEST_TILEMAP_BUMP,
     TEST_TILEMAP_FLAT,

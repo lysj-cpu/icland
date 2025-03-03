@@ -740,4 +740,3 @@ def render(
     # )
 
     return frames
-
