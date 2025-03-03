@@ -583,77 +583,6 @@ def render_frame_with_objects(
 
 
 @partial(jax.jit, static_argnames=["view_width", "view_height"])
-def render_frame(
-    cam_pos: jax.Array,
-    cam_dir: jax.Array,
-    tilemap: jax.Array,
-    terrain_color: jax.Array = DEFAULT_COLOR,
-    light_dir: jax.Array = __normalize(jnp.array([5.0, 10.0, 5.0])),
-    view_width: int = DEFAULT_VIEWSIZE[0],
-    view_height: int = DEFAULT_VIEWSIZE[1],
-    # view_size: tuple[jnp.int32, jnp.int32] = DEFAULT_VIEWSIZE,
-) -> jax.Array:
-    """Renders one frame given camera position, direction, and world terrain."""
-    # Ray casting
-    ray_dir = __camera_rays(cam_pos, cam_dir, view_width, view_height, fx=0.6)
-    sdf = partial(scene_sdf_from_tilemap, tilemap)
-    sdf_dist_only = lambda p: sdf(p)[0]
-    hit_pos = jax.vmap(partial(__raycast, sdf_dist_only, cam_pos))(ray_dir)
-
-    # Shading
-    raw_normal = jax.vmap(jax.grad(sdf_dist_only))(hit_pos)
-    shadow = jax.vmap(partial(__cast_shadow, sdf_dist_only, light_dir))(hit_pos)
-    color_sdf = partial(
-        __scene_sdf_from_tilemap_color,
-        tilemap,
-        terrain_color=terrain_color,
-        with_color=True,
-    )
-    _, surf_color = jax.vmap(color_sdf)(hit_pos)
-
-    # Frame export
-    f = partial(__shade_f, light_dir=light_dir)
-    frame = jax.vmap(f)(surf_color, shadow, raw_normal, ray_dir)
-    frame = frame ** (1.0 / 2.2)  # gamma correction
-
-    return frame.reshape((view_height, view_width, NUM_CHANNELS))
-
-
-@jax.jit
-def get_agent_camera_from_mjx(
-    icland_state: ICLandState,
-    world_width: int,
-    body_id: int,
-) -> tuple[jax.Array, jax.Array]:
-    """Get the camera position and direction from the MuJoCo data."""
-    data = icland_state.pipeline_state.mjx_data
-    agent_id = icland_state.pipeline_state.component_ids[body_id, 0].astype(int)
-    pitch = icland_state.pipeline_state.component_ids[body_id, 3] * 0.5
-    dof_address = icland_state.pipeline_state.component_ids[body_id, 2].astype(int)
-
-    agent_pos = jnp.array(
-        [
-            -data.xpos[agent_id][0] + world_width,
-            data.xpos[agent_id][2],
-            data.xpos[agent_id][1],
-        ]
-    )
-
-    # Get yaw from the MuJoCo data
-    yaw = data.qpos[dof_address + body_id * 4 + 3]  # Get angle from dof address
-
-    # Compute forward direction using both yaw and pitch.
-    # When pitch=0, this reduces to [-cos(yaw), 0, sin(yaw)] as before.
-    forward_dir = jnp.array(
-        [-jnp.cos(pitch) * jnp.cos(yaw), jnp.sin(pitch), jnp.cos(pitch) * jnp.sin(yaw)]
-    )
-
-    camera_pos = agent_pos
-
-    return camera_pos, forward_dir
-
-
-@partial(jax.jit, static_argnames=["view_width", "view_height"])
 def render(
     agent_info: ICLandAgentInfo,
     agent_vars: ICLandAgentVariables,
@@ -1079,14 +1008,6 @@ if __name__ == "__main__":  # pragma: no cover
     )
 
     for i in range(24):
-        # f = render_frame(
-        # cam_pos=jnp.array([5.0, 10.0, -10.0 + (i * 10 / 72)]),
-        # cam_dir=jnp.array([0.0, -0.5, 1.0]),
-        # tilemap=tilemap,
-        # terrain_color=jnp.array([1.0, 0.0, 0.0]),
-        # view_width=256,
-        # view_height=144,
-        # )
         f = render_frame_with_objects(
             cam_pos=jnp.array([5.0, 10.0, -10.0 + (i * 10 / 72)]),
             cam_dir=jnp.array([0.0, -0.5, 1.0]),

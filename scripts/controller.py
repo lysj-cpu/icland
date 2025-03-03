@@ -17,10 +17,9 @@ This script is based on video_generator but instead of writing a video file, it 
 
 import os
 import sys
+from typing import Any
 
 import imageio
-
-from icland.renderer.renderer import get_agent_camera_from_mjx, render_frame
 
 # N.B. These need to be set before the mujoco imports.
 os.environ["MUJOCO_GL"] = "egl"
@@ -88,7 +87,7 @@ def interactive_simulation() -> None:
     cv2.namedWindow(window_name)
 
     frame_rate = 30
-    frames = []
+    frames: list[Any] = []
     controlling = 0
 
     # Create the renderer.
@@ -129,6 +128,8 @@ def interactive_simulation() -> None:
             if keyboard.is_pressed("0"):
                 controlling += 1
                 controlling = controlling % 2
+            if keyboard.is_pressed("2"):
+                new_policy += GRAB_AGENT_POLICY
 
             # Update the current policy if it has changed.
             if not jnp.array_equal(new_policy, current_policy):
@@ -191,18 +192,13 @@ def sdfr_interactive_simulation() -> None:
     # Take an initial step with the default (no-op) policy.
     current_policy = NOOP_POLICY
 
-    # Set up default agent and world width for camera parameters.
-    default_agent = 0
-    tilemap = icland_params.world.tilemap
-    max_world_width = tilemap.shape[1]
-
     # Set up an OpenCV window.
     window_name = "SDF Interactive Simulation"
     cv2.namedWindow(window_name)
     print("Starting SDF interactive simulation. Press 'q' to quit.")
 
     framerate = 30
-    frames = []
+    frames: list[Any] = []
 
     controlling = 0
     while True:
@@ -237,6 +233,8 @@ def sdfr_interactive_simulation() -> None:
         if keyboard.is_pressed("0"):
             controlling += 1
             controlling = controlling % 2
+        if keyboard.is_pressed("2"):
+            new_policy += GRAB_AGENT_POLICY
 
         # Update the current policy if it has changed.
         if not jnp.array_equal(new_policy, current_policy):

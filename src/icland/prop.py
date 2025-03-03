@@ -72,9 +72,40 @@ def step_props(
     prop_data: ICLandPropInfo,
     prop_variables: ICLandPropVariables,
 ) -> Any:
-    def compute_prop_force(owner_id, prop_body_id, time_of_grab, prop_dof_addr):
+    """Step the props in the physics environment.
+
+    Args:
+        mjx_data: The Mujoco data object.
+        mjx_model: The Mujoco model object.
+        agents_data: The agent data object.
+        agent_variables: The agent variables object.
+        prop_data: The prop data object.
+        prop_variables: The prop variables object.
+
+    Returns:
+        The updated Mujoco data object.
+    """
+
+    def compute_prop_force(
+        owner_id: jax.Array,
+        prop_body_id: jax.Array,
+        time_of_grab: jax.Array,
+        prop_dof_addr: jax.Array,
+    ) -> jax.Array:
+        """Compute the force applied to a prop.
+
+        Args:
+            owner_id: The ID of the agent holding the prop.
+            prop_body_id: The body ID of the prop.
+            time_of_grab: The time the prop was grabbed.
+            prop_dof_addr: The degree-of-freedom address of the prop.
+
+        Returns:
+            The force applied to the prop.
+        """
+
         # Compute the force if the prop is held (owner_id != -1)
-        def held_force():
+        def held_force() -> jax.Array:
             # The prop is held by an agent; use the agent's index (owner_id)
             agent_idx = owner_id
             # Get the agent's degree-of-freedom address and compute yaw from qpos.
@@ -112,11 +143,9 @@ def step_props(
             current_vel = jax.lax.dynamic_slice(mjx_data.qvel, (prop_dof_addr,), (3,))
             # PD controller gains.
             kp = 50.0
-            kd = 10000.0
+            kd = 15
             return (
-                kp * (ray_end - current_pos)
-                - kd * current_vel
-                + jnp.array([0, 0, 9.81])
+                kp * (ray_end - current_pos) - kd * current_vel + jnp.array([0, 0, 15])
             )
 
         is_held = jnp.logical_and(

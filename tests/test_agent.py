@@ -98,13 +98,13 @@ def test_agent_translation(
     body_id = icland_params.agent_info.body_ids[0]
 
     # Initial step (to apply data from model)
-    icland_state = icland.step(icland_state, icland_params, jnp.array(policy))
+    icland_state, obs, rew = icland.step(icland_state, icland_params, jnp.array(policy))
 
     # Get initial position, without height
     initial_pos = icland_state.mjx_data.xpos[body_id][:2]
 
     # Step the environment to update the agents velocty
-    icland_state = icland.step(icland_state, icland_params, jnp.array(policy))
+    icland_state, obs, rew = icland.step(icland_state, icland_params, jnp.array(policy))
 
     # Check if the correct velocity was applied
     velocity = icland_state.mjx_data.qvel[:2]
@@ -116,7 +116,9 @@ def test_agent_translation(
     )
 
     # Step the environment to update the agents position via the velocity
-    icland_state = icland.step(icland_state, icland_params, jnp.array(NOOP_POLICY))
+    icland_state, obs, rew = icland.step(
+        icland_state, icland_params, jnp.array(NOOP_POLICY)
+    )
     new_position = icland_state.mjx_data.xpos[body_id][:2]  # Get new position
 
     # Check if the agent moved in the expected direction
@@ -153,7 +155,7 @@ def test_agent_rotation(
     initial_orientation = icland_state.mjx_data.qpos[3]
 
     # Step the environment to update the agents angular velocity
-    icland_state = icland.step(icland_state, icland_params, jnp.array(policy))
+    icland_state, obs, rew = icland.step(icland_state, icland_params, jnp.array(policy))
 
     # Get new orientation
     new_orientation = icland_state.mjx_data.qpos[3]
@@ -179,11 +181,11 @@ def test_two_agents(key: jax.Array, name: str, policies: jnp.ndarray) -> None:
     # Create the ICLand environment
     icland_params = world(2)
     icland_state = icland.init(icland_params)
-    icland_state = icland.step(icland_state, icland_params, policies)
+    icland_state, obs, rew = icland.step(icland_state, icland_params, policies)
 
     # Simulate 2 seconds
     while icland_state.mjx_data.time < 0.5:
-        icland_state = icland.step(icland_state, icland_params, policies)
+        icland_state, obs, rew = icland.step(icland_state, icland_params, policies)
 
     # Get the positions of the two agents
     body_id_1, body_id_2 = icland_params.agent_info.body_ids
@@ -192,7 +194,7 @@ def test_two_agents(key: jax.Array, name: str, policies: jnp.ndarray) -> None:
 
     # Simulate one more second.
     while icland_state.mjx_data.time < 0.5:
-        icland_state = icland.step(
+        icland_state, obs, rew = icland.step(
             icland_state, icland_params, jnp.array([NOOP_POLICY, NOOP_POLICY])
         )
 

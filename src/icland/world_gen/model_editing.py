@@ -149,12 +149,12 @@ def generate_base_model(
     max_prop_count = max_cube_count + max_sphere_count
     if max_prop_count > 0:
         curr_ind = 0
-        for _ in range(max_sphere_count):
-            create_prop(curr_ind, jnp.zeros((3,)), spec, PropType.SPHERE)
-            curr_ind += 1
-
         for _ in range(max_cube_count):
             create_prop(curr_ind, jnp.zeros((3,)), spec, PropType.CUBE)
+            curr_ind += 1
+
+        for _ in range(max_sphere_count):
+            create_prop(curr_ind, jnp.zeros((3,)), spec, PropType.SPHERE)
             curr_ind += 1
     else:
         # Create empty placeholder prop.

@@ -7,7 +7,6 @@ import jax.numpy as jnp
 
 import icland.renderer.sdfs as Sdf
 from icland.presets import (
-    TEST_FRAME,
     TEST_TILEMAP_BUMP,
     TEST_TILEMAP_FLAT,
 )
@@ -44,18 +43,6 @@ def test_can_see_object() -> None:
         terrain_sdf=terrain_sdf_2,
     )
     assert not visible
-
-
-def test_render_frame() -> None:
-    """Tests if render_frame can correctly render one frame."""
-    frame = render_frame(
-        jnp.array([0, 5.0, -10]),
-        jnp.array([0, -0.5, 1.0]),
-        TEST_TILEMAP_BUMP,
-        view_width=10,
-        view_height=10,
-    )
-    assert jnp.linalg.norm(frame.flatten() - TEST_FRAME.flatten(), ord=1) < 5
 
 
 def test_generate_colormap() -> None:
