@@ -49,18 +49,18 @@ from icland.world_gen.model_editing import generate_base_model
 def interactive_simulation() -> None:
     """Runs an interactive simulation where you can change the agent's policy via keyboard input."""
     # Create the MuJoCo model from the .
-    icland_params = icland.sample(jax.random.PRNGKey(42))
-    tilemap = icland_params.world.tilemap
+
+    jax_key = jax.random.PRNGKey(0)
+    icland_params = icland.sample(jax_key)
     mjx_model, mj_model = generate_base_model(
-        tilemap.shape[0], tilemap.shape[1], 6, 1, 0, 0
+        icland.DEFAULT_CONFIG.max_world_width,
+        icland.DEFAULT_CONFIG.max_world_depth,
+        icland.DEFAULT_CONFIG.max_world_height,
+        icland.DEFAULT_CONFIG.max_agent_count,
+        icland.DEFAULT_CONFIG.max_sphere_count,
+        icland.DEFAULT_CONFIG.max_cube_count,
     )
 
-    # for field in mjx.Model.fields():
-    #     if field.type in [jax.Array, np.ndarray]:
-    #         value = getattr(mjx_model, field.name)
-    #         setattr(mj_model, field.name, value)
-
-    jax_key = jax.random.PRNGKey(42)
     icland_state = icland.init(icland_params)
 
     # Set up the camera.
@@ -89,6 +89,7 @@ def interactive_simulation() -> None:
 
     frame_rate = 30
     frames = []
+    controlling = 0
 
     # Create the renderer.
     with mujoco.Renderer(mj_model) as renderer:
@@ -123,6 +124,11 @@ def interactive_simulation() -> None:
                 new_policy += LOOK_UP_POLICY
             if keyboard.is_pressed("down"):
                 new_policy += LOOK_DOWN_POLICY
+            if keyboard.is_pressed("1"):
+                new_policy += TAG_AGENT_POLICY
+            if keyboard.is_pressed("0"):
+                controlling += 1
+                controlling = controlling % 2
 
             # Update the current policy if it has changed.
             if not jnp.array_equal(new_policy, current_policy):
@@ -130,9 +136,15 @@ def interactive_simulation() -> None:
                 print(f"Time {mjx_data.time:.2f}: {current_policy}")
 
             # Step the simulation using the current_policy.
-            icland_state, = icland.step(icland_state, icland_params, current_policy)
-            # (Optional) Update the JAX random key.
-            jax_key, _ = jax.random.split(jax_key)
+            icland_state, obs, rew = icland.step(
+                icland_state,
+                icland_params,
+                jnp.array(
+                    [current_policy, NOOP_POLICY]
+                    if controlling == 0
+                    else [NOOP_POLICY, current_policy]
+                ),
+            )
 
             # Get the latest simulation data.
             mjx_data = icland_state.mjx_data
@@ -162,24 +174,15 @@ def interactive_simulation() -> None:
 
     cv2.destroyWindow(window_name)
     print("Interactive simulation ended.")
-    print(f"Exporting video: {"controller.mp4"} number of frame {len(frames)}")
-    imageio.mimsave("scripts/video_output/controller.mp4", frames, fps=frame_rate, quality=8)
+    print(f"Exporting video: {'controller.mp4'} number of frame {len(frames)}")
+    imageio.mimsave(
+        "scripts/video_output/controller.mp4", frames, fps=frame_rate, quality=8
+    )
 
 
 def sdfr_interactive_simulation() -> None:
     """Runs an interactive SDF simulation using a generated world and SDF rendering."""
     # Set up the JAX random key.
-    jax_key = jax.random.PRNGKey(42)
-
-    # World configuration.
-    height, width = 10, 10
-
-    # Sample the world (we follow render_sdfr's approach).
-    # model = sample_world(height, width, 1000, jax_key, True, 1)
-    # Create a dummy tilemap (all zeros) as in render_sdfr.
-
-    # Create the MuJoCo model using an EMPTY_WORLD MJCF string.
-    # (Assumes EMPTY_WORLD is imported from icland.presets)
     jax_key = jax.random.PRNGKey(0)
     icland_params = icland.sample(jax_key)
 
@@ -201,8 +204,7 @@ def sdfr_interactive_simulation() -> None:
     framerate = 30
     frames = []
 
-    controlling = 0;
-
+    controlling = 0
     while True:
         # Process any pending OpenCV window events.
         cv2.waitKey(1)
@@ -242,7 +244,15 @@ def sdfr_interactive_simulation() -> None:
             print(f"Current policy updated: {current_policy}")
 
         # Step the simulation using the current policy.
-        icland_state, obs, _ = icland.step(icland_state, icland_params, jnp.array([current_policy, NOOP_POLICY] if controlling == 0 else [NOOP_POLICY, current_policy]))
+        icland_state, obs, _ = icland.step(
+            icland_state,
+            icland_params,
+            jnp.array(
+                [current_policy, NOOP_POLICY]
+                if controlling == 0
+                else [NOOP_POLICY, current_policy]
+            ),
+        )
 
         # Render the frame using the SDF rendering callback.
         frame = obs.render[controlling]
@@ -252,7 +262,7 @@ def sdfr_interactive_simulation() -> None:
         resized_frame = cv2.resize(frame, (960, 720), interpolation=cv2.INTER_NEAREST)
         # Convert the frame from RGB to BGR for OpenCV.
         frame_bgr = cv2.cvtColor(resized_frame, cv2.COLOR_RGB2BGR)
-        
+
         if len(frames) < icland_state.mjx_data.time * framerate:
             frames.append(frame_bgr)
 
@@ -260,8 +270,11 @@ def sdfr_interactive_simulation() -> None:
 
     cv2.destroyWindow(window_name)
     print("SDF interactive simulation ended.")
-    print(f"Exporting video: {"controller.mp4"} number of frame {len(frames)}")
-    imageio.mimsave("scripts/video_output/controller.mp4", frames, fps=framerate, quality=8)
+    print(f"Exporting video: {'controller.mp4'} number of frame {len(frames)}")
+    imageio.mimsave(
+        "scripts/video_output/controller.mp4", frames, fps=framerate, quality=8
+    )
+
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "-sdfr":

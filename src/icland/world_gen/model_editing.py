@@ -76,7 +76,10 @@ def generate_base_model(
 
     # Add the ground
     spec.worldbody.add_geom(
-        type=mujoco.mjtGeom.mjGEOM_PLANE, size=[0, 0, 0.01], rgba=[1, 1, 1, 1], material="default"
+        type=mujoco.mjtGeom.mjGEOM_PLANE,
+        size=[0, 0, 0.01],
+        rgba=[1, 1, 1, 1],
+        material="default",
     )
 
     # Add the walls

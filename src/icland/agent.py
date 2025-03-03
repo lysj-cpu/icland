@@ -10,6 +10,7 @@ import mujoco.mjx as mjx
 from .constants import *
 from .types import *
 
+
 @jax.jit
 def _agent_raycast(
     body_id: jax.Array,
@@ -38,7 +39,9 @@ def _agent_raycast(
     )
     ray_origin = mjx_data.xpos[body_id] + rotated_offset
     raycast = mjx.ray(mjx_model, mjx_data, ray_origin, ray_direction)
-    return jnp.where(jnp.logical_and(trigger, raycast[0] < AGENT_MAX_TAG_DISTANCE), raycast[1], -1)
+    return jnp.where(
+        jnp.logical_and(trigger, raycast[0] < AGENT_MAX_TAG_DISTANCE), raycast[1], -1
+    )
 
 
 def create_agent(
@@ -80,7 +83,11 @@ def create_agent(
 
     # This is just to make rotation visible.
     agent.add_geom(
-        type=mujoco.mjtGeom.mjGEOM_BOX, size=[0.05, 0.05, 0.05], pos=[0, 0, 0.2], mass=0, material="default"
+        type=mujoco.mjtGeom.mjGEOM_BOX,
+        size=[0.05, 0.05, 0.05],
+        pos=[0, 0, 0.2],
+        mass=0,
+        material="default",
     )
 
     return specification
@@ -91,9 +98,11 @@ def step_agents(
     mjx_data: Any,
     mjx_model: Any,
     actions: jax.Array,
-    agents_data: Any,
-    agent_variables: Any,
-) -> tuple[Any, jax.Array]:
+    agents_data: ICLandAgentInfo,
+    agent_variables: ICLandAgentVariables,
+    prop_data: ICLandPropInfo,
+    prop_variables: ICLandPropVariables,
+) -> tuple[Any, jax.Array, jax.Array]:
     """Update the agents in the physics environment based on the provided actions.
 
     Returns:
@@ -128,16 +137,57 @@ def step_agents(
         actions[:, 4],
     )
 
-    compute_index = lambda geom: jnp.argmax(agents_data.geom_ids == geom)
-    indices = jax.vmap(compute_index)(geom_raycasted_ids)
-    tagged_agent_geom_ids = jnp.where(jnp.isin(geom_raycasted_ids, agents_data.geom_ids), indices, -1)
+    compute_agent_index = lambda geom: jnp.argmax(agents_data.geom_ids == geom)
+    agent_indices = jax.vmap(compute_agent_index)(geom_raycasted_ids)
+    tagged_agent_geom_ids = jnp.where(
+        jnp.isin(geom_raycasted_ids, agents_data.geom_ids), agent_indices, -1
+    )
 
+    compute_prop_index = lambda geom: jnp.argmax(prop_data.geom_ids == geom)
+    prop_indices = jax.vmap(compute_prop_index)(geom_raycasted_ids)
+    tagged_prop_geom_ids = jnp.where(
+        jnp.isin(geom_raycasted_ids, prop_data.geom_ids), prop_indices, -1
+    )
 
+    # Define a loop body that iterates over each index in a.
+    def body_fun(i, b):
+        # Use lax.cond to update b only when a[i] is not -1.
+        b = jax.lax.cond(
+            tagged_prop_geom_ids[i] != -1,
+            lambda b: b.at[tagged_prop_geom_ids[i]].set(i),
+            lambda b: b,
+            b,
+        )
+        return b
+
+    # Update prop_owner for tagged props.
+    new_prop_owner = jax.lax.fori_loop(
+        0, tagged_prop_geom_ids.shape[0], body_fun, prop_variables.prop_owner
+    )
+
+    prop_variables = prop_variables.replace(
+        prop_owner=new_prop_owner,
+        time_of_grab=jnp.where(
+            new_prop_owner != prop_variables.prop_owner,
+            mjx_data.time,
+            prop_variables.time_of_grab,
+        ),
+    )
+
+    prop_variables = prop_variables.replace(
+        prop_owner=jnp.where(
+            prop_variables.time_of_grab + AGENT_GRAB_DURATION < mjx_data.time,
+            -1,
+            prop_variables.prop_owner,
+        ),
+    )
 
     # Update time_of_tag for agents that were tagged.
     agent_variables = agent_variables.replace(
         time_of_tag=jnp.where(
-            jnp.isin(jnp.arange(agent_variables.time_of_tag.shape[0]), tagged_agent_geom_ids),
+            jnp.isin(
+                jnp.arange(agent_variables.time_of_tag.shape[0]), tagged_agent_geom_ids
+            ),
             mjx_data.time,
             agent_variables.time_of_tag,
         )
@@ -149,10 +199,6 @@ def step_agents(
         dof: jax.Array,
         pitch: jax.Array,
         action: jax.Array,
-        time_of_tag: jax.Array,
-        contact_geom: jax.Array,
-        contact_frame: jax.Array,
-        contact_dist: jax.Array,
     ) -> tuple[
         Any,  # body_id
         Any,  # dof
@@ -229,17 +275,13 @@ def step_agents(
         return body_id, dof, new_angle, new_vel_2d, new_omega, force, new_pitch
 
     (body_ids, dofs, new_angles, new_vels, new_omegas, forces, new_pitches) = jax.vmap(
-        agent_update, in_axes=(0, 0, 0, 0, 0, 0, None, None, None)
+        agent_update, in_axes=(0, 0, 0, 0, 0)
     )(
         agents_data.body_ids,
         agents_data.geom_ids,
         agents_data.dof_addresses,
         agent_variables.pitch,
         actions,
-        agent_variables.time_of_tag,
-        contact_geom,
-        contact_frame,
-        contact_dist,
     )
 
     # Combine per-agent updates into new simulation arrays.
@@ -258,13 +300,19 @@ def step_agents(
     dof_indices = dofs[:, None] + jnp.arange(4)
 
     # Define masks:
-    freeze_mask = (agent_variables.time_of_tag != -AGENT_TAG_SECS_OUT) & (mjx_data.time < agent_variables.time_of_tag + AGENT_TAG_SECS_OUT)
-    resume_mask = (agent_variables.time_of_tag != -AGENT_TAG_SECS_OUT) & (mjx_data.time >= agent_variables.time_of_tag + AGENT_TAG_SECS_OUT)
+    freeze_mask = (agent_variables.time_of_tag != -AGENT_TAG_SECS_OUT) & (
+        mjx_data.time < agent_variables.time_of_tag + AGENT_TAG_SECS_OUT
+    )
+    resume_mask = (agent_variables.time_of_tag != -AGENT_TAG_SECS_OUT) & (
+        mjx_data.time >= agent_variables.time_of_tag + AGENT_TAG_SECS_OUT
+    )
 
     # Override qpos:
     current_pos = jnp.take(new_qpos, dof_indices)  # shape: (n_agents, 4)
     # For frozen agents, set to [0, 0, 0, 0]. For resumed agents, set to [1, 1, 1, 0].
-    resumed_override = jnp.concatenate([agents_data.spawn_points, agents_data.spawn_orientations[:, None]], axis=1)
+    resumed_override = jnp.concatenate(
+        [agents_data.spawn_points, agents_data.spawn_orientations[:, None]], axis=1
+    )
     frozen_override = resumed_override.at[:, 2].set(-10)
     override_pos = jnp.where(freeze_mask[:, None], frozen_override, current_pos)
     override_pos = jnp.where(resume_mask[:, None], resumed_override, override_pos)
@@ -272,7 +320,9 @@ def step_agents(
 
     # Override qvel: set the entire 4–component state to 0 for agents being frozen/resumed.
     current_vel = jnp.take(new_qvel, dof_indices)
-    override_vel = jnp.where((freeze_mask | resume_mask)[:, None], jnp.zeros((4,)), current_vel)
+    override_vel = jnp.where(
+        (freeze_mask | resume_mask)[:, None], jnp.zeros((4,)), current_vel
+    )
     new_qvel = new_qvel.at[dof_indices].set(override_vel)
 
     # Override applied forces for these agents (only the first 3 components).
@@ -285,10 +335,16 @@ def step_agents(
     new_xfrc_applied = new_xfrc_applied.at[body_ids, :3].set(forces_override)
 
     # For resumed agents, update the time_of_tag to -AGENT_TAG_SECS_OUT.
-    new_time_of_tag = jnp.where(resume_mask, -AGENT_TAG_SECS_OUT, agent_variables.time_of_tag)
+    new_time_of_tag = jnp.where(
+        resume_mask, -AGENT_TAG_SECS_OUT, agent_variables.time_of_tag
+    )
     new_agents_variables = ICLandAgentVariables(
         pitch=new_pitches,
         time_of_tag=new_time_of_tag,
+    )
+    new_prop_variables = ICLandPropVariables(
+        prop_owner=prop_variables.prop_owner,
+        time_of_grab=prop_variables.time_of_grab,
     )
 
     new_mjx_data = mjx_data.replace(
@@ -298,4 +354,4 @@ def step_agents(
         qfrc_applied=mjx_data.qfrc_applied,
     )
 
-    return new_mjx_data, new_agents_variables
+    return new_mjx_data, new_agents_variables, new_prop_variables

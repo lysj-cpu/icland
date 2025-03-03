@@ -7,6 +7,7 @@ from mujoco import mjx
 from icland.agent import step_agents
 from icland.constants import *
 from icland.presets import DEFAULT_VIEWSIZE
+from icland.prop import step_props
 from icland.renderer.renderer import generate_colormap, render, select_random_color
 from icland.types import *
 from icland.world_gen.converter import sample_spawn_points
@@ -51,12 +52,12 @@ def config(*args: int) -> ICLandConfig:
 
 # Default global configuration
 DEFAULT_CONFIG = config(
-    2,
-    2,
+    5,
+    5,
     6,
     2,
-    0,
-    0,
+    2,
+    2,
 )
 
 
@@ -233,13 +234,14 @@ def init(icland_params: ICLandParams) -> ICLandState:
     )
 
     prop_variables = ICLandPropVariables(
-        prop_owner=jnp.zeros((max_prop_count,), dtype="int32"),
+        prop_owner=-jnp.ones((max_prop_count,), dtype="int32"),
+        time_of_grab=jnp.full((max_prop_count,), -AGENT_GRAB_DURATION, dtype="float32"),
     )
 
     return ICLandState(
         mjx_data=mjx.make_data(icland_params.mjx_model),
         agent_variables=agent_variables,
-        prop_variables=prop_variables
+        prop_variables=prop_variables,
     )
 
 
@@ -284,41 +286,56 @@ def step(
     # Ensure parameters are in correct shape
     action_batch = action_batch.reshape(-1, ACTION_SPACE_DIM)
 
-
     def physics_step(carry, _):
-        mjx_data, agent_variables = carry
+        mjx_data, agent_variables, prop_variables = carry
         # Step through each agent
-        mjx_data, agent_variables = step_agents(mjx_data, mjx_model, action_batch, agent_info, agent_variables)
+        mjx_data, agent_variables, prop_variables = step_agents(
+            mjx_data,
+            mjx_model,
+            action_batch,
+            agent_info,
+            agent_variables,
+            prop_info,
+            prop_variables,
+        )
+        # Steo through props
+        mjx_data = step_props(
+            mjx_data, mjx_model, agent_info, agent_variables, prop_info, prop_variables
+        )
         # Update state
         mjx_data = mjx.step(params.mjx_model, mjx_data)
-        return (mjx_data, agent_variables), None
+        return (mjx_data, agent_variables, prop_variables), None
 
     # Scan over 5 iterations; we ignore the output per iteration (_)
-    (mjx_data, agent_variables), _ = jax.lax.scan(physics_step, (mjx_data, agent_variables), None, length=PHYS_PER_CTRL_STEP)
-    
+    (mjx_data, agent_variables, prop_variables), _ = jax.lax.scan(
+        physics_step,
+        (mjx_data, agent_variables, prop_variables),
+        None,
+        length=PHYS_PER_CTRL_STEP,
+    )
+
     # Evaluate reward function
     reward = jnp.zeros(
         (agent_info.spawn_points.shape[0],)
     )  # params.reward_function(state)
 
     # Update observation and render frames
-    # Do not render every step, only once every SPS / FPS steps.
     frames = render(
-            agent_info,
-            agent_variables,
-            prop_info,
-            prop_variables,
-            world,
-            mjx_data,
-        )
-    
+        agent_info,
+        agent_variables,
+        prop_info,
+        prop_variables,
+        world,
+        mjx_data,
+    )
+
     # TODO: Update prop vars as well
     observation = ICLandObservation(frames, 0)
 
     new_icland_state = ICLandState(
         mjx_data=mjx_data,
         agent_variables=agent_variables,
-        prop_variables=prop_variables
+        prop_variables=prop_variables,
     )
 
     return new_icland_state, observation, reward

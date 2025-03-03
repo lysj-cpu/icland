@@ -752,7 +752,7 @@ def render(
             agent_pos = jnp.array(
                 [
                     -mjx_data.xpos[body_id][0] + max_world_width,
-                    mjx_data.xpos[body_id][2]+ AGENT_HEIGHT / 2,
+                    mjx_data.xpos[body_id][2] + AGENT_HEIGHT / 2,
                     mjx_data.xpos[body_id][1],
                 ]
             )
