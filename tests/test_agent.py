@@ -21,7 +21,7 @@ def world(num_agents: int) -> ICLandParams:
     """Helper function to provide a consistent world for tests."""
     WORLD_WIDTH = 10
     WORLD_DEPTH = 10
-    WORLD_HEIGHT = 6
+    WORLD_HEIGHT = 0
     MAX_AGENT_COUNT = num_agents
     MAX_SPHERE_COUNT = 0
     MAX_CUBE_COUNT = 0
