@@ -71,7 +71,7 @@ def world(num_agents: int):
         reward_function=None,
         mjx_model=mjx_model,
     )
-    return icland_params, mj_model
+    return icland_params
 
 
 @pytest.mark.parametrize(
