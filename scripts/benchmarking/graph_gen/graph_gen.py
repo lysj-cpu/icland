@@ -230,29 +230,34 @@ def plot_cpu_gpu_step_graph(output_dir: str, y_axis: str, log: bool) -> None:
 
     plt.legend(handles=legend_elements, loc='upper left')
 
-    # # Special points
-    # for x_val, pu in special_points:
-    #     if pu == "cpu":
-    #         y_val = cpu_steps[batch_sizes.index(x_val)]
-    #         opp_y_val = gpu_steps[batch_sizes.index(x_val)]
-    #         color = "blue"
-    #     elif pu == "gpu":
-    #         y_val = gpu_steps[batch_sizes.index(x_val)]
-    #         opp_y_val = cpu_steps[batch_sizes.index(x_val)]
-    #         color = "green"
-    #     else:
-    #         raise ValueError(f"Invalid value for pu: {pu}")
+    # special_points = [(1, "gpu"), (2**9, "cpu"), (2**9, "gpu"), (2048, "gpu"), (16384, "gpu")]
+    special_points = [(1, "cpu"), (1, "gpu"), (2**10, "cpu"), (2**10, "gpu"), (16384, "gpu")]
+    # Special points
+    for x_val, pu in special_points:
+        if pu == "cpu":
+            y_val = cpu_non_empty_world_steps[cpu_non_empty_world_batch_sizes.index(x_val)]
+            opp_y_val = gpu_non_empty_world_steps[gpu_non_empty_world_batch_sizes.index(x_val)]
+            color = "blue"
+        elif pu == "gpu":
+            y_val = gpu_non_empty_world_steps[gpu_non_empty_world_batch_sizes.index(x_val)]
+            if (x_val not in cpu_non_empty_world_batch_sizes):
+               opp_y_val = 0
+            else:
+              opp_y_val = cpu_non_empty_world_steps[cpu_non_empty_world_batch_sizes.index(x_val)]
+            color = "green"
+        else:
+            raise ValueError(f"Invalid value for pu: {pu}")
 
-    #     plt.annotate(
-    #         round_to_sig_figs(y_val), 
-    #         (x_val, y_val), 
-    #         textcoords="offset points",
-    #         xytext=(0, 10) if y_val >= opp_y_val else (0, -20),
-    #         ha="center", 
-    #         fontsize=10,
-    #         color=color,
-    #         bbox=dict(boxstyle="round,pad=0.3", edgecolor=color, facecolor="white")
-    #     )
+        plt.annotate(
+            round_to_sig_figs(y_val), 
+            (x_val, y_val), 
+            textcoords="offset points",
+            xytext=(0, 10) if y_val >= opp_y_val else (0, -15),
+            ha="center", 
+            fontsize=9,
+            color=color,
+            bbox=dict(boxstyle="round,pad=0.3", edgecolor=color, facecolor="white")
+        )
 
     if log:
         plt.xscale("log", base=2)
@@ -457,16 +462,121 @@ def plot_agents_step_graph(output_dir: str, y_axis: str, log: bool) -> None:
 
     plt.legend(handles=legend_elements, loc='upper left')
 
+    # special_points = [(1, "1"), (1, "2"), (1, "4"), (2**11, "1"), (2**11, "2"), (2**8, "4"), (2**14, "1"), (2**13, "2"), (2**13, "4")]
+    special_points = []
+
+    # Special points
+    for x_val, pu in special_points:
+        if pu == "1":
+            y_val = gpu_1_agent_non_empty_world_steps[gpu_1_agent_non_empty_world_batch_sizes.index(x_val)]
+            color = "red"
+        elif pu == "2":
+            y_val = gpu_2_agents_non_empty_world_steps[gpu_2_agents_non_empty_world_batch_sizes.index(x_val)]
+            color = "green"
+        elif pu == "4":
+            y_val = gpu_4_agents_non_empty_world_steps[gpu_4_agents_non_empty_world_batch_sizes.index(x_val)]
+            color = "blue"
+        else:
+            raise ValueError(f"Invalid value for pu: {pu}")
+
+        plt.annotate(
+            round_to_sig_figs(y_val), 
+            (x_val, y_val), 
+            textcoords="offset points",
+            xytext=(0, 10) if pu == "4" else (0, -15),
+            ha="center", 
+            fontsize=8,
+            color=color,
+            bbox=dict(boxstyle="round,pad=0.3", edgecolor=color, facecolor="white")
+        )
+
+    if log:
+        plt.xscale("log", base=2)
+    plt.xlabel("Batch Size")
+    if (y_axis == "time"):
+      plt.ylabel("Total time (in s)")
+      plt.title(f"Total time (100 steps) vs Batch Size ({scenario_name})")
+      plot_path = os.path.join(
+          output_dir, f"{scenario_name}_total-time.png"
+      )
+    else:
+      plt.ylabel(f"Total steps per second")
+      plt.title(f"Total Steps per Second (100 steps) vs Batch Size ({scenario_name})")
+      plot_path = os.path.join(
+        output_dir, f"{scenario_name}_total-steps-per-sec.png"
+      )
+
+    plt.grid(True)
+    plt.savefig(plot_path, bbox_inches="tight")
+    plt.close()
+
+def plot_grid_sizes_step_graph(output_dir: str, y_axis: str, log: bool) -> None:
+    os.makedirs(output_dir, exist_ok=True)
+
+    input_dir = "scripts/benchmarking/graph_gen/jsons"
+    gpu_2x2_world_json = "step_gpu_1_agent_simple_non_empty_world_100_steps.json"
+    gpu_4x4_world_json = "step_gpu_1_agent_simple_non_empty_world_4x4_100_steps.json"
+    gpu_8x8_world_json = "step_gpu_1_agent_simple_non_empty_world_8x8_100_steps.json"
+
+    gpu_2x2_world_json = os.path.join(input_dir, gpu_2x2_world_json)
+    gpu_4x4_world_json = os.path.join(input_dir, gpu_4x4_world_json)
+    gpu_8x8_world_json = os.path.join(input_dir, gpu_8x8_world_json)
+    # gpu_1_agent_empty_world_json = os.path.join(input_dir, gpu_1_agent_empty_world_json)
+    # gpu_2_agents_empty_world_json = os.path.join(input_dir, gpu_2_agents_empty_world_json)
+    # gpu_4_agents_empty_world_json = os.path.join(input_dir, gpu_4_agents_empty_world_json)
+
+    with open(gpu_2x2_world_json, "r") as file:
+        gpu_2x2_world_data = json.load(file)
+    with open(gpu_4x4_world_json, "r") as file:
+        gpu_4x4_world_data = json.load(file)
+    with open(gpu_8x8_world_json, "r") as file:
+        gpu_8x8_world_data = json.load(file)
+
+    gpu_2x2_world_results = gpu_2x2_world_data['benchmark_results']
+    gpu_4x4_world_results = gpu_4x4_world_data['benchmark_results']
+    gpu_8x8_world_results = gpu_8x8_world_data['benchmark_results']
+
+    # Assume that there is only one scenario in both json files
+    _, gpu_2x2_world_metrics_list = list(gpu_2x2_world_results.items())[0]
+    _, gpu_4x4_world_metrics_list = list(gpu_4x4_world_results.items())[0]
+    scenario_name, gpu_8x8_world_metrics_list = list(gpu_8x8_world_results.items())[0]
+
+    gpu_2x2_world_batch_sizes = [m['batch_size'] for m in gpu_2x2_world_metrics_list]
+    gpu_4x4_world_batch_sizes = [m['batch_size'] for m in gpu_4x4_world_metrics_list]
+    gpu_8x8_world_batch_sizes = [m['batch_size'] for m in gpu_8x8_world_metrics_list]
+
+    if y_axis == "time":
+      gpu_2x2_world_steps = [m['total_time'] for m in gpu_2x2_world_metrics_list]
+      gpu_4x4_world_steps = [m['total_time'] for m in gpu_4x4_world_metrics_list]
+      gpu_8x8_world_steps = [m['total_time'] for m in gpu_8x8_world_metrics_list]
+    elif y_axis == "steps":
+      gpu_2x2_world_steps = [m['num_steps'] * m['batch_size'] / m['total_time'] for m in gpu_2x2_world_metrics_list]
+      gpu_4x4_world_steps = [m['num_steps'] * m['batch_size'] / m['total_time'] for m in gpu_4x4_world_metrics_list]
+      gpu_8x8_world_steps = [m['num_steps'] * m['batch_size'] / m['total_time'] for m in gpu_8x8_world_metrics_list]
+    else:
+      raise ValueError(f"Invalid value for y_axis: {y_axis}")
+
+    plt.figure()
+    plt.plot(gpu_2x2_world_batch_sizes, gpu_2x2_world_steps, color="red", marker="x", label="2x2 world")
+    plt.plot(gpu_4x4_world_batch_sizes, gpu_4x4_world_steps, color="green", marker="o", label="4x4 world")
+    plt.plot(gpu_8x8_world_batch_sizes, gpu_8x8_world_steps, color="blue", marker="s", label="8x8 world")
+
+    plt.legend(loc='upper left')
+
+    # special_points = [(1, "1"), (1, "2"), (1, "4"), (2**11, "1"), (2**11, "2"), (2**8, "4"), (2**14, "1"), (2**13, "2"), (2**13, "4")]
+    special_points = []
+
     # # Special points
     # for x_val, pu in special_points:
-    #     if pu == "cpu":
-    #         y_val = cpu_steps[batch_sizes.index(x_val)]
-    #         opp_y_val = gpu_steps[batch_sizes.index(x_val)]
-    #         color = "blue"
-    #     elif pu == "gpu":
-    #         y_val = gpu_steps[batch_sizes.index(x_val)]
-    #         opp_y_val = cpu_steps[batch_sizes.index(x_val)]
+    #     if pu == "1":
+    #         y_val = gpu_1_agent_non_empty_world_steps[gpu_1_agent_non_empty_world_batch_sizes.index(x_val)]
+    #         color = "red"
+    #     elif pu == "2":
+    #         y_val = gpu_2_agents_non_empty_world_steps[gpu_2_agents_non_empty_world_batch_sizes.index(x_val)]
     #         color = "green"
+    #     elif pu == "4":
+    #         y_val = gpu_4_agents_non_empty_world_steps[gpu_4_agents_non_empty_world_batch_sizes.index(x_val)]
+    #         color = "blue"
     #     else:
     #         raise ValueError(f"Invalid value for pu: {pu}")
 
@@ -474,9 +584,9 @@ def plot_agents_step_graph(output_dir: str, y_axis: str, log: bool) -> None:
     #         round_to_sig_figs(y_val), 
     #         (x_val, y_val), 
     #         textcoords="offset points",
-    #         xytext=(0, 10) if y_val >= opp_y_val else (0, -20),
+    #         xytext=(0, 10) if pu == "4" else (0, -15),
     #         ha="center", 
-    #         fontsize=10,
+    #         fontsize=8,
     #         color=color,
     #         bbox=dict(boxstyle="round,pad=0.3", edgecolor=color, facecolor="white")
     #     )
@@ -500,7 +610,7 @@ def plot_agents_step_graph(output_dir: str, y_axis: str, log: bool) -> None:
     plt.grid(True)
     plt.savefig(plot_path, bbox_inches="tight")
     plt.close()
-
+   
 if __name__ == "__main__":
   # plot_simple_step_graph(
   #   "scripts/benchmarking/graph_gen/graphs", 
@@ -514,7 +624,7 @@ if __name__ == "__main__":
   #   "scripts/benchmarking/graph_gen/graphs", 
   #   True
   # )
-  plot_agents_step_graph(
+  plot_grid_sizes_step_graph(
     "scripts/benchmarking/graph_gen/graphs", 
     "steps",
     True
