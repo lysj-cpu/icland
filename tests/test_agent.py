@@ -17,7 +17,7 @@ def key() -> jax.Array:
     return jax.random.PRNGKey(42)
 
 
-def world(num_agents: int):
+def world(num_agents: int) -> ICLandParams:
     """Helper function to provide a consistent world for tests."""
     WORLD_WIDTH = 10
     WORLD_DEPTH = 10
