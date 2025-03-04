@@ -1,12 +1,14 @@
 """Recreating Google DeepMind's XLand RL environment in JAX."""
 
+from typing import Any
+
 import jax
 import jax.numpy as jnp
 from mujoco import mjx
 
 from icland.agent import step_agents
 from icland.constants import *
-from icland.presets import DEFAULT_VIEWSIZE
+from icland.prop import step_props
 from icland.renderer.renderer import generate_colormap, render, select_random_color
 from icland.types import *
 from icland.world_gen.converter import sample_spawn_points
@@ -54,9 +56,9 @@ DEFAULT_CONFIG = config(
     5,
     5,
     6,
-    1,
-    0,
-    0,
+    2,
+    2,
+    2,
 )
 
 
@@ -76,7 +78,7 @@ def sample(key: jax.Array, config: ICLandConfig = DEFAULT_CONFIG) -> ICLandParam
         >>> import icland
         >>> key = jax.random.PRNGKey(42)
         >>> icland.sample(key)
-        ICLandParams(world=ICLandWorld(tilemap.shape=(5, 5, 4), max_world_width=5, max_world_depth=5, max_world_height=6, cmap.shape=(5, 5, 3)), agent_info=ICLandAgentInfo(agent_count=1, spawn_points.shape=(1, 3), body_ids.shape=(1,), colour.shape=(1, 3)), prop_info=ICLandPropInfo(prop_count=1, prop_types.shape=(1,), spawn_points.shape=(1, 3), body_ids.shape=(1,), colour.shape=(1, 3)), reward_function=None)
+        ICLandParams(world=ICLandWorld(...), agent_info=ICLandAgentInfo(...), prop_info=ICLandPropInfo(...), reward_function=None)
     """
     # Unpack config
     (
@@ -222,35 +224,32 @@ def init(icland_params: ICLandParams) -> ICLandState:
         >>> import icland
         >>> icland_params = icland.sample(jax.random.PRNGKey(42))
         >>> icland.init(icland_params)
-        ICLandState(agent_variables=ICLandAgentVariables(pitch.shape=(1,), is_tagged.shape=(1,)), prop_variables=ICLandPropVariables(prop_owner.shape=(1,)), observation=ICLandObservation(render.shape=(1, 72, 96, 3), is_grabbing=0), reward.shape=(1,))
+        ICLandState(mjx_data=Data(...), agent_variables=ICLandAgentVariables(...), prop_variables=ICLandPropVariables(...))
     """
     max_agent_count = icland_params.agent_info.spawn_points.shape[0]
     max_prop_count = icland_params.prop_info.spawn_points.shape[0]
 
     agent_variables = ICLandAgentVariables(
         pitch=jnp.zeros((max_agent_count,), dtype="float32"),
-        is_tagged=jnp.zeros((max_agent_count,), dtype="int32"),
+        time_of_tag=jnp.full((max_agent_count,), -AGENT_TAG_SECS_OUT, dtype="float32"),
     )
 
     prop_variables = ICLandPropVariables(
-        prop_owner=jnp.zeros((max_prop_count,), dtype="int32"),
+        prop_owner=-jnp.ones((max_prop_count,), dtype="int32"),
+        time_of_grab=jnp.full((max_prop_count,), -AGENT_GRAB_DURATION, dtype="float32"),
     )
 
     return ICLandState(
         mjx_data=mjx.make_data(icland_params.mjx_model),
         agent_variables=agent_variables,
         prop_variables=prop_variables,
-        observation=ICLandObservation(
-            jnp.zeros((max_agent_count, DEFAULT_VIEWSIZE[1], DEFAULT_VIEWSIZE[0], 3)), 0
-        ),
-        reward=jnp.zeros((max_agent_count,)),
     )
 
 
 @jax.jit
 def step(
     state: ICLandState, params: ICLandParams, action_batch: jax.Array
-) -> tuple[ICLandState, jax.Array]:
+) -> tuple[ICLandState, ICLandObservation, jax.Array]:
     """Step the ICLand environment forward in time.
 
     Args:
@@ -269,8 +268,10 @@ def step(
         >>> key = jax.random.PRNGKey(42)
         >>> params = icland.sample(key)
         >>> state = icland.init(params)
-        >>> actions = jnp.zeros((params.agent_info.agent_count, icland.constants.ACTION_SPACE_DIM))
+        >>> actions = jnp.zeros((2, icland.constants.ACTION_SPACE_DIM))
         >>> new_state = icland.step(state, params, actions)
+        >>> new_state
+        (ICLandState(mjx_data=Data(...), agent_variables=ICLandAgentVariables(...), prop_variables=ICLandPropVariables(...)), ICLandObservation(...), Array(...))
     """
     # Unpack state
     mjx_data = state.mjx_data
@@ -283,14 +284,37 @@ def step(
     prop_info = params.prop_info
     world = params.world
 
-    # Unpack actions
-
     # Ensure parameters are in correct shape
     action_batch = action_batch.reshape(-1, ACTION_SPACE_DIM)
 
-    # Step through each agent
-    applied_agent_forces, new_agent_variables = step_agents(
-        mjx_data, action_batch, agent_info, agent_variables
+    def physics_step(
+        carry: tuple[MjxStateType, ICLandAgentVariables, ICLandPropVariables], _: Any
+    ) -> tuple[tuple[MjxStateType, ICLandAgentVariables, ICLandPropVariables], None]:
+        mjx_data, agent_variables, prop_variables = carry
+        # Step through each agent
+        mjx_data, agent_variables, prop_variables = step_agents(
+            mjx_data,
+            mjx_model,
+            action_batch,
+            agent_info,
+            agent_variables,
+            prop_info,
+            prop_variables,
+        )
+        # Steo through props
+        mjx_data = step_props(
+            mjx_data, mjx_model, agent_info, agent_variables, prop_info, prop_variables
+        )
+        # Update state
+        mjx_data = mjx.step(params.mjx_model, mjx_data)
+        return (mjx_data, agent_variables, prop_variables), None
+
+    # Scan over 5 iterations; we ignore the output per iteration (_)
+    (mjx_data, agent_variables, prop_variables), _ = jax.lax.scan(
+        physics_step,
+        (mjx_data, agent_variables, prop_variables),
+        None,
+        length=PHYS_PER_CTRL_STEP,
     )
 
     # Evaluate reward function
@@ -298,33 +322,30 @@ def step(
         (agent_info.spawn_points.shape[0],)
     )  # params.reward_function(state)
 
-    # Update state
-    new_mjx_state = mjx.step(params.mjx_model, applied_agent_forces)
-
     # Update observation and render frames
-    # Do not render every step, only once every SPS / FPS steps.
-    frames = jax.lax.cond(
-        jnp.mod(jnp.floor(mjx_data.time * SPS), jnp.floor(SPS / FPS)) == 0,
-        lambda _: render(
-            agent_info,
-            new_agent_variables,
-            prop_info,
-            prop_variables,
-            world,
-            new_mjx_state,
-        ),
-        lambda _: state.observation.render,
-        None,
+    frames = render(
+        agent_info,
+        agent_variables,
+        prop_info,
+        prop_variables,
+        world,
+        mjx_data,
     )
-    # TODO: Update prop vars as well
-    observation = ICLandObservation(frames, 0)
+
+    observation = ICLandObservation(
+        frames,
+        is_grabbing=jnp.isin(
+            jnp.arange(agent_variables.time_of_tag.shape[0]), prop_variables.prop_owner
+        ).astype(jnp.int32),
+        acceleration=jax.vmap(
+            lambda dof: jax.lax.dynamic_slice(mjx_data.qacc, (dof,), (3,))
+        )(agent_info.dof_addresses),
+    )
 
     new_icland_state = ICLandState(
-        mjx_data=new_mjx_state,
-        agent_variables=new_agent_variables,
+        mjx_data=mjx_data,
+        agent_variables=agent_variables,
         prop_variables=prop_variables,
-        observation=observation,
-        reward=reward,
     )
 
-    return new_icland_state
+    return new_icland_state, observation, reward

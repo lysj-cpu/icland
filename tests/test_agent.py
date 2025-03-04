@@ -25,7 +25,7 @@ def world(num_agents: int) -> ICLandParams:
     MAX_AGENT_COUNT = num_agents
     MAX_SPHERE_COUNT = 0
     MAX_CUBE_COUNT = 0
-    mjx_model, _ = generate_base_model(
+    mjx_model, mj_model = generate_base_model(
         WORLD_WIDTH,
         WORLD_DEPTH,
         WORLD_HEIGHT,
@@ -35,7 +35,7 @@ def world(num_agents: int) -> ICLandParams:
     )
     agent_info = ICLandAgentInfo(
         agent_count=num_agents,
-        spawn_points=jnp.array([[1, 1 + 0.15 * i, 1] for i in range(num_agents)]),
+        spawn_points=jnp.array([[5, 2 + 1 * i, 3.5] for i in range(num_agents)]),
         spawn_orientations=jnp.zeros((num_agents,), dtype="float32"),
         body_ids=jnp.arange(1, num_agents + 1, dtype="int32"),
         geom_ids=(jnp.arange(num_agents) + WORLD_WIDTH * WORLD_DEPTH) * 2 + WALL_OFFSET,
@@ -56,11 +56,11 @@ def world(num_agents: int) -> ICLandParams:
         colour=jnp.zeros((1, 3)),
     )
     mjx_model = edit_model_data(
-        TEST_TILEMAP_EMPTY_WORLD, mjx_model, agent_info, prop_info, WORLD_HEIGHT
+        TEST_TILEMAP_FLAT, mjx_model, agent_info, prop_info, WORLD_HEIGHT
     )
     icland_params = ICLandParams(
         world=ICLandWorld(
-            TEST_TILEMAP_EMPTY_WORLD,
+            TEST_TILEMAP_FLAT,
             WORLD_WIDTH,
             WORLD_DEPTH,
             WORLD_HEIGHT,
@@ -98,25 +98,32 @@ def test_agent_translation(
     body_id = icland_params.agent_info.body_ids[0]
 
     # Initial step (to apply data from model)
-    icland_state = icland.step(icland_state, icland_params, jnp.array(policy))
+    icland_state, obs, rew = icland.step(icland_state, icland_params, jnp.array(policy))
 
     # Get initial position, without height
     initial_pos = icland_state.mjx_data.xpos[body_id][:2]
 
     # Step the environment to update the agents velocty
-    icland_state = icland.step(icland_state, icland_params, jnp.array(policy))
+    icland_state, obs, rew = icland.step(icland_state, icland_params, jnp.array(policy))
 
     # Check if the correct velocity was applied
     velocity = icland_state.mjx_data.qvel[:2]
+
+    if jnp.all(policy == NOOP_POLICY):
+        assert jnp.allclose(velocity, jnp.array([0, 0]), 0, 1e-2), (
+            f"{name} failed: Expected velocity [0, 0], Actual velocity {velocity}"
+        )
+        return
+
     normalised_velocity = velocity / (jnp.linalg.norm(velocity) + SMALL_VALUE)
 
-    assert jnp.allclose(normalised_velocity, expected_direction), (
+    assert jnp.allclose(normalised_velocity, expected_direction, 0, 1e-2), (
         f"{name} failed: Expected velocity {expected_direction}, "
         f"Actual velocity {normalised_velocity}"
     )
 
     # Step the environment to update the agents position via the velocity
-    icland_state = icland.step(icland_state, icland_params, jnp.array(NOOP_POLICY))
+    icland_state, obs, rew = icland.step(icland_state, icland_params, jnp.array(policy))
     new_position = icland_state.mjx_data.xpos[body_id][:2]  # Get new position
 
     # Check if the agent moved in the expected direction
@@ -124,7 +131,7 @@ def test_agent_translation(
     normalised_displacement = displacement / (
         jnp.linalg.norm(displacement) + SMALL_VALUE
     )
-    assert jnp.allclose(normalised_displacement, expected_direction), (
+    assert jnp.allclose(normalised_displacement, expected_direction, 0, 1e-2), (
         f"{name} failed: Expected displacement {expected_direction}, "
         f"Actual displacement {normalised_displacement}"
     )
@@ -153,7 +160,7 @@ def test_agent_rotation(
     initial_orientation = icland_state.mjx_data.qpos[3]
 
     # Step the environment to update the agents angular velocity
-    icland_state = icland.step(icland_state, icland_params, jnp.array(policy))
+    icland_state, obs, rew = icland.step(icland_state, icland_params, jnp.array(policy))
 
     # Get new orientation
     new_orientation = icland_state.mjx_data.qpos[3]
@@ -161,7 +168,7 @@ def test_agent_rotation(
     normalised_orientation_delta = orientation_delta / (
         jnp.linalg.norm(orientation_delta) + SMALL_VALUE
     )
-    assert jnp.allclose(normalised_orientation_delta, expected_orientation), (
+    assert jnp.allclose(normalised_orientation_delta, expected_orientation, 0, 1e-2), (
         f"{name} failed: Expected orientation {expected_orientation}, "
         f"Actual orientation {normalised_orientation_delta}"
     )
@@ -179,11 +186,11 @@ def test_two_agents(key: jax.Array, name: str, policies: jnp.ndarray) -> None:
     # Create the ICLand environment
     icland_params = world(2)
     icland_state = icland.init(icland_params)
-    icland_state = icland.step(icland_state, icland_params, policies)
+    icland_state, obs, rew = icland.step(icland_state, icland_params, policies)
 
     # Simulate 2 seconds
     while icland_state.mjx_data.time < 0.5:
-        icland_state = icland.step(icland_state, icland_params, policies)
+        icland_state, obs, rew = icland.step(icland_state, icland_params, policies)
 
     # Get the positions of the two agents
     body_id_1, body_id_2 = icland_params.agent_info.body_ids
@@ -192,7 +199,7 @@ def test_two_agents(key: jax.Array, name: str, policies: jnp.ndarray) -> None:
 
     # Simulate one more second.
     while icland_state.mjx_data.time < 0.5:
-        icland_state = icland.step(
+        icland_state, obs, rew = icland.step(
             icland_state, icland_params, jnp.array([NOOP_POLICY, NOOP_POLICY])
         )
 

@@ -191,19 +191,19 @@ class ICLandAgentVariables(PyTreeNode):  # type: ignore[misc]
 
     Attributes:
         pitch: Pitch angle of each agent, shape (max_agent_count,).
-        is_tagged: Tag status of each agent (1=tagged, 0=not tagged), shape (max_agent_count,).
+        time_of_tag: Tag status of each agent (1=tagged, 0=not tagged), shape (max_agent_count,).
     """
 
     pitch: jax.Array  # Shape (max_agent_count, )
-    is_tagged: jax.Array  # Shape (max_agent_count, )
+    time_of_tag: jax.Array  # Shape (max_agent_count, )
 
     def __repr__(self) -> str:
         """Return a string representation of the ICLandAgentVariables object.
 
         Returns:
-            A string with the pitch and is_tagged array shapes.
+            A string with the pitch and time_of_tag array shapes.
         """
-        return f"ICLandAgentVariables(pitch.shape={self.pitch.shape}, is_tagged.shape={self.is_tagged.shape})"
+        return f"ICLandAgentVariables(pitch.shape={self.pitch.shape}, time_of_tag.shape={self.time_of_tag.shape})"
 
 
 class ICLandPropVariables(PyTreeNode):  # type: ignore[misc]
@@ -211,9 +211,11 @@ class ICLandPropVariables(PyTreeNode):  # type: ignore[misc]
 
     Attributes:
         prop_owner: ID of agent grabbing each prop (0=not grabbed), shape (max_prop_count,).
+        time_of_grab: Time of grab for each prop (0=not grabbed), shape (max_prop_count,).
     """
 
     prop_owner: jax.Array  # Shape (max_prop_count, )
+    time_of_grab: jax.Array  # Shape (max_prop_count, )
 
     def __repr__(self) -> str:
         """Return a string representation of the ICLandPropVariables object.
@@ -221,7 +223,7 @@ class ICLandPropVariables(PyTreeNode):  # type: ignore[misc]
         Returns:
             A string with the prop_owner array shape.
         """
-        return f"ICLandPropVariables(prop_owner.shape={self.prop_owner.shape})"
+        return f"ICLandPropVariables(prop_owner.shape={self.prop_owner.shape}, time_of_grab.shape={self.time_of_grab.shape})"
 
 
 class ICLandObservation(PyTreeNode):  # type: ignore[misc]
@@ -231,10 +233,12 @@ class ICLandObservation(PyTreeNode):  # type: ignore[misc]
         render: Rendered frames for each agent's viewpoint,
                 shape (max_agent_count, height, width, 3).
         is_grabbing: Boolean indicator for whether each agent is grabbing a prop.
+        acceleration: Acceleration values for each agent, shape (max_agent_count, 3).
     """
 
     render: jax.Array
     is_grabbing: jax.Array
+    acceleration: jax.Array
 
     def __repr__(self) -> str:
         """Return a string representation of the ICLandObservation object.
@@ -242,7 +246,7 @@ class ICLandObservation(PyTreeNode):  # type: ignore[misc]
         Returns:
             A string with the render array shape and is_grabbing value.
         """
-        return f"ICLandObservation(render.shape={self.render.shape}, is_grabbing={self.is_grabbing})"
+        return f"ICLandObservation(render.shape={self.render.shape}, is_grabbing={self.is_grabbing}, acceleration.shape={self.acceleration.shape})"
 
 
 class ICLandState(PyTreeNode):  # type: ignore[misc]
@@ -259,8 +263,6 @@ class ICLandState(PyTreeNode):  # type: ignore[misc]
     mjx_data: MjxStateType
     agent_variables: ICLandAgentVariables
     prop_variables: ICLandPropVariables
-    observation: ICLandObservation
-    reward: jax.Array
 
     def __repr__(self) -> str:
         """Return a string representation of the ICLandState object.
@@ -268,4 +270,4 @@ class ICLandState(PyTreeNode):  # type: ignore[misc]
         Returns:
             A string with mjx_data, agent_variables, prop_variables, and observation.
         """
-        return f"ICLandState(agent_variables={self.agent_variables}, prop_variables={self.prop_variables}, observation={self.observation}, reward.shape={self.reward.shape})"
+        return f"ICLandState(mjx_data={self.mjx_data}, agent_variables={self.agent_variables}, prop_variables={self.prop_variables})"

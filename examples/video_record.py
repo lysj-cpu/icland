@@ -11,11 +11,11 @@ import jax.numpy as jnp
 import numpy as np
 
 import icland
-from icland.constants import FPS
 from icland.types import *
 
 # Create a random key
 key = jax.random.PRNGKey(2004)
+FPS = 30
 
 # Sample initial conditions
 config = icland.config(
