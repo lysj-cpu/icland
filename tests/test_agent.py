@@ -17,15 +17,15 @@ def key() -> jax.Array:
     return jax.random.PRNGKey(42)
 
 
-def world(num_agents: int) -> ICLandParams:
+def world(num_agents: int):
     """Helper function to provide a consistent world for tests."""
     WORLD_WIDTH = 10
     WORLD_DEPTH = 10
-    WORLD_HEIGHT = 0
+    WORLD_HEIGHT = 6
     MAX_AGENT_COUNT = num_agents
     MAX_SPHERE_COUNT = 0
     MAX_CUBE_COUNT = 0
-    mjx_model, _ = generate_base_model(
+    mjx_model, mj_model = generate_base_model(
         WORLD_WIDTH,
         WORLD_DEPTH,
         WORLD_HEIGHT,
@@ -35,7 +35,7 @@ def world(num_agents: int) -> ICLandParams:
     )
     agent_info = ICLandAgentInfo(
         agent_count=num_agents,
-        spawn_points=jnp.array([[1, 1 + 0.15 * i, 1] for i in range(num_agents)]),
+        spawn_points=jnp.array([[1, 1 + 1 * i, 3.5] for i in range(num_agents)]),
         spawn_orientations=jnp.zeros((num_agents,), dtype="float32"),
         body_ids=jnp.arange(1, num_agents + 1, dtype="int32"),
         geom_ids=(jnp.arange(num_agents) + WORLD_WIDTH * WORLD_DEPTH) * 2 + WALL_OFFSET,
@@ -56,11 +56,11 @@ def world(num_agents: int) -> ICLandParams:
         colour=jnp.zeros((1, 3)),
     )
     mjx_model = edit_model_data(
-        TEST_TILEMAP_EMPTY_WORLD, mjx_model, agent_info, prop_info, WORLD_HEIGHT
+        TEST_TILEMAP_FLAT, mjx_model, agent_info, prop_info, WORLD_HEIGHT
     )
     icland_params = ICLandParams(
         world=ICLandWorld(
-            TEST_TILEMAP_EMPTY_WORLD,
+            TEST_TILEMAP_FLAT,
             WORLD_WIDTH,
             WORLD_DEPTH,
             WORLD_HEIGHT,
@@ -71,7 +71,7 @@ def world(num_agents: int) -> ICLandParams:
         reward_function=None,
         mjx_model=mjx_model,
     )
-    return icland_params
+    return icland_params, mj_model
 
 
 @pytest.mark.parametrize(
