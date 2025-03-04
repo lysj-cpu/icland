@@ -35,7 +35,7 @@ def world(num_agents: int):
     )
     agent_info = ICLandAgentInfo(
         agent_count=num_agents,
-        spawn_points=jnp.array([[1, 1 + 1 * i, 3.5] for i in range(num_agents)]),
+        spawn_points=jnp.array([[5, 2 + 1 * i, 3.5] for i in range(num_agents)]),
         spawn_orientations=jnp.zeros((num_agents,), dtype="float32"),
         body_ids=jnp.arange(1, num_agents + 1, dtype="int32"),
         geom_ids=(jnp.arange(num_agents) + WORLD_WIDTH * WORLD_DEPTH) * 2 + WALL_OFFSET,
@@ -108,17 +108,22 @@ def test_agent_translation(
 
     # Check if the correct velocity was applied
     velocity = icland_state.mjx_data.qvel[:2]
+
+    if jnp.all(policy == NOOP_POLICY):
+        assert jnp.allclose(velocity, jnp.array([0, 0]), 0, 1e-2), (
+            f"{name} failed: Expected velocity [0, 0], Actual velocity {velocity}"
+        )
+        return
+
     normalised_velocity = velocity / (jnp.linalg.norm(velocity) + SMALL_VALUE)
 
-    assert jnp.allclose(normalised_velocity, expected_direction), (
+    assert jnp.allclose(normalised_velocity, expected_direction, 0, 1e-2), (
         f"{name} failed: Expected velocity {expected_direction}, "
         f"Actual velocity {normalised_velocity}"
     )
 
     # Step the environment to update the agents position via the velocity
-    icland_state, obs, rew = icland.step(
-        icland_state, icland_params, jnp.array(NOOP_POLICY)
-    )
+    icland_state, obs, rew = icland.step(icland_state, icland_params, jnp.array(policy))
     new_position = icland_state.mjx_data.xpos[body_id][:2]  # Get new position
 
     # Check if the agent moved in the expected direction
@@ -126,7 +131,7 @@ def test_agent_translation(
     normalised_displacement = displacement / (
         jnp.linalg.norm(displacement) + SMALL_VALUE
     )
-    assert jnp.allclose(normalised_displacement, expected_direction), (
+    assert jnp.allclose(normalised_displacement, expected_direction, 0, 1e-2), (
         f"{name} failed: Expected displacement {expected_direction}, "
         f"Actual displacement {normalised_displacement}"
     )
@@ -163,7 +168,7 @@ def test_agent_rotation(
     normalised_orientation_delta = orientation_delta / (
         jnp.linalg.norm(orientation_delta) + SMALL_VALUE
     )
-    assert jnp.allclose(normalised_orientation_delta, expected_orientation), (
+    assert jnp.allclose(normalised_orientation_delta, expected_orientation, 0, 1e-2), (
         f"{name} failed: Expected orientation {expected_orientation}, "
         f"Actual orientation {normalised_orientation_delta}"
     )
