@@ -10,6 +10,8 @@ Controls:
     - Hold 'd' to command the agent with RIGHT_POLICY.
     - Hold the left arrow key to command the agent with ANTI_CLOCKWISE_POLICY.
     - Hold the right arrow key to command the agent with CLOCKWISE_POLICY.
+    - Press '1' to attempt to tag an agent in front of you with TAG_POLICY.
+    - Press '2' to attempt to grab a prop in front of you with GRAB_POLICY.
     - Press 'q' to quit the simulation.
 
 This script is based on video_generator but instead of writing a video file, it displays frames in real time.
@@ -175,7 +177,7 @@ def interactive_simulation() -> None:
 
     cv2.destroyWindow(window_name)
     print("Interactive simulation ended.")
-    print(f"Exporting video: {'controller.mp4'} number of frame {len(frames)}")
+    print(f"Exporting video: {'controller.mp4'} with {len(frames)} frames.")
     imageio.mimsave(
         "scripts/video_output/controller.mp4", frames, fps=frame_rate, quality=8
     )
@@ -201,7 +203,7 @@ def sdfr_interactive_simulation() -> None:
     frames: list[Any] = []
 
     controlling = 0
-    while True:
+    while cv2.getWindowProperty(window_name, 0) >= 0:
         # Process any pending OpenCV window events.
         cv2.waitKey(1)
 
@@ -262,7 +264,7 @@ def sdfr_interactive_simulation() -> None:
         frame_bgr = cv2.cvtColor(resized_frame, cv2.COLOR_RGB2BGR)
 
         if len(frames) < icland_state.mjx_data.time * framerate:
-            frames.append(frame_bgr)
+            frames.append(resized_frame)
 
         cv2.imshow(window_name, frame_bgr)
 

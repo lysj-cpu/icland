@@ -150,3 +150,32 @@ def test_cube_sdf() -> None:
             atol=1e-05,
         )
     )
+
+
+def test_beam_sdf() -> None:
+    """Test the beam signed distance function."""
+    dists = []
+    view_dir = jnp.array([1, 1, 1]) / jnp.linalg.norm(jnp.array([1, 1, 1]))
+    for i in range(NUM_ITERS):
+        dists.append(float(beam_sdf(jnp.full((3,), i * 1.0), view_dir, 1)))
+
+    assert np.all(
+        np.isclose(
+            dists,
+            np.array(
+                [
+                    0.0,
+                    0.7320507764816284,
+                    2.464101791381836,
+                    4.196152210235596,
+                    5.928203105926514,
+                    7.660254001617432,
+                    9.392305374145508,
+                    11.124356269836426,
+                    12.856407165527344,
+                    14.588457107543945,
+                ]
+            ),
+            atol=1e-05,
+        )
+    )
