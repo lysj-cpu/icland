@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+from icland.presets import TEST_TILEMAP_FLAT
 from icland.renderer.renderer import get_agent_camera_from_mjx, render_frame
 import jax
 import jax.numpy as jnp
@@ -607,6 +608,145 @@ def benchmark_render_frame_non_empty_world(batch_size: int, width: int, agent_co
         print(f'Start of batched render_frame step {s}')
         render_frame_start_time = time.time()
         f = batched_render_frame(camera_poses, camera_dirs, tilemaps)        
+
+        # CPU Memory & Usage
+        memory_usage_mb = process.memory_info().rss / (1024**2)  # in MB
+        cpu_usage_percent = process.cpu_percent(interval=None) / psutil.cpu_count()
+        render_frame_max_memory_usage_mb = max(render_frame_max_memory_usage_mb, memory_usage_mb)
+        render_frame_max_cpu_usage_percent = max(render_frame_max_cpu_usage_percent, cpu_usage_percent)
+
+        # GPU Usage & Memory
+        if gpu_available:
+            for i in range(num_gpus):
+                handle = pynvml.nvmlDeviceGetHandleByIndex(i)
+                util_rates = pynvml.nvmlDeviceGetUtilizationRates(handle)
+                mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+
+                gpu_util_percent = util_rates.gpu
+                gpu_mem_usage_mb = mem_info.used / (1024**2)
+                render_frame_max_gpu_usage_percent[i] = max(
+                    render_frame_max_gpu_usage_percent[i], gpu_util_percent
+                )
+                render_frame_max_gpu_memory_usage_mb[i] = max(
+                    render_frame_max_gpu_memory_usage_mb[i], gpu_mem_usage_mb
+                )
+
+        jax.tree_util.tree_map(lambda x: x.block_until_ready(), f)
+        render_frame_time = time.time() - render_frame_start_time
+        total_render_frame_time += render_frame_time
+        print(f'End of batched render_frame step {s}. Time taken: {render_frame_time}')
+
+    if gpu_available:
+        pynvml.nvmlShutdown()
+
+    return (
+        ComplexStepMetrics(
+            batch_size=batch_size,
+            num_steps=num_steps,
+            total_time=total_step_time,
+            max_memory_usage_mb=step_max_memory_usage_mb,
+            max_cpu_usage_percent=step_max_cpu_usage_percent,
+            max_gpu_usage_percent=step_max_gpu_usage_percent,
+            max_gpu_memory_usage_mb=step_max_gpu_memory_usage_mb,
+        ),
+        ComplexStepMetrics(
+            batch_size=batch_size,
+            num_steps=num_steps,
+            total_time=total_render_frame_time,
+            max_memory_usage_mb=render_frame_max_memory_usage_mb,
+            max_cpu_usage_percent=render_frame_max_cpu_usage_percent,
+            max_gpu_usage_percent=render_frame_max_gpu_usage_percent,
+            max_gpu_memory_usage_mb=render_frame_max_gpu_memory_usage_mb,
+        )
+    )
+
+def benchmark_render_frame_empty_world(batch_size: int, width: int, agent_count: int, num_steps: int) -> tuple[ComplexStepMetrics, ComplexStepMetrics]:
+    key = jax.random.PRNGKey(SEED)
+    icland_params = icland.sample(agent_count, key)
+    init_state = icland.init(key, icland_params)
+
+    # Prepare batch
+    def replicate(x):
+        return jnp.broadcast_to(x, (batch_size,) + x.shape)
+
+    icland_states = jax.tree_map(replicate, init_state)
+    actions = jnp.tile(jnp.array([1, 0, 0]), (batch_size, 1))
+
+    keys = jax.random.split(key, batch_size)
+
+    # Batched step function
+    batched_step = jax.vmap(icland.step, in_axes=(None, 0, None, 0))
+    batched_get_camera_info = jax.vmap(get_agent_camera_from_mjx, in_axes=(0, None, None))
+    batched_render_frame = jax.vmap(render_frame, in_axes=(0, 0, 0))
+
+    process = psutil.Process()
+    step_max_memory_usage_mb = 0.0
+    step_max_cpu_usage_percent = 0.0
+    render_frame_max_memory_usage_mb = 0.0
+    render_frame_max_cpu_usage_percent = 0.0
+
+    # Attempt to initialize NVML for GPU usage
+    gpu_available = True
+    try:
+        pynvml.nvmlInit()
+        num_gpus = pynvml.nvmlDeviceGetCount()
+        step_max_gpu_usage_percent: list[float] = [0.0] * num_gpus
+        step_max_gpu_memory_usage_mb: list[float] = [0.0] * num_gpus
+        render_frame_max_gpu_usage_percent: list[float] = [0.0] * num_gpus
+        render_frame_max_gpu_memory_usage_mb: list[float] = [0.0] * num_gpus
+    except pynvml.NVMLError:
+        gpu_available = False
+        step_max_gpu_usage_percent = []
+        step_max_gpu_memory_usage_mb = []
+        render_frame_max_gpu_usage_percent = []
+        render_frame_max_gpu_memory_usage_mb = []
+
+    default_agent_1 = 0
+
+    camera_poses, camera_dirs = batched_get_camera_info(
+        icland_states, width, default_agent_1
+    )
+
+    # Timed run
+    total_step_time = 0
+    total_render_frame_time = 0
+    for s in range(num_steps):
+        step_start_time = time.time()
+        icland_states = batched_step(keys, icland_states, icland_params, actions)
+
+        # CPU Memory & Usage
+        memory_usage_mb = process.memory_info().rss / (1024**2)  # in MB
+        cpu_usage_percent = process.cpu_percent(interval=None) / psutil.cpu_count()
+        step_max_memory_usage_mb = max(step_max_memory_usage_mb, memory_usage_mb)
+        step_max_cpu_usage_percent = max(step_max_cpu_usage_percent, cpu_usage_percent)
+
+        # GPU Usage & Memory
+        if gpu_available:
+            for i in range(num_gpus):
+                handle = pynvml.nvmlDeviceGetHandleByIndex(i)
+                util_rates = pynvml.nvmlDeviceGetUtilizationRates(handle)
+                mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+
+                gpu_util_percent = util_rates.gpu
+                gpu_mem_usage_mb = mem_info.used / (1024**2)
+                step_max_gpu_usage_percent[i] = max(
+                    step_max_gpu_usage_percent[i], gpu_util_percent
+                )
+                step_max_gpu_memory_usage_mb[i] = max(
+                    step_max_gpu_memory_usage_mb[i], gpu_mem_usage_mb
+                )
+
+        jax.tree_util.tree_map(lambda x: x.block_until_ready(), icland_states)
+        step_time = time.time() - step_start_time
+        total_step_time += step_time
+
+        camera_poses, camera_dirs = batched_get_camera_info(
+            icland_states, width, default_agent_1
+        )
+
+        print(f'Start of batched render_frame step {s}')
+        render_frame_start_time = time.time()
+        f = batched_render_frame(camera_poses, camera_dirs, TEST_TILEMAP_FLAT)        
 
         # CPU Memory & Usage
         memory_usage_mb = process.memory_info().rss / (1024**2)  # in MB
