@@ -660,7 +660,8 @@ def benchmark_render_frame_non_empty_world(batch_size: int, width: int, agent_co
         )
     )
 
-def benchmark_render_frame_empty_world(batch_size: int, width: int, agent_count: int, num_steps: int) -> tuple[ComplexStepMetrics, ComplexStepMetrics]:
+def benchmark_render_frame_empty_world(batch_size: int, agent_count: int, num_steps: int) -> tuple[ComplexStepMetrics, ComplexStepMetrics]:
+    width = 10
     key = jax.random.PRNGKey(SEED)
     icland_params = icland.sample(agent_count, key)
     init_state = icland.init(key, icland_params)
@@ -677,7 +678,7 @@ def benchmark_render_frame_empty_world(batch_size: int, width: int, agent_count:
     # Batched step function
     batched_step = jax.vmap(icland.step, in_axes=(None, 0, None, 0))
     batched_get_camera_info = jax.vmap(get_agent_camera_from_mjx, in_axes=(0, None, None))
-    batched_render_frame = jax.vmap(render_frame, in_axes=(0, 0, 0))
+    batched_render_frame = jax.vmap(render_frame, in_axes=(0, 0, None))
 
     process = psutil.Process()
     step_max_memory_usage_mb = 0.0
