@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from icland.presets import TEST_TILEMAP_FLAT
+from icland.presets import TEST_TILEMAP_EMPTY, TEST_TILEMAP_FLAT
 from icland.renderer.renderer import get_agent_camera_from_mjx, render_frame
 import jax
 import jax.numpy as jnp
@@ -747,7 +747,7 @@ def benchmark_render_frame_empty_world(batch_size: int, agent_count: int, num_st
 
         print(f'Start of batched render_frame step {s}')
         render_frame_start_time = time.time()
-        f = batched_render_frame(camera_poses, camera_dirs, TEST_TILEMAP_FLAT)        
+        f = batched_render_frame(camera_poses, camera_dirs, TEST_TILEMAP_EMPTY)        
 
         # CPU Memory & Usage
         memory_usage_mb = process.memory_info().rss / (1024**2)  # in MB

@@ -651,11 +651,19 @@ def create_report(input_json_path: str, output_pdf: str = "scripts/benchmark_out
 if __name__ == "__main__":
     # create_report()
     # plot_benchmark_results('step_cpu_1_agent_simple_non_empty_world_100_steps', [SimpleStepMetrics(batch_size=1, total_time=0.1, max_memory_usage_mb=100, max_cpu_usage_percent=10, max_gpu_usage_percent=[10], max_gpu_memory_usage_mb=[100])], 'scripts/benchmark_output/plots')
+<<<<<<< HEAD
     jax_devices = jax.devices()
 
     with jax.default_device(jax_devices[0]):
         print(jax_devices[0])
         output_json('render_frame_gpu_1_agent_8x8_100_steps')
+=======
+<<<<<<< HEAD
+    output_json('render_frame_cpu_1_agent_empty_world_100_steps')
+=======
+    output_json('step_cpu_1_agent_non_empty_world_simple_100_steps')
+>>>>>>> 814adb98cbf767c16a1466acb4d726293744046c
+>>>>>>> 7fa8204434ea79581f985d9407e7b00e6b976e88
 
     # create_report('scripts/benchmark_output/raw_data/step_gpu_1_agent_complex.json')
 
