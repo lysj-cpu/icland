@@ -336,6 +336,9 @@ RAMP_60 = """
 </mujoco>
 """
 
+TEST_TILEMAP_EMPTY = jnp.array(
+    []
+)
 TEST_TILEMAP_FLAT = jnp.array([[[0, 0, 0, 3] for _ in range(10)] for _ in range(10)])
 TEST_TILEMAP_BUMP = TEST_TILEMAP_FLAT.at[:, 5].set(jnp.array([0, 0, 0, 5]))
 TEST_TILEMAP_WORLD42 = jnp.array(

@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt  # For plotting
 import psutil
 
 # Import the benchmark function (ensure benchmark_functions is in your PYTHONPATH)
-from benchmark_functions import ComplexStepMetrics, SampleWorldBenchmarkMetrics, SimpleStepMetrics, benchmark_complex_step_empty_world, benchmark_render_frame_non_empty_world, benchmark_sample_world, benchmark_simple_step_empty_world, benchmark_simple_step_non_empty_world
+from benchmark_functions import ComplexStepMetrics, SampleWorldBenchmarkMetrics, SimpleStepMetrics, benchmark_complex_step_empty_world, benchmark_render_frame_empty_world, benchmark_render_frame_non_empty_world, benchmark_sample_world, benchmark_simple_step_empty_world, benchmark_simple_step_non_empty_world
 from pylatex import Document, NoEscape
 
 
@@ -53,10 +53,10 @@ class BenchmarkScenario:
 
 
 BENCHMARKING_SCENARIOS: dict[str, BenchmarkScenario] = {
-    "render_frame_cpu_1_agent_non_empty_world_simple_100_steps": BenchmarkScenario(
+    "render_frame_cpu_1_agent_empty_world_100_steps": BenchmarkScenario(
         description="Batched step performance",
-        function=partial(benchmark_render_frame_non_empty_world, width=2, agent_count=1, num_steps=100),
-        parameters=[2**i for i in range(0, 10)],
+        function=partial(benchmark_render_frame_empty_world, agent_count=1, num_steps=100),
+        parameters=[2**i for i in range(0, 12)],
     ),
 }
 
@@ -650,7 +650,7 @@ def create_report(input_json_path: str, output_pdf: str = "scripts/benchmark_out
 if __name__ == "__main__":
     # create_report()
     # plot_benchmark_results('step_cpu_1_agent_simple_non_empty_world_100_steps', [SimpleStepMetrics(batch_size=1, total_time=0.1, max_memory_usage_mb=100, max_cpu_usage_percent=10, max_gpu_usage_percent=[10], max_gpu_memory_usage_mb=[100])], 'scripts/benchmark_output/plots')
-    output_json('render_frame_cpu_1_agent_non_empty_world_simple_100_steps')
+    output_json('render_frame_cpu_1_agent_empty_world_100_steps')
 
     # create_report('scripts/benchmark_output/raw_data/step_gpu_1_agent_complex.json')
 

@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from icland.presets import TEST_TILEMAP_FLAT
+from icland.presets import TEST_TILEMAP_EMPTY, TEST_TILEMAP_FLAT
 from icland.renderer.renderer import get_agent_camera_from_mjx, render_frame
 import jax
 import jax.numpy as jnp
@@ -660,7 +660,8 @@ def benchmark_render_frame_non_empty_world(batch_size: int, width: int, agent_co
         )
     )
 
-def benchmark_render_frame_empty_world(batch_size: int, width: int, agent_count: int, num_steps: int) -> tuple[ComplexStepMetrics, ComplexStepMetrics]:
+def benchmark_render_frame_empty_world(batch_size: int, agent_count: int, num_steps: int) -> tuple[ComplexStepMetrics, ComplexStepMetrics]:
+    width = 10
     key = jax.random.PRNGKey(SEED)
     icland_params = icland.sample(agent_count, key)
     init_state = icland.init(key, icland_params)
@@ -677,7 +678,7 @@ def benchmark_render_frame_empty_world(batch_size: int, width: int, agent_count:
     # Batched step function
     batched_step = jax.vmap(icland.step, in_axes=(None, 0, None, 0))
     batched_get_camera_info = jax.vmap(get_agent_camera_from_mjx, in_axes=(0, None, None))
-    batched_render_frame = jax.vmap(render_frame, in_axes=(0, 0, 0))
+    batched_render_frame = jax.vmap(render_frame, in_axes=(0, 0, None))
 
     process = psutil.Process()
     step_max_memory_usage_mb = 0.0
@@ -746,7 +747,7 @@ def benchmark_render_frame_empty_world(batch_size: int, width: int, agent_count:
 
         print(f'Start of batched render_frame step {s}')
         render_frame_start_time = time.time()
-        f = batched_render_frame(camera_poses, camera_dirs, TEST_TILEMAP_FLAT)        
+        f = batched_render_frame(camera_poses, camera_dirs, TEST_TILEMAP_EMPTY)        
 
         # CPU Memory & Usage
         memory_usage_mb = process.memory_info().rss / (1024**2)  # in MB
