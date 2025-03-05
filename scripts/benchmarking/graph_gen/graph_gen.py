@@ -5,6 +5,11 @@ from matplotlib.lines import Line2D
 import matplotlib.patches as mpatches
 import math
 
+def linux_to_windows_path(linux_path):
+   print(linux_path)
+   return linux_path.replace('/', '\\')
+
+
 def round_to_sig_figs(num, sig_figs=3):
     if num == 0:
         return 0
@@ -611,6 +616,124 @@ def plot_grid_sizes_step_graph(output_dir: str, y_axis: str, log: bool) -> None:
     plt.savefig(plot_path, bbox_inches="tight")
     plt.close()
    
+def plot_cpu_gpu_non_empty_world_render_frame(output_dir: str, y_axis: str, log: bool, agent_count: int) -> None:
+    os.makedirs(output_dir, exist_ok=True)
+
+    input_dir = "scripts/benchmarking/graph_gen/jsons"
+    # gpu_empty_world_json = f"render_frame_gpu_{agent_count}_agents_empty_world_100_steps.json"
+    # cpu_empty_world_json = f"render_frame_cpu_{agent_count}_agents_empty_world_100_steps.json"
+    gpu_non_empty_world_json = f"render_frame_gpu_{agent_count}_agents_non_empty_world_100_steps.json"
+    cpu_non_empty_world_json = f"render_frame_cpu_{agent_count}_agents_non_empty_world_100_steps.json"
+
+    # cpu_empty_world_json = os.path.join(input_dir, cpu_empty_world_json)
+    cpu_non_empty_world_json = os.path.join(input_dir, cpu_non_empty_world_json)
+    cpu_non_empty_world_json = linux_to_windows_path(cpu_non_empty_world_json)
+    # gpu_empty_world_json = os.path.join(input_dir, gpu_empty_world_json)
+    gpu_non_empty_world_json = os.path.join(input_dir, gpu_non_empty_world_json)
+    gpu_non_empty_world_json = linux_to_windows_path(gpu_non_empty_world_json)
+
+    # with open(cpu_empty_world_json, "r") as file:
+    #   cpu_empty_world_data = json.load(file)
+    with open(cpu_non_empty_world_json, "r") as file:
+      cpu_non_empty_world_data = json.load(file)
+    # with open(gpu_empty_world_json, "r") as file:
+    #   gpu_empty_world_data = json.load(file)
+    with open(gpu_non_empty_world_json, "r") as file:
+      gpu_non_empty_world_data = json.load(file)
+
+    # cpu_empty_world_results = cpu_empty_world_data['benchmark_results']
+    cpu_non_empty_world_results = cpu_non_empty_world_data['benchmark_results']
+    # gpu_empty_world_results = gpu_empty_world_data['benchmark_results']
+    gpu_non_empty_world_results = gpu_non_empty_world_data['benchmark_results']
+
+    # Assume that there is only one scenario in both json files
+    # _, cpu_empty_world_metrics_list = list(cpu_empty_world_results.items())[0]
+    _, cpu_non_empty_world_metrics_list = list(cpu_non_empty_world_results.items())[0]
+    # _, gpu_empty_world_metrics_list = list(gpu_empty_world_results.items())[0]
+    scenario_name, gpu_non_empty_world_metrics_list = list(gpu_non_empty_world_results.items())[0]
+
+    # cpu_empty_world_batch_sizes = [m['batch_size'] for m in cpu_empty_world_metrics_list]
+    cpu_non_empty_world_batch_sizes = [m['batch_size'] for m in cpu_non_empty_world_metrics_list]
+    # gpu_empty_world_batch_sizes = [m['batch_size'] for m in gpu_empty_world_metrics_list]
+    gpu_non_empty_world_batch_sizes = [m['batch_size'] for m in gpu_non_empty_world_metrics_list]
+
+    if y_axis == "time":
+      # cpu_empty_world_steps = [m['total_time'] for m in cpu_empty_world_metrics_list]
+      cpu_non_empty_world_steps = [m['total_time'] for m in cpu_non_empty_world_metrics_list]
+      # gpu_empty_world_steps = [m['total_time'] for m in gpu_empty_world_metrics_list]
+      gpu_non_empty_world_steps = [m['total_time'] for m in gpu_non_empty_world_metrics_list]
+    elif y_axis == "steps":
+      # cpu_empty_world_steps = [m['num_steps'] * m['batch_size'] / m['total_time'] for m in cpu_empty_world_metrics_list]
+      cpu_non_empty_world_steps = [m['num_steps'] * m['batch_size'] / m['total_time'] for m in cpu_non_empty_world_metrics_list]
+      # gpu_empty_world_steps = [m['num_steps'] * m['batch_size'] / m['total_time'] for m in gpu_empty_world_metrics_list]
+      gpu_non_empty_world_steps = [m['num_steps'] * m['batch_size'] / m['total_time'] for m in gpu_non_empty_world_metrics_list]
+    else:
+      raise ValueError(f"Invalid value for y_axis: {y_axis}")
+
+    plt.figure()
+    # plt.plot(cpu_empty_world_batch_sizes, cpu_empty_world_steps, color="blue", marker="x", linestyle=':', label="CPU (empty world)")
+    plt.plot(cpu_non_empty_world_batch_sizes, cpu_non_empty_world_steps, color="blue", marker="o", label="CPU (non-empty world)")
+    # plt.plot(gpu_empty_world_batch_sizes, gpu_empty_world_steps, color="green", marker="x", linestyle=':', label="GPU (empty world)")
+    plt.plot(gpu_non_empty_world_batch_sizes, gpu_non_empty_world_steps, color="green", marker="o", label="GPU (non-empty world)")
+
+    legend_elements = [
+      mpatches.Patch(color='blue', label='CPU'),
+      mpatches.Patch(color='green', label='GPU'),
+      Line2D([0], [0], color='black', lw=1, marker='x', linestyle=':', label='empty world (baseline)'),
+      Line2D([0], [0], color='black', lw=1, marker='o', label='non-empty (2x2) world'),
+    ]
+
+    plt.legend(handles=legend_elements, loc='upper left')
+
+    # special_points = [(1, "gpu"), (2**9, "cpu"), (2**9, "gpu"), (2048, "gpu"), (16384, "gpu")]
+    special_points = [(1, "cpu"), (1, "gpu"), (2**10, "cpu"), (2**10, "gpu"), (16384, "gpu")]
+    # Special points
+    for x_val, pu in special_points:
+        if pu == "cpu":
+            y_val = cpu_non_empty_world_steps[cpu_non_empty_world_batch_sizes.index(x_val)]
+            opp_y_val = gpu_non_empty_world_steps[gpu_non_empty_world_batch_sizes.index(x_val)]
+            color = "blue"
+        elif pu == "gpu":
+            y_val = gpu_non_empty_world_steps[gpu_non_empty_world_batch_sizes.index(x_val)]
+            if (x_val not in cpu_non_empty_world_batch_sizes):
+               opp_y_val = 0
+            else:
+              opp_y_val = cpu_non_empty_world_steps[cpu_non_empty_world_batch_sizes.index(x_val)]
+            color = "green"
+        else:
+            raise ValueError(f"Invalid value for pu: {pu}")
+
+        plt.annotate(
+            round_to_sig_figs(y_val), 
+            (x_val, y_val), 
+            textcoords="offset points",
+            xytext=(0, 10) if y_val >= opp_y_val else (0, -15),
+            ha="center", 
+            fontsize=9,
+            color=color,
+            bbox=dict(boxstyle="round,pad=0.3", edgecolor=color, facecolor="white")
+        )
+
+    if log:
+        plt.xscale("log", base=2)
+    plt.xlabel("Batch Size")
+    if (y_axis == "time"):
+      plt.ylabel("Total time (in s)")
+      plt.title(f"Total time (100 steps) vs Batch Size ({scenario_name})")
+      plot_path = os.path.join(
+          output_dir, f"{scenario_name}_total-time.png"
+      )
+    else:
+      plt.ylabel(f"Total steps per second")
+      plt.title(f"Total Steps per Second (100 steps) vs Batch Size ({scenario_name})")
+      plot_path = os.path.join(
+        output_dir, f"{scenario_name}_total-steps-per-sec.png"
+      )
+
+    plt.grid(True)
+    plt.savefig(plot_path, bbox_inches="tight")
+    plt.close()
+
 if __name__ == "__main__":
   # plot_simple_step_graph(
   #   "scripts/benchmarking/graph_gen/graphs", 
@@ -624,8 +747,9 @@ if __name__ == "__main__":
   #   "scripts/benchmarking/graph_gen/graphs", 
   #   True
   # )
-  plot_grid_sizes_step_graph(
+  plot_cpu_gpu_non_empty_world_render_frame(
     "scripts/benchmarking/graph_gen/graphs", 
-    "steps",
-    True
+    "Batched steps per second",
+    True,
+    1
   )
