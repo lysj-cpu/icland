@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from typing import Any
 import json
 from dataclasses import asdict
+import jax
 
 import cpuinfo
 import GPUtil
@@ -500,10 +501,7 @@ def output_json(json_filename: str) -> None:
     print(results)
     benchmark_results = {}
     for scenario_name, metrics_list in results.items():
-        for i in range(len(metrics_list)):
-            metrics_list[i] = tuple(map(asdict, metrics_list[i]))
-
-        benchmark_results[scenario_name] = metrics_list
+        benchmark_results[scenario_name] = list(map(asdict, metrics_list))
 
     output_dir = "scripts/benchmarking/benchmark_output/raw_data"
     os.makedirs(output_dir, exist_ok=True)
@@ -650,7 +648,11 @@ def create_report(input_json_path: str, output_pdf: str = "scripts/benchmark_out
 if __name__ == "__main__":
     # create_report()
     # plot_benchmark_results('step_cpu_1_agent_simple_non_empty_world_100_steps', [SimpleStepMetrics(batch_size=1, total_time=0.1, max_memory_usage_mb=100, max_cpu_usage_percent=10, max_gpu_usage_percent=[10], max_gpu_memory_usage_mb=[100])], 'scripts/benchmark_output/plots')
+<<<<<<< HEAD
     output_json('render_frame_cpu_1_agent_empty_world_100_steps')
+=======
+    output_json('step_cpu_1_agent_non_empty_world_simple_100_steps')
+>>>>>>> 814adb98cbf767c16a1466acb4d726293744046c
 
     # create_report('scripts/benchmark_output/raw_data/step_gpu_1_agent_complex.json')
 
