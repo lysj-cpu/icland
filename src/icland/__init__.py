@@ -328,6 +328,7 @@ def step(
         agent_variables,
         prop_info,
         prop_variables,
+        action_batch,
         world,
         mjx_data,
     )

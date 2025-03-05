@@ -12,7 +12,14 @@ from mujoco.mjx._src.dataclasses import PyTreeNode
 
 from icland.constants import *
 from icland.presets import DEFAULT_VIEWSIZE
-from icland.renderer.sdfs import box_sdf, capsule_sdf, cube_sdf, ramp_sdf, sphere_sdf
+from icland.renderer.sdfs import (
+    beam_sdf,
+    box_sdf,
+    capsule_sdf,
+    cube_sdf,
+    ramp_sdf,
+    sphere_sdf,
+)
 from icland.types import *
 
 
@@ -20,6 +27,7 @@ class RenderAgentInfo(PyTreeNode):  # type: ignore[misc]
     """Player info."""
 
     pos: jax.Array
+    rot: jax.Array
     col: jax.Array
 
 
@@ -297,10 +305,11 @@ def __scene_sdf_with_objs(
     tilemap: jax.Array,
     # Props (list of ints to represent which prop it is)
     props: jax.Array,  # shape: (n_props, )
-    # agents positions and rotation
-    # TODO: Change to adapt with mjx data
+    # Agent positions and rotation
     agent_pos: jax.Array,  # shape: (agent_count, 3)
+    agent_rot: jax.Array,  # shape: (agent_count, 3)
     agent_col: jax.Array,  # shape: (agent_count, 3)
+    actions: jax.Array,  # shape: (agent_count, 3)
     # Prop positions and rotation
     prop_pos: jax.Array,  # shape: (n_props, 3)
     prop_rot: jax.Array,  # shape: (n_props, 4)
@@ -376,11 +385,38 @@ def __scene_sdf_with_objs(
             ),
         ), curr_col
 
+    def process_beam_sdf(i: Int[Array, ""]) -> jax.Array:
+        curr_pos = agent_pos[i]
+        curr_rot = agent_rot[i]
+
+        curr_action = actions[i]
+
+        # Check if it's grabbing or tagging. If not, return infinity.
+        is_tagging = curr_action[4] > 0.5
+        is_grabbing = curr_action[5] > 0.5
+        is_tagging_or_grabbing = jnp.logical_or(is_tagging, is_grabbing)
+        beam_length = jnp.maximum(
+            is_tagging * AGENT_MAX_TAG_DISTANCE, is_grabbing * AGENT_GRAB_RANGE
+        )
+        dist = jax.lax.cond(
+            is_tagging_or_grabbing,
+            lambda _: beam_sdf(
+                p - curr_pos - jnp.array([0, -0.1, 0]), curr_rot, beam_length
+            ),
+            lambda _: jnp.inf,
+            None,
+        )
+
+        return cast(jax.Array, dist)
+
     # Prop distances: Tuple[Array of floats, Array of colors]
     prop_dists = jax.vmap(process_prop_sdf)(jnp.arange(props.shape[0]))
 
     # Player distances
     agent_dists = jax.vmap(process_agent_sdf)(jnp.arange(agent_pos.shape[0]))
+
+    # Agent beam distances
+    beam_dists = jax.vmap(process_beam_sdf)(jnp.arange(agent_pos.shape[0]))
 
     # Get minimum distance and color
     min_prop_dist, min_prop_col = (
@@ -391,18 +427,21 @@ def __scene_sdf_with_objs(
         jnp.min(agent_dists[0]),
         agent_col[jnp.argmin(agent_dists[0])],
     )
+    min_beam_dist = jnp.min(beam_dists)
+    BEAM_COLOR = jnp.array([1, 0, 0])
 
     # Get the absolute minimum distance and color
-    candidates = jnp.array([tile_dist, floor_dist, min_prop_dist, min_agent_dist])
+    candidates = jnp.array(
+        [tile_dist, floor_dist, min_prop_dist, min_agent_dist, min_beam_dist]
+    )
     min_dist = jnp.min(candidates)
-
     x, _, z = jnp.tanh(jnp.sin(p * jnp.pi) * 20.0)
     floor_color = (0.5 + (x * z) * 0.1) * jnp.ones(3)
     terrain_color = cmap[cx, cy]
 
-    min_dist_col = jnp.array([terrain_color, floor_color, min_prop_col, min_agent_col])[
-        jnp.argmin(candidates)
-    ]
+    min_dist_col = jnp.array(
+        [terrain_color, floor_color, min_prop_col, min_agent_col, BEAM_COLOR]
+    )[jnp.argmin(candidates)]
 
     return min_dist, min_dist_col
 
@@ -515,6 +554,7 @@ def render_frame_with_objects(
     cmap: jax.Array,
     agents: RenderAgentInfo,
     props: RenderPropInfo,
+    actions: jax.Array,
     light_dir: jax.Array = __normalize(jnp.array([5.0, 10.0, 5.0])),
     view_width: int = DEFAULT_VIEWSIZE[0],
     view_height: int = DEFAULT_VIEWSIZE[1],
@@ -532,6 +572,7 @@ def render_frame_with_objects(
         cmap: A JAX array representing the color map of the world.
         agents: Information about the agents to render, as a RenderAgentInfo namedtuple.
         props: Information about the props to render, as a RenderPropInfo namedtuple.
+        actions: Information about the agents' actions to render (e.g. tagging), as a JAX array of shape (agent_count, ACTION_SPACE_DIM).
         light_dir: The direction of the light source, as a JAX array of shape (3,). Defaults to a normalized vector.
         view_width: The width of the rendered frame in pixels. Defaults to the first element of DEFAULT_VIEWSIZE.
         view_height: The height of the rendered frame in pixels. Defaults to the second element of DEFAULT_VIEWSIZE.
@@ -542,6 +583,7 @@ def render_frame_with_objects(
         A JAX array representing the rendered frame, with shape (view_height, view_width, NUM_CHANNELS).
     """
     agent_pos = agents.pos
+    agent_rot = agents.rot
     agent_col = agents.col
     prop_pos = props.pos
     prop_rot = props.rot
@@ -558,7 +600,9 @@ def render_frame_with_objects(
         tilemap,
         prop_types,
         agent_pos,
+        agent_rot,
         agent_col,
+        actions,
         prop_pos,
         prop_rot,
         prop_col,
@@ -586,6 +630,7 @@ def render(
     agent_vars: ICLandAgentVariables,
     prop_info: ICLandPropInfo,
     prop_vars: ICLandPropVariables,
+    agent_actions: jax.Array,
     world: ICLandWorld,
     mjx_data: MjxStateType,
     view_width: int = DEFAULT_VIEWSIZE[0],
@@ -600,6 +645,7 @@ def render(
         agent_vars: Variables associated with the agents, as an `ICLandAgentVariables` namedtuple.
         prop_info: Information about the props to render, as an `ICLandPropInfo` namedtuple.
         prop_vars: Variables associated with the props, as an `ICLandPropVariables` namedtuple.
+        agent_actions: Information about the agents' actions to render, such as tagging and grabbing.
         world: The ICLand world information, as an `ICLandWorld` namedtuple.
         mjx_data: The current state of the MuJoCo simulation, as an `MjxStateType`.
         view_width: The width of the rendered frame in pixels. Defaults to the first element of `DEFAULT_VIEWSIZE`.
@@ -662,7 +708,7 @@ def render(
         agent_info: ICLandAgentInfo,
         agent_vars: ICLandAgentVariables,
         max_world_width: int,
-    ) -> tuple[RenderAgentInfo, jax.Array]:
+    ) -> RenderAgentInfo:
         max_agent_count = agent_info.spawn_points.shape[0]
         agent_count = agent_info.agent_count
         agent_indices = jnp.arange(max_agent_count)
@@ -704,11 +750,11 @@ def render(
             agent_pos = agent_pos * agent_mask[agent_id]
             colour = agent_info.colour[agent_id] * agent_mask[agent_id]
 
-            return RenderAgentInfo(pos=agent_pos, col=colour), forward_dir
+            return RenderAgentInfo(pos=agent_pos, rot=forward_dir, col=colour)
 
         return cast(RenderAgentInfo, jax.vmap(__get_agent_data)(agent_indices))
 
-    render_agent_info, agent_dirs = __get_agents_info(
+    render_agent_info = __get_agents_info(
         mjx_data, agent_info, agent_vars, world.max_world_width
     )
     render_prop_info = __get_props_info(
@@ -721,11 +767,12 @@ def render(
             cmap=world.cmap,
             agents=render_agent_info,
             props=render_prop_info,
+            actions=agent_actions,
             view_width=view_width,
             view_height=view_height,
         ),
         in_axes=(0, 0),
-    )(render_agent_info.pos, agent_dirs)
+    )(render_agent_info.pos, render_agent_info.rot)
     # )(
     #     jnp.array(
     #         [

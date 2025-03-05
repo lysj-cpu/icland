@@ -93,3 +93,29 @@ def sphere_sdf(p: jax.Array, r: float) -> Float[Array, ""]:
 def cube_sdf(p: jax.Array, size: float) -> Float[Array, ""]:
     """Signed distance function for a cube."""
     return box_sdf(p, jnp.array(size), jnp.array(size / 2))
+
+
+@jax.jit
+def beam_sdf(
+    p: jax.Array, view_dir: jax.Array, beam_range: jax.Array
+) -> Float[Array, ""]:
+    """Special signed distance function for a tagging beam."""
+    # SDF of a cylinder: from agent_pos to agent_pos + view_dir * beam_range, radius 0.01
+    # Pre: the view_dir is normalized
+    BEAM_RADIUS = 0.01
+    b = view_dir * beam_range
+
+    bb = jnp.dot(b, b)
+    pb = jnp.dot(p, b)
+
+    x = jnp.linalg.norm(p * bb - b * pb) - BEAM_RADIUS * bb
+    y = jnp.abs(pb - bb * 0.5) - bb * 0.5
+    x2 = x * x
+    y2 = y * y * bb
+
+    selector = __safe_max(x, y) < 0
+    dist = selector * -__safe_min(x2, y2) + (1 - selector) * (
+        (x > 0) * x2 + (y > 0) * y2
+    )
+
+    return jnp.sign(dist) * jnp.sqrt(jnp.abs(dist)) / bb
