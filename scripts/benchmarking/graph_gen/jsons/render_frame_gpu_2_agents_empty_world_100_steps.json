@@ -4,13 +4,13 @@
             "Model": "AMD Ryzen 9 7900X 12-Core Processor",
             "Architecture": "x86_64",
             "Cores (Physical/Logical)": "12/24",
-            "Base Frequency": "5.4840 GHz",
+            "Base Frequency": "4.9625 GHz",
             "L2 Cache": "12582912 bytes",
             "L3 Cache": "1048576 bytes"
         },
         "memory_information": {
             "Total RAM": "62.01 GB",
-            "Available RAM": "39.29 GB"
+            "Available RAM": "42.29 GB"
         },
         "storage_information": {
             "Total Storage": "70.32 GB",
@@ -23,13 +23,13 @@
             "Version": "#49~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Wed Nov  6 17:42:15 UTC 2",
             "Release": "6.8.0-49-generic",
             "Kernel": "#49~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Wed Nov  6 17:42:15 UTC 2",
-            "Uptime": "6209245 seconds"
+            "Uptime": "6209028 seconds"
         },
         "gpu_information": {
             "GPU GPU 1": {
                 "Model": "NVIDIA GeForce RTX 4090",
                 "VRAM": "24564.0 MB",
-                "Temperature": "40.0 \u00b0C",
+                "Temperature": "36.0 \u00b0C",
                 "Driver": "550.120"
             },
             "GPU GPU 2": {
@@ -47,36 +47,36 @@
         }
     },
     "benchmark_results": {
-        "render_frame_gpu_1_agent_empty_world_100_steps": [
+        "render_frame_gpu_2_agents_empty_world_100_steps": [
             [
                 {
                     "batch_size": 1,
                     "num_steps": 100,
-                    "total_time": 5.145355939865112,
-                    "max_memory_usage_mb": 1730.7265625,
-                    "max_cpu_usage_percent": 12.783333333333333,
+                    "total_time": 14.19631576538086,
+                    "max_memory_usage_mb": 1927.984375,
+                    "max_cpu_usage_percent": 11.9375,
                     "max_gpu_usage_percent": [
-                        100,
-                        43
+                        44,
+                        0.0
                     ],
                     "max_gpu_memory_usage_mb": [
-                        23467.375,
-                        19486.9375
+                        23455.375,
+                        877.375
                     ]
                 },
                 {
                     "batch_size": 1,
                     "num_steps": 100,
-                    "total_time": 2.2669460773468018,
-                    "max_memory_usage_mb": 1730.7265625,
-                    "max_cpu_usage_percent": 8.729166666666666,
+                    "total_time": 2.1076736450195312,
+                    "max_memory_usage_mb": 1927.984375,
+                    "max_cpu_usage_percent": 8.9125,
                     "max_gpu_usage_percent": [
-                        100,
-                        43
+                        44,
+                        0.0
                     ],
                     "max_gpu_memory_usage_mb": [
-                        23467.375,
-                        19486.9375
+                        23455.375,
+                        877.375
                     ]
                 }
             ],
@@ -84,31 +84,31 @@
                 {
                     "batch_size": 2,
                     "num_steps": 100,
-                    "total_time": 5.163325786590576,
-                    "max_memory_usage_mb": 1921.03125,
-                    "max_cpu_usage_percent": 12.470833333333333,
+                    "total_time": 14.955141067504883,
+                    "max_memory_usage_mb": 2193.66015625,
+                    "max_cpu_usage_percent": 11.495833333333332,
                     "max_gpu_usage_percent": [
-                        100,
-                        45
+                        44,
+                        0.0
                     ],
                     "max_gpu_memory_usage_mb": [
-                        23467.375,
-                        19490.9375
+                        23459.375,
+                        877.375
                     ]
                 },
                 {
                     "batch_size": 2,
                     "num_steps": 100,
-                    "total_time": 2.156731605529785,
-                    "max_memory_usage_mb": 1921.03125,
-                    "max_cpu_usage_percent": 8.6875,
+                    "total_time": 2.2346749305725098,
+                    "max_memory_usage_mb": 2193.66015625,
+                    "max_cpu_usage_percent": 8.920833333333333,
                     "max_gpu_usage_percent": [
-                        100,
-                        45
+                        44,
+                        0.0
                     ],
                     "max_gpu_memory_usage_mb": [
-                        23467.375,
-                        19490.9375
+                        23459.375,
+                        877.375
                     ]
                 }
             ],
@@ -116,27 +116,155 @@
                 {
                     "batch_size": 4,
                     "num_steps": 100,
-                    "total_time": 4.476431131362915,
-                    "max_memory_usage_mb": 2069.703125,
-                    "max_cpu_usage_percent": 11.575000000000001,
+                    "total_time": 15.211379528045654,
+                    "max_memory_usage_mb": 2393.1484375,
+                    "max_cpu_usage_percent": 10.816666666666668,
                     "max_gpu_usage_percent": [
-                        100,
-                        45
+                        44,
+                        0.0
                     ],
                     "max_gpu_memory_usage_mb": [
-                        23467.375,
-                        19490.9375
+                        23461.375,
+                        877.375
                     ]
                 },
                 {
                     "batch_size": 4,
                     "num_steps": 100,
-                    "total_time": 2.332692861557007,
-                    "max_memory_usage_mb": 2069.703125,
+                    "total_time": 2.4438772201538086,
+                    "max_memory_usage_mb": 2393.1484375,
                     "max_cpu_usage_percent": 8.612499999999999,
                     "max_gpu_usage_percent": [
-                        100,
-                        45
+                        44,
+                        0.0
+                    ],
+                    "max_gpu_memory_usage_mb": [
+                        23461.375,
+                        877.375
+                    ]
+                }
+            ],
+            [
+                {
+                    "batch_size": 8,
+                    "num_steps": 100,
+                    "total_time": 15.035770177841187,
+                    "max_memory_usage_mb": 2635.9453125,
+                    "max_cpu_usage_percent": 10.1625,
+                    "max_gpu_usage_percent": [
+                        48,
+                        0.0
+                    ],
+                    "max_gpu_memory_usage_mb": [
+                        23465.375,
+                        877.375
+                    ]
+                },
+                {
+                    "batch_size": 8,
+                    "num_steps": 100,
+                    "total_time": 2.538996458053589,
+                    "max_memory_usage_mb": 2635.9453125,
+                    "max_cpu_usage_percent": 11.616666666666667,
+                    "max_gpu_usage_percent": [
+                        48,
+                        0.0
+                    ],
+                    "max_gpu_memory_usage_mb": [
+                        23465.375,
+                        877.375
+                    ]
+                }
+            ],
+            [
+                {
+                    "batch_size": 16,
+                    "num_steps": 100,
+                    "total_time": 14.658588409423828,
+                    "max_memory_usage_mb": 2790.24609375,
+                    "max_cpu_usage_percent": 9.470833333333333,
+                    "max_gpu_usage_percent": [
+                        53,
+                        0.0
+                    ],
+                    "max_gpu_memory_usage_mb": [
+                        23467.375,
+                        877.375
+                    ]
+                },
+                {
+                    "batch_size": 16,
+                    "num_steps": 100,
+                    "total_time": 2.960012912750244,
+                    "max_memory_usage_mb": 2790.24609375,
+                    "max_cpu_usage_percent": 10.924999999999999,
+                    "max_gpu_usage_percent": [
+                        53,
+                        0.0
+                    ],
+                    "max_gpu_memory_usage_mb": [
+                        23467.375,
+                        877.375
+                    ]
+                }
+            ],
+            [
+                {
+                    "batch_size": 32,
+                    "num_steps": 100,
+                    "total_time": 15.511614799499512,
+                    "max_memory_usage_mb": 2891.67578125,
+                    "max_cpu_usage_percent": 7.816666666666666,
+                    "max_gpu_usage_percent": [
+                        60,
+                        0.0
+                    ],
+                    "max_gpu_memory_usage_mb": [
+                        23467.375,
+                        19432.9375
+                    ]
+                },
+                {
+                    "batch_size": 32,
+                    "num_steps": 100,
+                    "total_time": 3.836785078048706,
+                    "max_memory_usage_mb": 2891.67578125,
+                    "max_cpu_usage_percent": 8.383333333333333,
+                    "max_gpu_usage_percent": [
+                        60,
+                        0.0
+                    ],
+                    "max_gpu_memory_usage_mb": [
+                        23467.375,
+                        19432.9375
+                    ]
+                }
+            ],
+            [
+                {
+                    "batch_size": 64,
+                    "num_steps": 100,
+                    "total_time": 15.623321294784546,
+                    "max_memory_usage_mb": 2985.45703125,
+                    "max_cpu_usage_percent": 4.470833333333333,
+                    "max_gpu_usage_percent": [
+                        79,
+                        1
+                    ],
+                    "max_gpu_memory_usage_mb": [
+                        23467.375,
+                        19496.9375
+                    ]
+                },
+                {
+                    "batch_size": 64,
+                    "num_steps": 100,
+                    "total_time": 5.949746370315552,
+                    "max_memory_usage_mb": 2985.45703125,
+                    "max_cpu_usage_percent": 5.433333333333334,
+                    "max_gpu_usage_percent": [
+                        79,
+                        1
                     ],
                     "max_gpu_memory_usage_mb": [
                         23467.375,
@@ -146,14 +274,14 @@
             ],
             [
                 {
-                    "batch_size": 8,
+                    "batch_size": 128,
                     "num_steps": 100,
-                    "total_time": 4.982399225234985,
-                    "max_memory_usage_mb": 2208.25,
-                    "max_cpu_usage_percent": 10.766666666666666,
+                    "total_time": 14.511434078216553,
+                    "max_memory_usage_mb": 3073.859375,
+                    "max_cpu_usage_percent": 4.345833333333333,
                     "max_gpu_usage_percent": [
-                        100,
-                        48
+                        89,
+                        100
                     ],
                     "max_gpu_memory_usage_mb": [
                         23467.375,
@@ -161,14 +289,14 @@
                     ]
                 },
                 {
-                    "batch_size": 8,
+                    "batch_size": 128,
                     "num_steps": 100,
-                    "total_time": 2.508721351623535,
-                    "max_memory_usage_mb": 2208.25,
-                    "max_cpu_usage_percent": 8.0375,
+                    "total_time": 10.303936243057251,
+                    "max_memory_usage_mb": 3073.859375,
+                    "max_cpu_usage_percent": 5.433333333333334,
                     "max_gpu_usage_percent": [
-                        100,
-                        48
+                        89,
+                        100
                     ],
                     "max_gpu_memory_usage_mb": [
                         23467.375,
@@ -178,11 +306,43 @@
             ],
             [
                 {
-                    "batch_size": 16,
+                    "batch_size": 256,
                     "num_steps": 100,
-                    "total_time": 5.111313104629517,
-                    "max_memory_usage_mb": 2337.8046875,
-                    "max_cpu_usage_percent": 9.6875,
+                    "total_time": 15.898860216140747,
+                    "max_memory_usage_mb": 3180.16015625,
+                    "max_cpu_usage_percent": 4.283333333333333,
+                    "max_gpu_usage_percent": [
+                        95,
+                        0.0
+                    ],
+                    "max_gpu_memory_usage_mb": [
+                        23467.375,
+                        877.375
+                    ]
+                },
+                {
+                    "batch_size": 256,
+                    "num_steps": 100,
+                    "total_time": 21.187541723251343,
+                    "max_memory_usage_mb": 3180.16015625,
+                    "max_cpu_usage_percent": 5.1375,
+                    "max_gpu_usage_percent": [
+                        95,
+                        0.0
+                    ],
+                    "max_gpu_memory_usage_mb": [
+                        23467.375,
+                        877.375
+                    ]
+                }
+            ],
+            [
+                {
+                    "batch_size": 512,
+                    "num_steps": 100,
+                    "total_time": 17.0319402217865,
+                    "max_memory_usage_mb": 3277.078125,
+                    "max_cpu_usage_percent": 4.2250000000000005,
                     "max_gpu_usage_percent": [
                         100,
                         53
@@ -193,11 +353,11 @@
                     ]
                 },
                 {
-                    "batch_size": 16,
+                    "batch_size": 512,
                     "num_steps": 100,
-                    "total_time": 2.7903730869293213,
-                    "max_memory_usage_mb": 2337.8046875,
-                    "max_cpu_usage_percent": 10.554166666666667,
+                    "total_time": 43.082688331604004,
+                    "max_memory_usage_mb": 3277.078125,
+                    "max_cpu_usage_percent": 5.0,
                     "max_gpu_usage_percent": [
                         100,
                         53
@@ -205,166 +365,6 @@
                     "max_gpu_memory_usage_mb": [
                         23467.375,
                         19492.9375
-                    ]
-                }
-            ],
-            [
-                {
-                    "batch_size": 32,
-                    "num_steps": 100,
-                    "total_time": 5.239783048629761,
-                    "max_memory_usage_mb": 2470.3671875,
-                    "max_cpu_usage_percent": 7.8500000000000005,
-                    "max_gpu_usage_percent": [
-                        0.0,
-                        62
-                    ],
-                    "max_gpu_memory_usage_mb": [
-                        4845.8125,
-                        19494.9375
-                    ]
-                },
-                {
-                    "batch_size": 32,
-                    "num_steps": 100,
-                    "total_time": 3.619859457015991,
-                    "max_memory_usage_mb": 2470.3671875,
-                    "max_cpu_usage_percent": 8.362499999999999,
-                    "max_gpu_usage_percent": [
-                        0.0,
-                        62
-                    ],
-                    "max_gpu_memory_usage_mb": [
-                        4845.8125,
-                        19494.9375
-                    ]
-                }
-            ],
-            [
-                {
-                    "batch_size": 64,
-                    "num_steps": 100,
-                    "total_time": 4.828297138214111,
-                    "max_memory_usage_mb": 2604.96484375,
-                    "max_cpu_usage_percent": 4.7,
-                    "max_gpu_usage_percent": [
-                        0.0,
-                        80
-                    ],
-                    "max_gpu_memory_usage_mb": [
-                        4845.8125,
-                        19494.9375
-                    ]
-                },
-                {
-                    "batch_size": 64,
-                    "num_steps": 100,
-                    "total_time": 5.784795761108398,
-                    "max_memory_usage_mb": 2604.96484375,
-                    "max_cpu_usage_percent": 6.4875,
-                    "max_gpu_usage_percent": [
-                        0.0,
-                        80
-                    ],
-                    "max_gpu_memory_usage_mb": [
-                        4845.8125,
-                        19494.9375
-                    ]
-                }
-            ],
-            [
-                {
-                    "batch_size": 128,
-                    "num_steps": 100,
-                    "total_time": 4.775749683380127,
-                    "max_memory_usage_mb": 2736.19921875,
-                    "max_cpu_usage_percent": 2.5833333333333335,
-                    "max_gpu_usage_percent": [
-                        0.0,
-                        90
-                    ],
-                    "max_gpu_memory_usage_mb": [
-                        4845.8125,
-                        19496.9375
-                    ]
-                },
-                {
-                    "batch_size": 128,
-                    "num_steps": 100,
-                    "total_time": 10.294098615646362,
-                    "max_memory_usage_mb": 2736.19921875,
-                    "max_cpu_usage_percent": 5.458333333333333,
-                    "max_gpu_usage_percent": [
-                        0.0,
-                        90
-                    ],
-                    "max_gpu_memory_usage_mb": [
-                        4845.8125,
-                        19496.9375
-                    ]
-                }
-            ],
-            [
-                {
-                    "batch_size": 256,
-                    "num_steps": 100,
-                    "total_time": 5.461318731307983,
-                    "max_memory_usage_mb": 2863.50390625,
-                    "max_cpu_usage_percent": 1.2333333333333334,
-                    "max_gpu_usage_percent": [
-                        0.0,
-                        97
-                    ],
-                    "max_gpu_memory_usage_mb": [
-                        4845.8125,
-                        19496.9375
-                    ]
-                },
-                {
-                    "batch_size": 256,
-                    "num_steps": 100,
-                    "total_time": 21.224305391311646,
-                    "max_memory_usage_mb": 2863.29296875,
-                    "max_cpu_usage_percent": 5.404166666666666,
-                    "max_gpu_usage_percent": [
-                        0.0,
-                        97
-                    ],
-                    "max_gpu_memory_usage_mb": [
-                        4845.8125,
-                        19496.9375
-                    ]
-                }
-            ],
-            [
-                {
-                    "batch_size": 512,
-                    "num_steps": 100,
-                    "total_time": 4.720385789871216,
-                    "max_memory_usage_mb": 2935.59765625,
-                    "max_cpu_usage_percent": 0.5791666666666667,
-                    "max_gpu_usage_percent": [
-                        0.0,
-                        100
-                    ],
-                    "max_gpu_memory_usage_mb": [
-                        4845.8125,
-                        19498.9375
-                    ]
-                },
-                {
-                    "batch_size": 512,
-                    "num_steps": 100,
-                    "total_time": 43.40898299217224,
-                    "max_memory_usage_mb": 2935.59765625,
-                    "max_cpu_usage_percent": 5.279166666666667,
-                    "max_gpu_usage_percent": [
-                        0.0,
-                        100
-                    ],
-                    "max_gpu_memory_usage_mb": [
-                        4845.8125,
-                        19498.9375
                     ]
                 }
             ]
