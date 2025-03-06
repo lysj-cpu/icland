@@ -271,7 +271,7 @@ def step(
         >>> actions = jnp.zeros((2, icland.constants.ACTION_SPACE_DIM))
         >>> new_state, obs, rew = icland.step(state, params, actions)
         >>> new_state
-        (ICLandState(mjx_data=Data(...), agent_variables=ICLandAgentVariables(...), prop_variables=ICLandPropVariables(...)), ICLandObservation(...), Array(...))
+        ICLandState(mjx_data=Data(...), agent_variables=ICLandAgentVariables(...), prop_variables=ICLandPropVariables(...)), ICLandObservation(...), Array(...))
     """
     # Unpack state
     mjx_data = state.mjx_data
