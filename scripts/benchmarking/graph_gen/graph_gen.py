@@ -610,7 +610,144 @@ def plot_grid_sizes_step_graph(output_dir: str, y_axis: str, log: bool) -> None:
     plt.grid(True)
     plt.savefig(plot_path, bbox_inches="tight")
     plt.close()
-   
+
+def plot_agents_render_frame_graph(output_dir: str, y_axis: str, log: bool) -> None:
+    os.makedirs(output_dir, exist_ok=True)
+
+    input_dir = "scripts/benchmarking/graph_gen/jsons"
+    gpu_1_agent_empty_world_json = "render_frame_gpu_1_agent_empty_world_100_steps.json"
+    gpu_2_agents_empty_world_json = "render_frame_gpu_2_agents_empty_world_100_steps.json"
+    gpu_4_agents_empty_world_json = "render_frame_gpu_4_agents_empty_world_100_steps.json"
+    gpu_1_agent_non_empty_world_json = "render_frame_gpu_1_agent_2x2_100_steps.json"
+    gpu_2_agents_non_empty_world_json = "render_frame_gpu_2_agents_simple_non_empty_world_100_steps.json"
+    gpu_4_agents_non_empty_world_json = "render_frame_gpu_4_agents_simple_non_empty_world_100_steps.json"
+
+    gpu_1_agent_empty_world_json = os.path.join(input_dir, gpu_1_agent_empty_world_json)
+    gpu_2_agents_empty_world_json = os.path.join(input_dir, gpu_2_agents_empty_world_json)
+    gpu_4_agents_empty_world_json = os.path.join(input_dir, gpu_4_agents_empty_world_json)
+    gpu_1_agent_non_empty_world_json = os.path.join(input_dir, gpu_1_agent_non_empty_world_json)
+    gpu_2_agents_non_empty_world_json = os.path.join(input_dir, gpu_2_agents_non_empty_world_json)
+    gpu_4_agents_non_empty_world_json = os.path.join(input_dir, gpu_4_agents_non_empty_world_json)
+
+    with open(gpu_1_agent_empty_world_json, "r") as file:
+        gpu_1_agent_empty_world_data = json.load(file)
+    with open(gpu_2_agents_empty_world_json, "r") as file:
+        gpu_2_agents_empty_world_data = json.load(file)
+    with open(gpu_4_agents_empty_world_json, "r") as file:
+        gpu_4_agents_empty_world_data = json.load(file)
+    with open(gpu_1_agent_non_empty_world_json, "r") as file:
+        gpu_1_agent_non_empty_world_data = json.load(file)
+    with open(gpu_2_agents_non_empty_world_json, "r") as file:
+        gpu_2_agents_non_empty_world_data = json.load(file)
+    with open(gpu_4_agents_non_empty_world_json, "r") as file:
+        gpu_4_agents_non_empty_world_data = json.load(file)
+
+    gpu_1_agent_empty_world_results = gpu_1_agent_empty_world_data['benchmark_results']
+    gpu_2_agents_empty_world_results = gpu_2_agents_empty_world_data['benchmark_results']
+    gpu_4_agents_empty_world_results = gpu_4_agents_empty_world_data['benchmark_results']
+    gpu_1_agent_non_empty_world_results = gpu_1_agent_non_empty_world_data['benchmark_results']
+    gpu_2_agents_non_empty_world_results = gpu_2_agents_non_empty_world_data['benchmark_results']
+    gpu_4_agents_non_empty_world_results = gpu_4_agents_non_empty_world_data['benchmark_results']
+
+    # Assume that there is only one scenario in both json files
+    gpu_1_agent_empty_world_metrics_list = list(map(lambda inner_list: inner_list[1], list(gpu_1_agent_empty_world_results.items())[0][1]))
+    gpu_2_agents_empty_world_metrics_list = list(map(lambda inner_list: inner_list[1], list(gpu_2_agents_empty_world_results.items())[0][1]))
+    gpu_4_agents_empty_world_metrics_list = list(map(lambda inner_list: inner_list[1], list(gpu_4_agents_empty_world_results.items())[0][1]))
+    gpu_1_agent_non_empty_world_metrics_list = list(map(lambda inner_list: inner_list[1], list(gpu_1_agent_non_empty_world_results.items())[0][1]))
+    gpu_2_agents_non_empty_world_metrics_list = list(map(lambda inner_list: inner_list[1], list(gpu_2_agents_non_empty_world_results.items())[0][1]))
+    gpu_4_agents_non_empty_world_metrics_list = list(map(lambda inner_list: inner_list[1], list(gpu_4_agents_non_empty_world_results.items())[0][1]))
+    scenario_name = list(gpu_4_agents_non_empty_world_results.items())[0][0]
+
+    gpu_1_agent_empty_world_batch_sizes = [m['batch_size'] for m in gpu_1_agent_empty_world_metrics_list]
+    gpu_2_agents_empty_world_batch_sizes = [m['batch_size'] for m in gpu_2_agents_empty_world_metrics_list]
+    gpu_4_agents_empty_world_batch_sizes = [m['batch_size'] for m in gpu_4_agents_empty_world_metrics_list]
+    gpu_1_agent_non_empty_world_batch_sizes = [m['batch_size'] for m in gpu_1_agent_non_empty_world_metrics_list]
+    gpu_2_agents_non_empty_world_batch_sizes = [m['batch_size'] for m in gpu_2_agents_non_empty_world_metrics_list]
+    gpu_4_agents_non_empty_world_batch_sizes = [m['batch_size'] for m in gpu_4_agents_non_empty_world_metrics_list]
+
+    if y_axis == "time":
+      gpu_1_agent_empty_world_steps = [m['total_time'] for m in gpu_1_agent_empty_world_metrics_list]
+      gpu_2_agents_empty_world_steps = [m['total_time'] for m in gpu_2_agents_empty_world_metrics_list]
+      gpu_4_agents_empty_world_steps = [m['total_time'] for m in gpu_4_agents_empty_world_metrics_list]
+      gpu_1_agent_non_empty_world_steps = [m['total_time'] for m in gpu_1_agent_non_empty_world_metrics_list]
+      gpu_2_agents_non_empty_world_steps = [m['total_time'] for m in gpu_2_agents_non_empty_world_metrics_list]
+      gpu_4_agents_non_empty_world_steps = [m['total_time'] for m in gpu_4_agents_non_empty_world_metrics_list]
+    elif y_axis == "steps":
+      gpu_1_agent_empty_world_steps = [m['num_steps'] * m['batch_size'] / m['total_time'] for m in gpu_1_agent_empty_world_metrics_list]
+      gpu_2_agents_empty_world_steps = [m['num_steps'] * m['batch_size'] / m['total_time'] for m in gpu_2_agents_empty_world_metrics_list]
+      gpu_4_agents_empty_world_steps = [m['num_steps'] * m['batch_size'] / m['total_time'] for m in gpu_4_agents_empty_world_metrics_list]
+      gpu_1_agent_non_empty_world_steps = [m['num_steps'] * m['batch_size'] / m['total_time'] for m in gpu_1_agent_non_empty_world_metrics_list]
+      gpu_2_agents_non_empty_world_steps = [m['num_steps'] * m['batch_size'] / m['total_time'] for m in gpu_2_agents_non_empty_world_metrics_list]
+      gpu_4_agents_non_empty_world_steps = [m['num_steps'] * m['batch_size'] / m['total_time'] for m in gpu_4_agents_non_empty_world_metrics_list]
+    else:
+      raise ValueError(f"Invalid value for y_axis: {y_axis}")
+
+    plt.figure()
+    plt.plot(gpu_1_agent_empty_world_batch_sizes, gpu_1_agent_empty_world_steps, color="red", marker="x", linestyle=":", label="1 agent (empty world)")
+    plt.plot(gpu_2_agents_empty_world_batch_sizes, gpu_2_agents_empty_world_steps, color="green", marker="x", linestyle=":", label="2 agents (empty world)")
+    plt.plot(gpu_4_agents_empty_world_batch_sizes, gpu_4_agents_empty_world_steps, color="blue", marker="x", linestyle=":", label="4 agents (empty world)")
+    plt.plot(gpu_1_agent_non_empty_world_batch_sizes, gpu_1_agent_non_empty_world_steps, color="red", marker="o", label="1 agent (non-empty world)")
+    plt.plot(gpu_2_agents_non_empty_world_batch_sizes, gpu_2_agents_non_empty_world_steps, color="green", marker="o", label="2 agents (non-empty world)")
+    plt.plot(gpu_4_agents_non_empty_world_batch_sizes, gpu_4_agents_non_empty_world_steps, color="blue", marker="o", label="4 agents (non-empty world)")
+
+    legend_elements = [
+      mpatches.Patch(color='red', label='1 agent'),
+      mpatches.Patch(color='green', label='2 agents'),
+      mpatches.Patch(color='blue', label='4 agents'),
+      Line2D([0], [0], color='black', lw=1, marker='x', linestyle=':', label='empty world (baseline)'),
+      Line2D([0], [0], color='black', lw=1, marker='o', label='non-empty (2x2) world'),
+    ]
+
+    plt.legend(handles=legend_elements, loc='upper left')
+
+    # special_points = [(1, "1"), (1, "2"), (1, "4"), (2**11, "1"), (2**11, "2"), (2**8, "4"), (2**14, "1"), (2**13, "2"), (2**13, "4")]
+    special_points = [(2**7, "4")]
+
+    # Special points
+    for x_val, pu in special_points:
+        if pu == "1":
+            y_val = gpu_1_agent_non_empty_world_steps[gpu_1_agent_non_empty_world_batch_sizes.index(x_val)]
+            color = "red"
+        elif pu == "2":
+            y_val = gpu_2_agents_non_empty_world_steps[gpu_2_agents_non_empty_world_batch_sizes.index(x_val)]
+            color = "green"
+        elif pu == "4":
+            y_val = gpu_4_agents_non_empty_world_steps[gpu_4_agents_non_empty_world_batch_sizes.index(x_val)]
+            color = "blue"
+        else:
+            raise ValueError(f"Invalid value for pu: {pu}")
+
+        plt.annotate(
+            round_to_sig_figs(y_val), 
+            (x_val, y_val), 
+            textcoords="offset points",
+            xytext=(0, 10) if pu == "4" else (0, -15),
+            ha="center", 
+            fontsize=8,
+            color=color,
+            bbox=dict(boxstyle="round,pad=0.3", edgecolor=color, facecolor="white")
+        )
+
+    if log:
+        plt.xscale("log", base=2)
+    plt.xlabel("Batch Size")
+    if (y_axis == "time"):
+      plt.ylabel("Total time (in s)")
+      plt.title(f"Total time (100 steps) vs Batch Size ({scenario_name})")
+      plot_path = os.path.join(
+          output_dir, f"{scenario_name}_total-time.png"
+      )
+    else:
+      plt.ylabel(f"Total steps per second")
+      plt.title(f"Total Steps per Second (100 steps) vs Batch Size ({scenario_name})")
+      plot_path = os.path.join(
+        output_dir, f"{scenario_name}_total-steps-per-sec.png"
+      )
+
+    plt.grid(True)
+    plt.savefig(plot_path, bbox_inches="tight")
+    plt.close()
+
 if __name__ == "__main__":
   # plot_simple_step_graph(
   #   "scripts/benchmarking/graph_gen/graphs", 
@@ -624,7 +761,7 @@ if __name__ == "__main__":
   #   "scripts/benchmarking/graph_gen/graphs", 
   #   True
   # )
-  plot_grid_sizes_step_graph(
+  plot_agents_render_frame_graph(
     "scripts/benchmarking/graph_gen/graphs", 
     "steps",
     True

@@ -661,7 +661,7 @@ def benchmark_render_frame_non_empty_world(batch_size: int, width: int, agent_co
     )
 
 def benchmark_render_frame_empty_world(batch_size: int, agent_count: int, num_steps: int) -> tuple[ComplexStepMetrics, ComplexStepMetrics]:
-    width = 10
+    width = 2
     key = jax.random.PRNGKey(SEED)
     icland_params = icland.sample(agent_count, key)
     init_state = icland.init(key, icland_params)
