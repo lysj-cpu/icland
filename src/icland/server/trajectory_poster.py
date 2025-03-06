@@ -46,7 +46,15 @@ class WebSocketTrajectoryPoster:  # pragma: no cover
             print("Server confirmed simulation has ended")
 
     def connect(self) -> None:
-        """Connects to the server."""
+        """Establish a connection to the server.
+
+        Attempts to connect to the server specified by `server_url` with a maximum
+        of 5 retries. If a connection attempt fails, it waits 1 second before the
+        next attempt. Raises a `ConnectionError` if all retries are exhausted.
+
+        Raises:
+            ConnectionError: If connection fails after all retry attempts.
+        """
         max_retries = 5
         retry_delay = 1
         for attempt in range(max_retries):
@@ -66,7 +74,18 @@ class WebSocketTrajectoryPoster:  # pragma: no cover
         rewards: list[Any],
         image: str,
     ) -> None:
-        """Post raw simulation data for a timestep."""
+        """Post raw simulation data for a specific timestep to the server.
+
+        Constructs a payload containing the timestep, agent positions, rewards,
+        and an image, then emits it to the server via the 'update_simulation_data'
+        event. Prints a confirmation message upon successful posting.
+
+        Args:
+            timestep (int): The simulation timestep.
+            positions (np.ndarray): Array of agent positions, can be multi-dimensional.
+            rewards (list[Any]): List of rewards for each agent.
+            image (str): Base64-encoded image string representing the simulation frame.
+        """
         payload = {
             "timestep": timestep,
             "positions": [
@@ -80,12 +99,20 @@ class WebSocketTrajectoryPoster:  # pragma: no cover
         print(f"Posted simulation data for timestep {timestep}")
 
     def end_simulation(self) -> None:
-        """Signal the end of the simulation."""
+        """Signal the server that the simulation has ended.
+
+        Emits an 'end_simulation' event to the server to indicate the completion
+        of the simulation and prints a confirmation message.
+        """
         self.sio.emit("end_simulation")
         print("Posted end of simulation signal")
 
     def stop(self) -> None:
-        """Sends a signal to the server to terminate it."""
+        """Signal the server to terminate its operation.
+
+        Sets the `stop_event` to indicate that the server should shut down. This
+        does not directly disconnect the client but prepares for termination.
+        """
         self.stop_event.set()
 
     def __numpy_to_base64(
@@ -111,7 +138,25 @@ class WebSocketTrajectoryPoster:  # pragma: no cover
         icland_rewards: jax.Array,
         window_size: tuple[int, int] = (960, 720),
     ) -> None:
-        """Post ICLand data (state and params) for a timestep to the server."""
+        """Post ICLand-specific simulation data for a timestep to the server.
+
+        Processes ICLand simulation data, including parameters and state, to extract
+        agent positions and render a top-down view. Converts the rendered frame to
+        a Base64-encoded string and posts it along with positions and rewards to
+        the server using `post_simulation_data`.
+
+        Args:
+            timestep (int): The simulation timestep.
+            icland_params (ICLandParams): Parameters defining the ICLand simulation.
+            icland_state (ICLandState): Current state of the ICLand simulation.
+            icland_actions (jax.Array): Actions taken by agents in this timestep.
+            icland_rewards (jax.Array): Rewards received by agents in this timestep.
+            window_size (tuple[int, int], optional): Size of the rendered frame in pixels.
+                Defaults to (960, 720).
+
+        Returns:
+            None
+        """
         # Unpack state
         mjx_data = icland_state.mjx_data
         agent_variables = icland_state.agent_variables

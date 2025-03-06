@@ -155,12 +155,23 @@ class TrajectoryManager:  # pragma: no cover
         self.server_process = Process(target=self.server.run, daemon=False)
 
     def start(self) -> None:
-        """Start up the server."""
+        """Start the trajectory manager server.
+
+        This method initializes the server by clearing the shutdown event and
+        starting the server process in a separate process. The server will begin
+        accepting connections and handling simulation data.
+        """
         self.shutdown_event.clear()
         self.server_process.start()
 
     def stop(self) -> None:
-        """Terminate the server."""
+        """Stop the trajectory manager server.
+
+        This method signals the server to shut down by setting the shutdown event
+        and waits for the server process to terminate gracefully within a 5-second
+        timeout. If the process does not terminate within this period, it is forcibly
+        terminated, and a message is printed to indicate the outcome.
+        """
         self.shutdown_event.set()
         self.server_process.join(timeout=5)
         if self.server_process.is_alive():
