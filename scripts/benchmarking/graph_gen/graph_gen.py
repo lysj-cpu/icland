@@ -655,16 +655,16 @@ def plot_cpu_gpu_render_frame(output_dir: str, y_axis: str, log: bool, agent_cou
     gpu_empty_world_metrics_list = gpu_empty_world_metrics_list[1::2]
     gpu_non_empty_world_metrics_list = gpu_non_empty_world_metrics_list[1::2]
 
-    cpu_non_empty_world_metrics_list = [m[0] for m in cpu_non_empty_world_metrics_list]
-    gpu_non_empty_world_metrics_list = [m[0] for m in gpu_non_empty_world_metrics_list]
-    cpu_empty_world_metrics_list = [m[0] for m in cpu_empty_world_metrics_list]
-    gpu_empty_world_metrics_list = [m[0] for m in gpu_empty_world_metrics_list]
+    cpu_non_empty_world_metrics_list = [m for ms in cpu_non_empty_world_metrics_list for m in ms]
+    gpu_non_empty_world_metrics_list = [m for ms in gpu_non_empty_world_metrics_list for m in ms]
+    cpu_empty_world_metrics_list = [m for ms in cpu_empty_world_metrics_list for m in ms]
+    gpu_empty_world_metrics_list = [m for ms in gpu_empty_world_metrics_list for m in ms]
 
     cpu_empty_world_batch_sizes = [m['batch_size'] for m in cpu_empty_world_metrics_list]
     cpu_non_empty_world_batch_sizes = [m['batch_size'] for m in cpu_non_empty_world_metrics_list]
     gpu_empty_world_batch_sizes = [m['batch_size'] for m in gpu_empty_world_metrics_list]
     gpu_non_empty_world_batch_sizes = [m['batch_size'] for m in gpu_non_empty_world_metrics_list]
-    print(cpu_non_empty_world_metrics_list)
+
     if y_axis == "time":
       cpu_empty_world_steps = [m['total_time'] for m in cpu_empty_world_metrics_list]
       cpu_non_empty_world_steps = [m['total_time'] for m in cpu_non_empty_world_metrics_list]
@@ -907,11 +907,11 @@ def plot_grid_size_render_graph_step(output_dir: str, y_axis: str, log: bool) ->
     _, gpu_4x4_world_metrics_list = list(gpu_4x4_world_results.items())[0]
     scenario_name = f"grid_{y_axis}"
     # scenario_name, gpu_8x8_world_metrics_list = list(gpu_8x8_world_results.items())[0]
-    
-    gpu_2x2_world_metrics_list = [m[0] for m in gpu_2x2_world_metrics_list]
-    gpu_4x4_world_metrics_list = [m[0] for m in gpu_4x4_world_metrics_list]
-    # gpu_8x8_world_metrics_list = [m[0] for m in gpu_8x8_world_metrics_list]
 
+    gpu_2x2_world_metrics_list = [m[1] for m in gpu_2x2_world_metrics_list]
+    gpu_4x4_world_metrics_list = [m[1] for m in gpu_4x4_world_metrics_list]
+    # gpu_8x8_world_metrics_list = [m[0] for m in gpu_8x8_world_metrics_list]
+    print(gpu_2x2_world_metrics_list)
     gpu_2x2_world_batch_sizes = [m['batch_size'] for m in gpu_2x2_world_metrics_list]
     gpu_4x4_world_batch_sizes = [m['batch_size'] for m in gpu_4x4_world_metrics_list]
     # gpu_8x8_world_batch_sizes = [m['batch_size'] for m in gpu_8x8_world_metrics_list]
@@ -1071,12 +1071,12 @@ if __name__ == "__main__":
   #   "scripts/benchmarking/graph_gen/graphs", 
   #   True
   # )
-  # plot_cpu_gpu_render_frame(
-  #   "scripts/benchmarking/graph_gen/graphs", 
-  #   "time",
-  #   True,
-  #   1
-  # )
+  plot_cpu_gpu_render_frame(
+    "scripts/benchmarking/graph_gen/graphs", 
+    "time",
+    True,
+    1
+  )
   # plot_agents_render_frame_graph(
   #    "scripts/benchmarking/graph_gen/graphs",
   #    "time",
@@ -1085,10 +1085,5 @@ if __name__ == "__main__":
   plot_grid_size_render_graph_step(
      "scripts/benchmarking/graph_gen/graphs",
      "time",
-     True,
-	)
-  plot_grid_size_render_graph_step(
-     "scripts/benchmarking/graph_gen/graphs",
-     "steps",
      True,
 	)
