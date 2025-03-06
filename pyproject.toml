@@ -9,6 +9,9 @@ license_files = ["LICENSE"]
 dependencies = [
     "beartype>=0.19.0",
     "brax>=0.12.1",
+    "flask>=3.1.0",
+    "flask-cors>=5.0.0",
+    "flask-socketio>=5.5.1",
     "flax>=0.10.2",
     "gputil>=1.4.0",
     "hilbertcurve>=2",
@@ -26,8 +29,10 @@ dependencies = [
     "pygame>=2.6.1",
     "pylatex>=1.4.2",
     "pynvml>=12.0.0",
+    "requests>=2.32.3",
     "scipy>=1.15.1",
     "types-setuptools>=75.8.0.20250110",
+    "websocket-client>=1.8.0",
 ]
 
 [build-system]

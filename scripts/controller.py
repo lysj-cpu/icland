@@ -98,7 +98,7 @@ def interactive_simulation(jax_key: jax.Array) -> None:
         while True:
             # Update mjx data
             mjx_data = icland_state.mjx_data
-            
+
             # Quit if 'q' is pressed
             keys = pygame.key.get_pressed()
             if keys[pygame.K_q]:
@@ -170,7 +170,9 @@ def interactive_simulation(jax_key: jax.Array) -> None:
             # Convert the frame from RGB to BGR for OpenCV.
             frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
-            resized_frame = cv2.resize(frame, window_size, interpolation=cv2.INTER_NEAREST)
+            resized_frame = cv2.resize(
+                frame, window_size, interpolation=cv2.INTER_NEAREST
+            )
             frame_bytes = resized_frame.tobytes()
             screen.blit(
                 pygame.image.frombuffer(frame_bytes, resized_frame.shape[1::-1], "RGB"),

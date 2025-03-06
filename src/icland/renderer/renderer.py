@@ -624,6 +624,106 @@ def render_frame_with_objects(
     return frame.reshape((view_height, view_width, NUM_CHANNELS))
 
 
+def _get_props_info(
+    mjx_data: MjxStateType,
+    agent_info: ICLandAgentInfo,
+    prop_info: ICLandPropInfo,
+    prop_vars: ICLandPropVariables,
+    max_world_width: int,
+) -> RenderPropInfo:
+    max_prop_count = prop_info.spawn_points.shape[0]
+    max_agent_count = agent_info.spawn_points.shape[0]
+    prop_count = prop_info.prop_count
+    prop_indices = jnp.arange(max_prop_count)
+
+    prop_mask = jax.vmap(lambda i: i < prop_count)(prop_indices)
+
+    def __get_prop_data(prop_id: jax.Array) -> RenderPropInfo:
+        body_id = prop_info.body_ids[prop_id].astype(int)
+        prop_dof = PROP_DOF_MULTIPLIER + 1
+        prop_pos_index = AGENT_DOF_OFFSET * max_agent_count + prop_dof * prop_id
+        prop_pos = jnp.array(
+            [
+                -mjx_data.qpos[prop_pos_index] + max_world_width,
+                mjx_data.qpos[prop_pos_index + 2],
+                mjx_data.qpos[prop_pos_index + 1],
+            ]
+        )
+
+        # Get rotation from the MJX data
+        prop_quat = jax.lax.dynamic_slice_in_dim(
+            mjx_data.qpos,
+            AGENT_DOF_OFFSET * max_agent_count
+            + prop_id * prop_dof
+            + PROP_DOF_OFFSET
+            - 1,
+            PROP_DOF_OFFSET,
+        )
+        # Transform quat to fit renderer coordinate system
+        # (w, x, y, z) --> (w, -x, z, y)
+        prop_quat = jnp.array([prop_quat[0], -prop_quat[1], prop_quat[3], prop_quat[2]])
+        prop_type = prop_info.prop_types[prop_id]
+        colour = prop_info.colour[prop_id] * prop_mask[prop_id]
+
+        return RenderPropInfo(
+            prop_type=prop_type, pos=prop_pos, rot=prop_quat, col=colour
+        )
+
+    return jax.vmap(__get_prop_data)(prop_indices)
+
+
+def _get_agents_info(
+    mjx_data: MjxStateType,
+    agent_info: ICLandAgentInfo,
+    agent_vars: ICLandAgentVariables,
+    max_world_width: int,
+) -> RenderAgentInfo:
+    max_agent_count = agent_info.spawn_points.shape[0]
+    agent_count = agent_info.agent_count
+    agent_indices = jnp.arange(max_agent_count)
+
+    agent_mask = jax.vmap(lambda i: i < agent_count)(agent_indices)
+
+    def __get_agent_data(
+        agent_id: jax.Array,
+    ) -> tuple[jax.Array, jax.Array]:
+        body_id = agent_info.body_ids[agent_id].astype(int)
+        pitch = agent_vars.pitch[agent_id]  # TODO: Change multiplier
+        dof_address = agent_info.dof_addresses[agent_id].astype(int)
+
+        agent_pos = jnp.array(
+            [
+                -mjx_data.xpos[body_id][0] + max_world_width,
+                mjx_data.xpos[body_id][2] + AGENT_HEIGHT / 2,
+                mjx_data.xpos[body_id][1],
+            ]
+        )
+
+        # Get yaw from the MJX data
+        # yaw = mjx_data.qpos[dof_address + body_id * 4 + 3]
+        yaw = mjx_data.qpos[dof_address + 3]  # Get angle from dof address
+
+        # Compute forward direction using both yaw and pitch.
+        # When pitch=0, this reduces to [-cos(yaw), 0, sin(yaw)] as before.
+        forward_dir = (
+            jnp.array(
+                [
+                    -jnp.cos(pitch) * jnp.cos(yaw),
+                    jnp.sin(pitch),
+                    jnp.cos(pitch) * jnp.sin(yaw),
+                ]
+            )
+            * agent_mask[agent_id]
+        )
+
+        agent_pos = agent_pos * agent_mask[agent_id]
+        colour = agent_info.colour[agent_id] * agent_mask[agent_id]
+
+        return RenderAgentInfo(pos=agent_pos, rot=forward_dir, col=colour)
+
+    return cast(RenderAgentInfo, jax.vmap(__get_agent_data)(agent_indices))
+
+
 @partial(jax.jit, static_argnames=["view_width", "view_height"])
 def render(
     agent_info: ICLandAgentInfo,
@@ -635,7 +735,7 @@ def render(
     mjx_data: MjxStateType,
     view_width: int = DEFAULT_VIEWSIZE[0],
     view_height: int = DEFAULT_VIEWSIZE[1],
-) -> jax.Array:
+) -> jax.Array:  # pragma: no cover
     """Top-level render function.
 
     Called by `icland.step` once every `FPS / Physics steps per second` physical steps.
@@ -650,115 +750,16 @@ def render(
         mjx_data: The current state of the MuJoCo simulation, as an `MjxStateType`.
         view_width: The width of the rendered frame in pixels. Defaults to the first element of `DEFAULT_VIEWSIZE`.
         view_height: The height of the rendered frame in pixels. Defaults to the second element of `DEFAULT_VIEWSIZE`.
+        top_down:
 
     Returns:
         A JAX array representing the rendered frames, with shape (num_agents, view_height, view_width, NUM_CHANNELS).
     """
-
-    def __get_props_info(
-        mjx_data: MjxStateType,
-        prop_info: ICLandPropInfo,
-        prop_vars: ICLandPropVariables,
-        max_world_width: int,
-    ) -> RenderPropInfo:
-        max_prop_count = prop_info.spawn_points.shape[0]
-        max_agent_count = agent_info.spawn_points.shape[0]
-        prop_count = prop_info.prop_count
-        prop_indices = jnp.arange(max_prop_count)
-
-        prop_mask = jax.vmap(lambda i: i < prop_count)(prop_indices)
-
-        def __get_prop_data(prop_id: jax.Array) -> RenderPropInfo:
-            body_id = prop_info.body_ids[prop_id].astype(int)
-            prop_dof = PROP_DOF_MULTIPLIER + 1
-            prop_pos_index = AGENT_DOF_OFFSET * max_agent_count + prop_dof * prop_id
-            prop_pos = jnp.array(
-                [
-                    -mjx_data.qpos[prop_pos_index] + max_world_width,
-                    mjx_data.qpos[prop_pos_index + 2],
-                    mjx_data.qpos[prop_pos_index + 1],
-                ]
-            )
-
-            # Get rotation from the MJX data
-            prop_quat = jax.lax.dynamic_slice_in_dim(
-                mjx_data.qpos,
-                AGENT_DOF_OFFSET * max_agent_count
-                + prop_id * prop_dof
-                + PROP_DOF_OFFSET
-                - 1,
-                PROP_DOF_OFFSET,
-            )
-            # Transform quat to fit renderer coordinate system
-            # (w, x, y, z) --> (w, -x, z, y)
-            prop_quat = jnp.array(
-                [prop_quat[0], -prop_quat[1], prop_quat[3], prop_quat[2]]
-            )
-            prop_type = prop_info.prop_types[prop_id]
-            colour = prop_info.colour[prop_id] * prop_mask[prop_id]
-
-            return RenderPropInfo(
-                prop_type=prop_type, pos=prop_pos, rot=prop_quat, col=colour
-            )
-
-        return jax.vmap(__get_prop_data)(prop_indices)
-
-    def __get_agents_info(
-        mjx_data: MjxStateType,
-        agent_info: ICLandAgentInfo,
-        agent_vars: ICLandAgentVariables,
-        max_world_width: int,
-    ) -> RenderAgentInfo:
-        max_agent_count = agent_info.spawn_points.shape[0]
-        agent_count = agent_info.agent_count
-        agent_indices = jnp.arange(max_agent_count)
-
-        agent_mask = jax.vmap(lambda i: i < agent_count)(agent_indices)
-
-        def __get_agent_data(
-            agent_id: jax.Array,
-        ) -> tuple[jax.Array, jax.Array]:
-            body_id = agent_info.body_ids[agent_id].astype(int)
-            pitch = agent_vars.pitch[agent_id]  # TODO: Change multiplier
-            dof_address = agent_info.dof_addresses[agent_id].astype(int)
-
-            agent_pos = jnp.array(
-                [
-                    -mjx_data.xpos[body_id][0] + max_world_width,
-                    mjx_data.xpos[body_id][2] + AGENT_HEIGHT / 2,
-                    mjx_data.xpos[body_id][1],
-                ]
-            )
-
-            # Get yaw from the MJX data
-            # yaw = mjx_data.qpos[dof_address + body_id * 4 + 3]
-            yaw = mjx_data.qpos[dof_address + 3]  # Get angle from dof address
-
-            # Compute forward direction using both yaw and pitch.
-            # When pitch=0, this reduces to [-cos(yaw), 0, sin(yaw)] as before.
-            forward_dir = (
-                jnp.array(
-                    [
-                        -jnp.cos(pitch) * jnp.cos(yaw),
-                        jnp.sin(pitch),
-                        jnp.cos(pitch) * jnp.sin(yaw),
-                    ]
-                )
-                * agent_mask[agent_id]
-            )
-
-            agent_pos = agent_pos * agent_mask[agent_id]
-            colour = agent_info.colour[agent_id] * agent_mask[agent_id]
-
-            return RenderAgentInfo(pos=agent_pos, rot=forward_dir, col=colour)
-
-        return cast(RenderAgentInfo, jax.vmap(__get_agent_data)(agent_indices))
-
-    render_agent_info = __get_agents_info(
+    render_agent_info = _get_agents_info(
         mjx_data, agent_info, agent_vars, world.max_world_width
     )
-    render_prop_info = __get_props_info(
-        mjx_data, prop_info, prop_vars, world.max_world_width
+    render_prop_info = _get_props_info(
+        mjx_data, agent_info, prop_info, prop_vars, world.max_world_width
     )
     frames = jax.vmap(
         partial(
@@ -773,17 +774,62 @@ def render(
         ),
         in_axes=(0, 0),
     )(render_agent_info.pos, render_agent_info.rot)
-    # )(
-    #     jnp.array(
-    #         [
-    #             [
-    #                 world.tilemap.shape[0] / 2,
-    #                 2 * (jnp.maximum(world.tilemap.shape[0], world.tilemap.shape[1])),
-    #                 world.tilemap.shape[1] / 2,
-    #             ]
-    #         ]
-    #     ),
-    #     jnp.array([[0.0, -1.0, 0.01]]),
-    # )
 
     return frames
+
+
+@partial(jax.jit, static_argnames=["view_width", "view_height"])
+def render_top_down(
+    agent_info: ICLandAgentInfo,
+    agent_vars: ICLandAgentVariables,
+    prop_info: ICLandPropInfo,
+    prop_vars: ICLandPropVariables,
+    agent_actions: jax.Array,
+    world: ICLandWorld,
+    mjx_data: MjxStateType,
+    view_width: int = DEFAULT_VIEWSIZE[0],
+    view_height: int = DEFAULT_VIEWSIZE[1],
+) -> jax.Array:  # pragma: no cover
+    """Render one "top-down" frame for monitoring.
+
+    Args:
+        agent_info: Information about the agents to render, as an `ICLandAgentInfo` namedtuple.
+        agent_vars: Variables associated with the agents, as an `ICLandAgentVariables` namedtuple.
+        prop_info: Information about the props to render, as an `ICLandPropInfo` namedtuple.
+        prop_vars: Variables associated with the props, as an `ICLandPropVariables` namedtuple.
+        agent_actions: Information about the agents' actions to render, such as tagging and grabbing.
+        world: The ICLand world information, as an `ICLandWorld` namedtuple.
+        mjx_data: The current state of the MuJoCo simulation, as an `MjxStateType`.
+        view_width: The width of the rendered frame in pixels. Defaults to the first element of `DEFAULT_VIEWSIZE`.
+        view_height: The height of the rendered frame in pixels. Defaults to the second element of `DEFAULT_VIEWSIZE`.
+
+    Returns:
+        A JAX array representing the rendered frame, with shape (view_height, view_width, NUM_CHANNELS).
+    """
+    render_agent_info = _get_agents_info(
+        mjx_data, agent_info, agent_vars, world.max_world_width
+    )
+    render_prop_info = _get_props_info(
+        mjx_data, agent_info, prop_info, prop_vars, world.max_world_width
+    )
+    cam_pos = jnp.array(
+        [
+            world.tilemap.shape[0] / 2,
+            2 * (jnp.maximum(world.tilemap.shape[0], world.tilemap.shape[1])),
+            world.tilemap.shape[1] / 2,
+        ]
+    )
+    cam_dir = jnp.array([0.0, -1.0, 0.01])
+    frame = render_frame_with_objects(
+        cam_pos,
+        cam_dir,
+        tilemap=world.tilemap,
+        cmap=world.cmap,
+        agents=render_agent_info,
+        props=render_prop_info,
+        actions=agent_actions,
+        view_width=view_width,
+        view_height=view_height,
+    )
+
+    return frame

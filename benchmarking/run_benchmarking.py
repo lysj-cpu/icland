@@ -13,7 +13,15 @@ import psutil
 import pynvml
 
 import icland
-from icland.presets import DEFAULT_CONFIG
+
+DEFAULT_CONFIG = icland.config(
+    5,
+    5,
+    6,
+    2,
+    2,
+    2,
+)
 
 # --------------------------------------------------------------------------------------
 # SCENARIOS: a dictionary for all your benchmark scenarios.
