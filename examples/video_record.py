@@ -2,6 +2,8 @@
 
 from typing import Any
 
+# import cv2  # For displaying frames and capturing window events.
+import imageio
 import jax
 import jax.numpy as jnp
 
@@ -113,8 +115,13 @@ while state.mjx_data.time < TIME:
     # cv2.imshow(window_name, frame_bgr)
     timestep += 1
 
-# DISABLE IF TESTING LOCALLY
-# imageio.mimsave(
-#     "tests/video_output/ICLand_FPS_ma.mp4", agent_frames, fps=FPS, quality=8
-# )
-# print("ICLand video ended.")
+# cv2.destroyWindow(window_name)
+imageio.mimsave(
+    "tests/video_output/ICLand_FPS_ma.mp4", agent_frames, fps=FPS, quality=8
+)
+print("ICLand video ended.")
+
+# Calculate the reward
+# if icland_params.reward_function is not None:
+#     reward = icland_params.reward_function(next_state.data)
+#     print(reward)

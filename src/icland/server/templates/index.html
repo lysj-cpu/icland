@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>ICLand simulation visualisation</title>
+    <title>Simulation Visualisation</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
         html, body {
@@ -19,8 +19,18 @@
             padding: 20px;
             box-sizing: border-box;
         }
+        #header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        #logo {
+            height: 50px;
+            width: auto;
+        }
         h1 {
-            margin: 0 0 20px 0;
+            margin: 0;
         }
         #main-container {
             flex: 1;
@@ -30,6 +40,7 @@
         #numeric-container {
             flex: 1;
             border: 1px solid #ddd;
+            border-radius: 10px;
             padding: 10px;
             overflow-y: auto;
         }
@@ -37,21 +48,29 @@
             flex: 1;
             display: flex;
             flex-direction: column;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 10px;
         }
         #image-display {
-            flex: 0 0 auto;
+            flex: 1;
             text-align: center;
+            min-height: 0;
+        }
+        #controls-container {
+            flex: 0 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
         }
         #timestep-slider {
             width: 100%;
-            margin-top: 10px;
         }
         #control-buttons {
-            margin-top: 10px;
             display: flex;
             gap: 10px;
         }
-        #stop-button, #play-button {
+        #stop-button, #play-button, #export-button, #export-data-button {
             padding: 10px 20px;
             color: white;
             border: none;
@@ -73,8 +92,20 @@
             background-color: #cccccc;
             cursor: not-allowed;
         }
+        #export-button {
+            background-color: #4444ff;
+        }
+        #export-button:hover {
+            background-color: #0000cc;
+        }
+        #export-data-button {
+            background-color: #800080; /* Purple */
+        }
+        #export-data-button:hover {
+            background-color: #4b0082;
+        }
         #current-timestep {
-            margin-top: 10px;
+            text-align: center;
         }
         .agent-data {
             margin-bottom: 10px;
@@ -83,26 +114,33 @@
         }
         img {
             max-width: 100%;
-            max-height: 300px;
+            max-height: 100%;
             border: 1px solid #ddd;
-            width: 100%; /* Ensure placeholder fills container */
+            width: 100%;
             height: auto;
-            object-fit: cover; /* Maintain aspect ratio while filling */
+            object-fit: contain;
         }
     </style>
 </head>
 <body>
-    <h1>ICLand simulation visualisation</h1>
+    <div id="header">
+        <h1>Simulation Visualization</h1>
+        <img src="/static/icland.png" alt="Logo" id="logo">
+    </div>
     <div id="main-container">
         <div id="numeric-container"></div>
         <div id="image-container">
             <div id="image-display"></div>
-            <input type="range" id="timestep-slider" min="0" max="0" value="0" disabled>
-            <div id="control-buttons">
-                <button id="play-button" disabled>Play</button>
-                <button id="stop-button">Stop Server</button>
+            <div id="controls-container">
+                <div id="current-timestep">Timestep: 0</div>
+                <input type="range" id="timestep-slider" min="0" max="0" value="0" disabled>
+                <div id="control-buttons">
+                    <button id="play-button" disabled>Play</button>
+                    <button id="stop-button">Stop Server</button>
+                    <button id="export-button">Export Video</button>
+                    <button id="export-data-button">Export Data</button>
+                </div>
             </div>
-            <div id="current-timestep">Timestep: 0</div>
         </div>
     </div>
 
@@ -117,9 +155,14 @@
         socket.on('connect', function() {
             console.log('Connected to server');
             socket.emit('get_simulation_data');
+            document.getElementById('timestep-slider').disabled = true;
+            document.getElementById('play-button').disabled = true;
+            // updateDisplay with /static/placeholder.png
+            updateDisplay();
         });
 
         socket.on('simulation_data_update', function(data) {
+            console.log('Data update:', data.timestep);
             simulationData.push(data);
             if (!simulationEnded) {
                 currentTimestep = data.timestep;
@@ -127,18 +170,22 @@
                 updateDisplay(data);
                 const numericContainer = document.getElementById('numeric-container');
                 numericContainer.scrollTop = numericContainer.scrollHeight;
+                document.getElementById('timestep-slider').disabled = true;
             } else {
                 updateSlider();
             }
         });
 
         socket.on('simulation_ended', function() {
+            console.log('Simulation ended event received');
             simulationEnded = true;
             document.getElementById('timestep-slider').disabled = false;
-            document.getElementById('play-button').disabled = false; // Enable play button when simulation ends
+            document.getElementById('play-button').disabled = false;
+            console.log('Simulation ended, controls enabled');
         });
 
         socket.on('simulation_data_response', function(data) {
+            console.log('Data response:', data);
             if (Array.isArray(data)) {
                 simulationData = data;
                 if (data.length > 0 && !simulationEnded) {
@@ -149,6 +196,7 @@
                 if (!simulationEnded) {
                     const numericContainer = document.getElementById('numeric-container');
                     numericContainer.scrollTop = numericContainer.scrollHeight;
+                    document.getElementById('timestep-slider').disabled = true;
                 }
             } else {
                 updateDisplay(data);
@@ -156,7 +204,7 @@
         });
 
         socket.on('server_stopped', function() {
-            console.log('Server has stopped');
+            console.log('Server stopped');
             alert('The server has been terminated.');
             stopPlayback();
         });
@@ -164,19 +212,15 @@
         function updateSlider() {
             const slider = document.getElementById('timestep-slider');
             slider.max = simulationData.length - 1;
-            if (!simulationEnded) {
-                slider.value = simulationData.length - 1;
-            } else {
-                slider.value = simulationData.findIndex(d => d.timestep === currentTimestep);
-            }
+            slider.value = simulationData.findIndex(d => d.timestep === currentTimestep);
             document.getElementById('current-timestep').textContent = `Timestep: ${currentTimestep}`;
+            console.log('Slider disabled state:', slider.disabled);
         }
 
         function updateDisplay(data) {
             const numericContainer = document.getElementById('numeric-container');
             const imageDisplay = document.getElementById('image-display');
             
-            // Update numeric data on the left
             numericContainer.innerHTML = '';
             if (data) {
                 const timestepDiv = document.createElement('div');
@@ -185,9 +229,10 @@
                 data.positions.forEach((pos, index) => {
                     const agentDiv = document.createElement('div');
                     agentDiv.className = 'agent-data';
+                    const formattedPos = pos.map(coord => Number(coord).toFixed(2)).join(', ');
                     agentDiv.innerHTML = `
                         <h4>Agent ${index}</h4>
-                        <p>Position: [${pos}]</p>
+                        <p>Position: [${formattedPos}]</p>
                         <p>Reward: ${data.rewards[index]}</p>
                     `;
                     timestepDiv.appendChild(agentDiv);
@@ -196,21 +241,13 @@
                 numericContainer.appendChild(timestepDiv);
             }
 
-            // Update image on the right with placeholder
             imageDisplay.innerHTML = '';
             if (data) {
                 const img = document.createElement('img');
                 const newSrc = `data:image/png;base64,${data.image}`;
                 
-                // Use placeholder initially
-                img.src = '/static/placeholder.png'; // Placeholder while loading
-                
-                // If there's a previous image and it's not the first load, use it instead of placeholder
-                if (lastImageSrc && simulationData.length > 1) {
-                    img.src = lastImageSrc;
-                }
+                img.src = lastImageSrc && simulationData.length > 1 ? lastImageSrc : '/static/placeholder.png';
 
-                // Load the new image in the background
                 const tempImg = new Image();
                 tempImg.src = newSrc;
                 tempImg.onload = function() {
@@ -220,7 +257,7 @@
                 tempImg.onerror = function() {
                     console.error(`Failed to load image for timestep ${data.timestep}`);
                     img.alt = 'Image failed to load';
-                    img.src = '/static/placeholder.png'; // Revert to placeholder on error
+                    img.src = '/static/placeholder.png';
                 };
 
                 imageDisplay.appendChild(img);
@@ -228,6 +265,7 @@
         }
 
         document.getElementById('timestep-slider').addEventListener('input', function() {
+            if (this.disabled) return;
             stopPlayback();
             const index = parseInt(this.value);
             currentTimestep = simulationData[index].timestep;
@@ -236,7 +274,7 @@
         });
 
         document.getElementById('stop-button').addEventListener('click', function() {
-            if (confirm('Are you sure you want to stop the server? This will terminate the simulation.')) {
+            if (confirm('Are you sure you want to stop the server?')) {
                 socket.emit('stop_server');
             }
         });
@@ -249,8 +287,29 @@
             }
         });
 
+        document.getElementById('export-button').addEventListener('click', function() {
+            if (simulationData.length === 0) {
+                alert('No simulation data available to export.');
+                return;
+            }
+            const fps = prompt('Enter the FPS for the video (e.g., 30):', '30');
+            if (fps === null || isNaN(fps) || fps <= 0) {
+                alert('Please enter a valid FPS value.');
+                return;
+            }
+            exportVideo(parseFloat(fps));
+        });
+
+        document.getElementById('export-data-button').addEventListener('click', function() {
+            if (simulationData.length === 0) {
+                alert('No simulation data available to export.');
+                return;
+            }
+            exportData();
+        });
+
         function startPlayback() {
-            if (simulationData.length === 0) return;
+            if (simulationData.length === 0 || !simulationEnded) return;
             document.getElementById('play-button').textContent = 'Pause';
             document.getElementById('timestep-slider').disabled = true;
             playInterval = setInterval(() => {
@@ -267,8 +326,78 @@
                 clearInterval(playInterval);
                 playInterval = null;
                 document.getElementById('play-button').textContent = 'Play';
-                document.getElementById('timestep-slider').disabled = simulationEnded;
+                if (simulationEnded) {
+                    document.getElementById('timestep-slider').disabled = false;
+                }
             }
+        }
+
+        async function exportVideo(fps) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const firstImage = new Image();
+            firstImage.src = `data:image/png;base64,${simulationData[0].image}`;
+            
+            await new Promise(resolve => { firstImage.onload = resolve; });
+            canvas.width = firstImage.width;
+            canvas.height = firstImage.height;
+
+            const stream = canvas.captureStream(fps);
+            const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+            const chunks = [];
+
+            recorder.ondataavailable = (e) => chunks.push(e.data);
+            recorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `simulation_${Date.now()}.webm`;
+                a.click();
+                URL.revokeObjectURL(url);
+            };
+
+            recorder.start();
+            let frameIndex = 0;
+
+            function drawNextFrame() {
+                if (frameIndex >= simulationData.length) {
+                    recorder.stop();
+                    return;
+                }
+                const img = new Image();
+                img.src = `data:image/png;base64,${simulationData[frameIndex].image}`;
+                img.onload = () => {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    frameIndex++;
+                    setTimeout(drawNextFrame, 1000 / fps);
+                };
+                img.onerror = () => {
+                    console.error(`Failed to load image for frame ${frameIndex}`);
+                    frameIndex++;
+                    drawNextFrame();
+                };
+            }
+
+            drawNextFrame();
+        }
+
+        function exportData() {
+            const exportData = simulationData.map(timestepData => ({
+                timestep: timestepData.timestep,
+                positions: timestepData.positions,
+                rewards: timestepData.rewards
+            }));
+
+            const jsonString = JSON.stringify(exportData, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `simulation_data_${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
         }
 
         socket.emit('get_simulation_data');

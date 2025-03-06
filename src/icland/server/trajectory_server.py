@@ -100,6 +100,7 @@ class _TrajectoryManagerServer:  # pragma: no cover
         def handle_end_simulation() -> None:
             self.trajectory_mgr.set_simulation_ended()
             emit("simulation_ended", broadcast=True)
+            print("Received end simulation request from client")
 
         @self.socketio.on("get_simulation_data")  # type: ignore
         def handle_get_simulation_data(data: dict[str, Any] | None = None) -> None:

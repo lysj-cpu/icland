@@ -68,8 +68,11 @@ try:
 
     # Tell the server to terminate the simulation.
     poster.end_simulation()
+    
+    # Allow broadcast to propagate
+    time.sleep(2)
 finally:
     # Disconnect.
     poster.sio.disconnect()
 
-tm.stop()
+# tm.stop()
