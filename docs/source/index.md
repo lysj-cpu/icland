@@ -39,16 +39,16 @@ Get Started
 
 ::::{grid} 1 3 3 3
 
-:::{grid-item-card} {octicon}`tools;1.5em` TODO
-<!-- :link: filters/index -->
+:::{grid-item-card} {octicon}`rocket;1.5em` Real-Time GPU Rendering & Editing
+:link: benchmarking
 :link-type: doc
-TODO
+Harnesses [ray marching](https://en.wikipedia.org/wiki/Ray_marching) with [Signed Distance Functions (SDFs)](https://en.wikipedia.org/wiki/Signed_distance_function) for ultra-smooth rendering and GPU-accelerated model editing.
 :::
 
-:::{grid-item-card} {octicon}`terminal;1.5em` TODO
-<!-- :link: reference/command-line -->
+:::{grid-item-card} {octicon}`globe;1.5em` Procedural World Generation
+:link: system_architecture
 :link-type: doc
-TODO
+Utilises [Wave Function Collapse (WFC)](https://en.wikipedia.org/wiki/Wave_function_collapse) and randomised sampling to create diverse, dynamic environments for RL agents.
 :::
 
 :::{grid-item-card} {octicon}`gear;1.5em` Powerful API
@@ -59,12 +59,16 @@ A fully type-annotated, extensively documented Python RL library, compatible wit
 
 ::::
 
+![Simulation Visualisation](_static/simulation.jpeg)
 
 ```{toctree}
 :hidden:
 
 🔎 Overview <self>
-quickstart
+background
+<!-- quickstart -->
+system_architecture
+benchmarking
 ```
 ```{toctree}
 :caption: 🔨 Contributing

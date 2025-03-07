@@ -29,7 +29,7 @@ extensions = [
 
 autosummary_generate = True
 
-myst_enable_extensions = ["colon_fence"]
+myst_enable_extensions = ["colon_fence", "attrs_inline"]
 
 ogp_site_url = "https://lysj-cpu.github.io/icland/"
 
@@ -45,7 +45,10 @@ copybutton_prompt_text = "$ "
 
 html_title = "icland"
 html_theme = "furo"
+html_logo = "_static/logo.png"
+html_favicon = "_static/logo.png"
 html_theme_options = {
+    "sidebar_hide_name": True,
     "footer_icons": [
         {
             "name": "GitHub",
