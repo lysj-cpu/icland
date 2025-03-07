@@ -1,28 +1,52 @@
-from typing import Any  # noqa: D100
+"""Code to parallelize model editing in JAX given a base model."""
 
 import jax
 import jax.numpy as jnp
 import mujoco
-import numpy as np
 
 from icland.agent import create_agent
-from icland.constants import AGENT_COMPONENT_IDS_DIM, WORLD_HEIGHT
-from icland.presets import TEST_TILEMAP_BUMP, TEST_TILEMAP_FLAT, TEST_TILEMAP_WORLD42
-from icland.types import MjxModelType
+from icland.constants import (
+    AGENT_DOF_OFFSET,
+    BODY_OFFSET,
+    TIMESTEP,
+    WALL_OFFSET,
+    WORLD_LEVEL,
+)
+from icland.prop import PropType, create_prop
+from icland.types import ICLandAgentInfo, ICLandPropInfo, MjxModelType
 
 
 def generate_base_model(
-    width: int,
-    height: int,
-    max_num_agents: int,
-    max_height: int = WORLD_HEIGHT,  # controls the BVH bounding box max height.
-    # prop_spawns: jax.Array,
+    max_world_width: int,
+    max_world_depth: int,
+    max_world_height: int,
+    max_agent_count: int,
+    max_sphere_count: int,
+    max_cube_count: int,
 ) -> MjxModelType:  # pragma: no cover
-    """Generates base MJX model from column meshes that form the world."""
-    # This code is run entirely on CPU
+    """Generates base MJX model from column meshes that form the world.
+
+    This code is run entirely on CPU and should only be used in the
+    smart constructor of the `ICLandConfig` object.
+
+    Args:
+        max_world_width: The maximum width of the world.
+        max_world_depth: The maximum depth of the world.
+        max_world_height: The maximum height of the world.
+        max_agent_count: The maximum number of agents.
+        max_sphere_count: The maximum number of spheres.
+        max_cube_count: The maximum number of cubes.
+
+    Returns:
+        A tuple containing the MJX model and the MuJoCo model.
+    """
     spec = mujoco.MjSpec()
 
     spec.compiler.degree = 1
+    spec.add_material(
+        name="default",
+        rgba=[0.8, 0.8, 0.8, 1],
+    )
 
     # Add assets
     # Ramp
@@ -52,41 +76,49 @@ def generate_base_model(
 
     # Add the ground
     spec.worldbody.add_geom(
-        type=mujoco.mjtGeom.mjGEOM_PLANE, size=[0, 0, 0.01], rgba=[1, 1, 1, 1]
+        type=mujoco.mjtGeom.mjGEOM_PLANE,
+        size=[0, 0, 0.01],
+        rgba=[1, 1, 1, 1],
+        material="default",
     )
 
     # Add the walls
-    spec.worldbody.add_geom(
-        type=mujoco.mjtGeom.mjGEOM_PLANE,
-        size=[height / 2, 10, 0.01],
-        quat=[0.5, -0.5, -0.5, 0.5],
-        pos=[width, height / 2, 10],
-        rgba=[0, 0, 0, 0],
-    )
+    if max_world_width > 0 and max_world_depth > 0:
+        spec.worldbody.add_geom(
+            type=mujoco.mjtGeom.mjGEOM_PLANE,
+            size=[max_world_depth / 2, 10, 0.01],
+            quat=[0.5, -0.5, -0.5, 0.5],
+            pos=[max_world_width, max_world_depth / 2, 10],
+            rgba=[0, 0, 0, 0],
+            material="default",
+        )
 
-    spec.worldbody.add_geom(
-        type=mujoco.mjtGeom.mjGEOM_PLANE,
-        size=[height / 2, 10, 0.01],
-        quat=[0.5, 0.5, 0.5, 0.5],
-        pos=[0, height / 2, 10],
-        rgba=[0, 0, 0, 0],
-    )
+        spec.worldbody.add_geom(
+            type=mujoco.mjtGeom.mjGEOM_PLANE,
+            size=[max_world_depth / 2, 10, 0.01],
+            quat=[0.5, 0.5, 0.5, 0.5],
+            pos=[0, max_world_depth / 2, 10],
+            rgba=[0, 0, 0, 0],
+            material="default",
+        )
 
-    spec.worldbody.add_geom(
-        type=mujoco.mjtGeom.mjGEOM_PLANE,
-        size=[10, width / 2, 0.01],
-        quat=[0.5, -0.5, 0.5, 0.5],
-        pos=[width / 2, 0, 10],
-        rgba=[0, 0, 0, 0],
-    )
+        spec.worldbody.add_geom(
+            type=mujoco.mjtGeom.mjGEOM_PLANE,
+            size=[10, max_world_width / 2, 0.01],
+            quat=[0.5, -0.5, 0.5, 0.5],
+            pos=[max_world_width / 2, 0, 10],
+            rgba=[0, 0, 0, 0],
+            material="default",
+        )
 
-    spec.worldbody.add_geom(
-        type=mujoco.mjtGeom.mjGEOM_PLANE,
-        size=[10, width / 2, 0.01],
-        quat=[0.5, 0.5, -0.5, 0.5],
-        pos=[width / 2, height, 10],
-        rgba=[0, 0, 0, 0],
-    )
+        spec.worldbody.add_geom(
+            type=mujoco.mjtGeom.mjGEOM_PLANE,
+            size=[10, max_world_width / 2, 0.01],
+            quat=[0.5, 0.5, -0.5, 0.5],
+            pos=[max_world_width / 2, max_world_depth, 10],
+            rgba=[0, 0, 0, 0],
+            material="default",
+        )
 
     # Default constants
     COLUMN_HEIGHT = 3
@@ -94,26 +126,45 @@ def generate_base_model(
 
     # Add tiles, all at max height to create correct BVH interactions
     # Tile indices: 5 to w * h + 4 inclusive
-    for i in range(width):
-        for j in range(height):
+    for i in range(max_world_width):
+        for j in range(max_world_depth):
             spec.worldbody.add_geom(
                 type=mujoco.mjtGeom.mjGEOM_BOX,
-                pos=[i + 0.5, j + 0.5, max_height - COLUMN_HEIGHT],
+                pos=[i + 0.5, j + 0.5, max_world_height - COLUMN_HEIGHT],
                 size=[0.5, 0.5, 3],
+                material="default",
             )
             spec.worldbody.add_geom(
                 type=mujoco.mjtGeom.mjGEOM_MESH,
                 meshname="ramp",
-                pos=[i + 0.5, j + 0.5, max_height - RAMP_HEIGHT],
+                pos=[i + 0.5, j + 0.5, max_world_height - RAMP_HEIGHT],
+                material="default",
             )
 
     # Add agents
     # Agent indices: w * h + 5 to num_agents + w * h + 4 inclusive
-    for i in range(max_num_agents):
-        create_agent(i, jnp.zeros((AGENT_COMPONENT_IDS_DIM,)), spec)  # default position
+    for i in range(max_agent_count):
+        create_agent(i, jnp.zeros((3,)), spec)  # default position
 
-    # TODO: Add props
+    max_prop_count = max_cube_count + max_sphere_count
+    if max_prop_count > 0:
+        curr_ind = 0
+        for _ in range(max_cube_count):
+            create_prop(curr_ind, jnp.zeros((3,)), spec, PropType.CUBE)
+            curr_ind += 1
+
+        for _ in range(max_sphere_count):
+            create_prop(curr_ind, jnp.zeros((3,)), spec, PropType.SPHERE)
+            curr_ind += 1
+    else:
+        # Create empty placeholder prop.
+        # This ensures the renderer and model editing functions can run
+        # as expected, as JAX dislikes empty arrays.
+        # See https://docs.jax.dev/en/latest/_autosummary/jax.numpy.empty.html
+        create_prop(0, jnp.zeros((3,)), spec, PropType.NONE)
+
     mj_model = spec.compile()
+    mj_model.opt.timestep = TIMESTEP
     mjx_model = mujoco.mjx.put_model(mj_model)
 
     return mjx_model, mj_model
@@ -121,16 +172,38 @@ def generate_base_model(
 
 @jax.jit
 def edit_model_data(
-    tilemap: jax.Array, base_model: MjxModelType, max_height: int = WORLD_HEIGHT
+    tilemap: jax.Array,
+    base_model: MjxModelType,
+    agent_info: ICLandAgentInfo,
+    prop_info: ICLandPropInfo,
+    max_world_height: int = WORLD_LEVEL,
 ) -> MjxModelType:
-    """Edit the base model data such that the terrain matches that of the tilemap."""
-    # Pre: the width and height of the tilemap MUST MATCH that of the base_model
+    """Edit the base model data such that the terrain matches that of the tilemap.
+
+    **NOTE**: the width and deoth of the tilemap MUST MATCH that of the base_model.
+
+    Args:
+        tilemap: A JAX array representing the tilemap of the world.
+        base_model: The base MJX model to be edited.
+        agent_info: Information about the agents in the environment.
+        prop_info: Information about the props in the environment.
+        max_world_height: The maximum height of the world.
+
+    Returns:
+        The edited MJX model.
+    """
+    agent_spawns = agent_info.spawn_points
+    prop_spawns = prop_info.spawn_points
 
     RAMP_OFFSET = 13 / 3
     COL_OFFSET = 2
-    WALL_OFFSET = 5
+    agent_count = agent_spawns.shape[0]
+    prop_count = prop_spawns.shape[0]
     b_geom_xpos = base_model.geom_pos
     b_geom_xquat = base_model.geom_quat
+    b_pos = base_model.body_pos
+    b_q_pos0 = base_model.qpos0
+    b_q_pos_spring = base_model.qpos_spring
     w, h = tilemap.shape[0], tilemap.shape[1]
 
     def rot_offset(i: jax.Array) -> jax.Array:
@@ -141,7 +214,7 @@ def edit_model_data(
     ) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
         t_type, rot, _, to_h = tile
         is_ramp = t_type % 2
-        offset = to_h - is_ramp - max_height + 1
+        offset = to_h - is_ramp - max_world_height + 1
 
         x, y = i // w, i % w
         quat_consts = jnp.array(
@@ -179,73 +252,45 @@ def edit_model_data(
     b_geom_xpos = jax.lax.dynamic_update_slice_in_dim(
         b_geom_xpos, tile_offsets_aligned, WALL_OFFSET, axis=0
     )
+
     b_geom_xquat = jax.lax.dynamic_update_slice_in_dim(
         b_geom_xquat, tile_quats_aligned, WALL_OFFSET, axis=0
     )
-
-    return base_model.replace(geom_pos=b_geom_xpos, geom_quat=b_geom_xquat)
-
-
-def _edit_mj_model_data(
-    tilemap: jax.Array, base_model: mujoco.MjModel, max_height: int = WORLD_HEIGHT
-) -> None:  # pragma: no cover
-    b_geom_xpos = base_model.geom_pos
-    b_geom_xquat = base_model.geom_quat
-    w, h = tilemap.shape[0], tilemap.shape[1]
-    RAMP_OFFSET = 13 / 3
-    COL_OFFSET = 2
-    WALL_OFFSET = 5
-
-    def rot_offset(i: jax.Array) -> jax.Array:
-        return 0.5 + jnp.cos(jnp.pi * i / 2) / 6
-
-    def process_tile(
-        i: int, tile: jax.Array
-    ) -> tuple[
-        np.ndarray[tuple[int, ...], Any],
-        np.ndarray[tuple[int, ...], Any],
-        jax.Array,
-    ]:
-        t_type, rot, _, to_h = tile
-        is_ramp = t_type % 2
-        offset = to_h - is_ramp - max_height - 1
-
-        x, y = i // w, i % w
-        quat_consts = jnp.array(
-            [
-                [0, 0.382683, 0, 0.92388],
-                [-0.653282, 0.270598, 0.270598, 0.653282],
-                [-0.92388, 0, 0.382683, 0],
-                [-0.653282, -0.270598, 0.270598, -0.653282],
-            ]
-        )
-        return (
-            np.array([x + 0.5, y + 0.5, offset + COL_OFFSET]),
-            np.array(
-                [
-                    x + rot_offset(rot),
-                    y + rot_offset(rot - 1),
-                    RAMP_OFFSET + offset + is_ramp,
-                ]
-            ).astype("float32"),
-            quat_consts[rot],
-        )
-
-    for i in range(w * h):
-        c, r, rq = process_tile(i, tilemap[i // w, i % w])
-        b_geom_xpos[2 * i + WALL_OFFSET] = c
-        b_geom_xpos[2 * i + WALL_OFFSET + 1] = r
-        b_geom_xquat[2 * i + WALL_OFFSET + 1] = rq
-
-
-if __name__ == "__main__":
-    mjx_model_j, mj_model = generate_base_model(10, 10, 1)
-    mj_data = mujoco.MjData(mj_model)
-
-    batch = jax.jit(jax.vmap(edit_model_data, in_axes=(0, None)))(
-        jnp.array([TEST_TILEMAP_WORLD42, TEST_TILEMAP_FLAT, TEST_TILEMAP_BUMP]),
-        mjx_model_j,
+    b_pos = jax.lax.dynamic_update_slice_in_dim(
+        b_pos, agent_spawns.astype("float32"), BODY_OFFSET, axis=0
     )
-    batch_data = jax.vmap(mujoco.mjx.make_data)(batch)
-    # compare_dataclass_instances(mjx_model_j, mjx_model_c)
-    print(batch.geom_pos[2, 5:205])
+    b_pos = jax.lax.dynamic_update_slice_in_dim(
+        b_pos,
+        prop_spawns.astype("float32").reshape((-1, 3)),
+        BODY_OFFSET + agent_count,
+        axis=0,
+    )
+
+    prop_spawns = prop_spawns.astype("float32").reshape((-1, 3))
+
+    # Update props qsprings
+    prop_qpos = jax.vmap(
+        lambda s: jnp.concatenate([s, jnp.array([1, 0, 0, 0])], axis=0)
+    )(prop_spawns)
+
+    b_q_pos0 = jax.lax.dynamic_update_slice_in_dim(
+        b_q_pos0,
+        prop_qpos.astype("float32").flatten(),
+        WALL_OFFSET - 1 + AGENT_DOF_OFFSET * agent_count,
+        axis=0,
+    )
+
+    b_q_pos_spring = jax.lax.dynamic_update_slice_in_dim(
+        b_q_pos_spring,
+        prop_qpos.astype("float32").flatten(),
+        WALL_OFFSET - 1 + AGENT_DOF_OFFSET * agent_count,
+        axis=0,
+    )
+
+    return base_model.replace(
+        geom_pos=b_geom_xpos,
+        geom_quat=b_geom_xquat,
+        body_pos=b_pos,
+        qpos0=b_q_pos0,
+        qpos_spring=b_q_pos_spring,
+    )

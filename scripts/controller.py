@@ -10,12 +10,18 @@ Controls:
     - Hold 'd' to command the agent with RIGHT_POLICY.
     - Hold the left arrow key to command the agent with ANTI_CLOCKWISE_POLICY.
     - Hold the right arrow key to command the agent with CLOCKWISE_POLICY.
+    - Press '1' to attempt to tag an agent in front of you with TAG_POLICY.
+    - Press '2' to attempt to grab a prop in front of you with GRAB_POLICY.
     - Press 'q' to quit the simulation.
 
 This script is based on video_generator but instead of writing a video file, it displays frames in real time.
 """
 
 import os
+import sys
+from typing import Any
+
+import imageio
 
 # N.B. These need to be set before the mujoco imports.
 os.environ["MUJOCO_GL"] = "egl"
@@ -30,6 +36,7 @@ import jax
 import jax.numpy as jnp
 import keyboard  # For polling the state of multiple keys simultaneously.
 import mujoco
+import numpy as np
 from mujoco import mjx
 
 import icland
@@ -37,23 +44,32 @@ import icland
 # Import your policies and worlds from your assets.
 from icland.presets import *
 from icland.types import *
+from icland.world_gen.model_editing import generate_base_model
 
 
 def interactive_simulation() -> None:
     """Runs an interactive simulation where you can change the agent's policy via keyboard input."""
-    # Create the MuJoCo model from the XML string.
-    icland_params = icland.sample(jax.random.PRNGKey(42))
-    mj_model = icland_params.model
+    # Create the MuJoCo model from the .
 
-    jax_key = jax.random.PRNGKey(42)
-    icland_state = icland.init(jax_key, icland_params)
+    jax_key = jax.random.PRNGKey(0)
+    icland_params = icland.sample(jax_key)
+    mjx_model, mj_model = generate_base_model(
+        icland.DEFAULT_CONFIG.max_world_width,
+        icland.DEFAULT_CONFIG.max_world_depth,
+        icland.DEFAULT_CONFIG.max_world_height,
+        icland.DEFAULT_CONFIG.max_agent_count,
+        icland.DEFAULT_CONFIG.max_sphere_count,
+        icland.DEFAULT_CONFIG.max_cube_count,
+    )
+
+    icland_state = icland.init(icland_params)
 
     # Set up the camera.
     cam = mujoco.MjvCamera()
     mujoco.mjv_defaultCamera(cam)
     cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
     # Use the first component id (e.g. the first agent's body) as the track target.
-    cam.trackbodyid = icland_state.pipeline_state.component_ids[0, 0]
+    cam.trackbodyid = icland_params.agent_info.body_ids[0]
     cam.distance = 1.5
     cam.azimuth = 0.0
     cam.elevation = -30.0
@@ -72,6 +88,10 @@ def interactive_simulation() -> None:
     window_name = "Interactive Simulation"
     cv2.namedWindow(window_name)
 
+    frame_rate = 30
+    frames: list[Any] = []
+    controlling = 0
+
     # Create the renderer.
     with mujoco.Renderer(mj_model) as renderer:
         while True:
@@ -79,7 +99,7 @@ def interactive_simulation() -> None:
             cv2.waitKey(1)
 
             # Stop if simulation time exceeds the duration.
-            mjx_data = icland_state.pipeline_state.mjx_data
+            mjx_data = icland_state.mjx_data
 
             # Quit if 'q' is pressed.
             if keyboard.is_pressed("q"):
@@ -101,6 +121,17 @@ def interactive_simulation() -> None:
                 new_policy += ANTI_CLOCKWISE_POLICY
             if keyboard.is_pressed("right"):
                 new_policy += CLOCKWISE_POLICY
+            if keyboard.is_pressed("up"):
+                new_policy += LOOK_UP_POLICY
+            if keyboard.is_pressed("down"):
+                new_policy += LOOK_DOWN_POLICY
+            if keyboard.is_pressed("1"):
+                new_policy += TAG_AGENT_POLICY
+            if keyboard.is_pressed("0"):
+                controlling += 1
+                controlling = controlling % 2
+            if keyboard.is_pressed("2"):
+                new_policy += GRAB_AGENT_POLICY
 
             # Update the current policy if it has changed.
             if not jnp.array_equal(new_policy, current_policy):
@@ -108,14 +139,18 @@ def interactive_simulation() -> None:
                 print(f"Time {mjx_data.time:.2f}: {current_policy}")
 
             # Step the simulation using the current_policy.
-            icland_state = icland.step(
-                jax_key, icland_state, icland_params, current_policy
+            icland_state, obs, rew = icland.step(
+                icland_state,
+                icland_params,
+                jnp.array(
+                    [current_policy, NOOP_POLICY]
+                    if controlling == 0
+                    else [NOOP_POLICY, current_policy]
+                ),
             )
-            # (Optional) Update the JAX random key.
-            jax_key, _ = jax.random.split(jax_key)
 
             # Get the latest simulation data.
-            mjx_data = icland_state.pipeline_state.mjx_data
+            mjx_data = icland_state.mjx_data
             mj_data = mjx.get_data(mj_model, mjx_data)
 
             # Update the scene.
@@ -134,12 +169,115 @@ def interactive_simulation() -> None:
             # Convert the frame from RGB to BGR for OpenCV.
             frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
+            if len(frames) < mjx_data.time * frame_rate:
+                frames.append(frame_bgr)
+
             # Display the frame.
             cv2.imshow(window_name, frame_bgr)
 
     cv2.destroyWindow(window_name)
     print("Interactive simulation ended.")
+    print(f"Exporting video: {'controller.mp4'} with {len(frames)} frames.")
+    imageio.mimsave(
+        "scripts/video_output/controller.mp4", frames, fps=frame_rate, quality=8
+    )
+
+
+def sdfr_interactive_simulation() -> None:
+    """Runs an interactive SDF simulation using a generated world and SDF rendering."""
+    # Set up the JAX random key.
+    jax_key = jax.random.PRNGKey(0)
+    icland_params = icland.sample(jax_key)
+
+    icland_state = icland.init(icland_params)
+
+    # Take an initial step with the default (no-op) policy.
+    current_policy = NOOP_POLICY
+
+    # Set up an OpenCV window.
+    window_name = "SDF Interactive Simulation"
+    cv2.namedWindow(window_name)
+    print("Starting SDF interactive simulation. Press 'q' to quit.")
+
+    framerate = 30
+    frames: list[Any] = []
+
+    controlling = 0
+    while cv2.getWindowProperty(window_name, 0) >= 0:
+        # Process any pending OpenCV window events.
+        cv2.waitKey(1)
+
+        # Quit if 'q' is pressed.
+        if keyboard.is_pressed("q"):
+            print("Quitting simulation.")
+            break
+
+        # Build the new policy based on keyboard input.
+        new_policy = jnp.zeros_like(current_policy)
+        if keyboard.is_pressed("w"):
+            new_policy += FORWARD_POLICY
+        if keyboard.is_pressed("s"):
+            new_policy += BACKWARD_POLICY
+        if keyboard.is_pressed("a"):
+            new_policy += LEFT_POLICY
+        if keyboard.is_pressed("d"):
+            new_policy += RIGHT_POLICY
+        if keyboard.is_pressed("left"):
+            new_policy += ANTI_CLOCKWISE_POLICY
+        if keyboard.is_pressed("right"):
+            new_policy += CLOCKWISE_POLICY
+        if keyboard.is_pressed("up"):
+            new_policy += LOOK_UP_POLICY
+        if keyboard.is_pressed("down"):
+            new_policy += LOOK_DOWN_POLICY
+        if keyboard.is_pressed("1"):
+            new_policy += TAG_AGENT_POLICY
+        if keyboard.is_pressed("0"):
+            controlling += 1
+            controlling = controlling % 2
+        if keyboard.is_pressed("2"):
+            new_policy += GRAB_AGENT_POLICY
+
+        # Update the current policy if it has changed.
+        if not jnp.array_equal(new_policy, current_policy):
+            current_policy = new_policy
+            print(f"Current policy updated: {current_policy}")
+
+        # Step the simulation using the current policy.
+        icland_state, obs, _ = icland.step(
+            icland_state,
+            icland_params,
+            jnp.array(
+                [current_policy, NOOP_POLICY]
+                if controlling == 0
+                else [NOOP_POLICY, current_policy]
+            ),
+        )
+
+        # Render the frame using the SDF rendering callback.
+        frame = obs.render[controlling]
+        # Frame is of shape (w, h, 3) with values in [0, 1].
+        # We repace all NaN values with 0 for OpenCV compatibility
+        frame = np.nan_to_num(frame)
+        resized_frame = cv2.resize(frame, (960, 720), interpolation=cv2.INTER_NEAREST)
+        # Convert the frame from RGB to BGR for OpenCV.
+        frame_bgr = cv2.cvtColor(resized_frame, cv2.COLOR_RGB2BGR)
+
+        if len(frames) < icland_state.mjx_data.time * framerate:
+            frames.append(resized_frame)
+
+        cv2.imshow(window_name, frame_bgr)
+
+    cv2.destroyWindow(window_name)
+    print("SDF interactive simulation ended.")
+    print(f"Exporting video: {'controller.mp4'} number of frame {len(frames)}")
+    imageio.mimsave(
+        "scripts/video_output/controller.mp4", frames, fps=framerate, quality=8
+    )
 
 
 if __name__ == "__main__":
-    interactive_simulation()
+    if len(sys.argv) > 1 and sys.argv[1] == "-sdfr":
+        sdfr_interactive_simulation()
+    else:
+        interactive_simulation()

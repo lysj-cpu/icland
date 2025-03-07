@@ -272,3 +272,4 @@ scripts/video_output/*
 scripts/benchmark_output/*
 
 /temp/
+**/_autosummary

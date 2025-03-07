@@ -12,7 +12,9 @@ def test_ramp_sdf() -> None:
     """Test the ramp signed distance function."""
     dists = []
     for i in range(NUM_ITERS):
-        dists.append(float(ramp_sdf(jnp.full((3,), i * 1.0), 1, 1)))
+        dists.append(
+            float(ramp_sdf(jnp.full((3,), i * 1.0), jnp.array(1), jnp.array(1)))
+        )
 
     assert np.all(
         np.isclose(
@@ -40,7 +42,9 @@ def test_box_sdf() -> None:
     """Test the box signed distance function."""
     dists = []
     for i in range(NUM_ITERS):
-        dists.append(float(box_sdf(jnp.full((3,), i * 1.0), 1, 1)))
+        dists.append(
+            float(box_sdf(jnp.full((3,), i * 1.0), jnp.array(1), jnp.array(1)))
+        )
 
     assert np.all(
         np.isclose(
@@ -124,7 +128,7 @@ def test_cube_sdf() -> None:
     """Test the cube signed distance function."""
     dists = []
     for i in range(NUM_ITERS):
-        dists.append(float(cube_sdf(jnp.full((3,), i * 1.0), 1)))
+        dists.append(float(cube_sdf(jnp.full((3,), i * 1.0), 1.0)))
 
     assert np.all(
         np.isclose(
@@ -141,6 +145,35 @@ def test_cube_sdf() -> None:
                     11.258330345153809,
                     12.990381240844727,
                     14.722432136535645,
+                ]
+            ),
+            atol=1e-05,
+        )
+    )
+
+
+def test_beam_sdf() -> None:
+    """Test the beam signed distance function."""
+    dists = []
+    view_dir = jnp.array([1, 1, 1]) / jnp.linalg.norm(jnp.array([1, 1, 1]))
+    for i in range(NUM_ITERS):
+        dists.append(float(beam_sdf(jnp.full((3,), i * 1.0), view_dir, 1)))
+
+    assert np.all(
+        np.isclose(
+            dists,
+            np.array(
+                [
+                    0.0,
+                    0.7320507764816284,
+                    2.464101791381836,
+                    4.196152210235596,
+                    5.928203105926514,
+                    7.660254001617432,
+                    9.392305374145508,
+                    11.124356269836426,
+                    12.856407165527344,
+                    14.588457107543945,
                 ]
             ),
             atol=1e-05,

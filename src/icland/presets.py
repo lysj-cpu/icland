@@ -335,6 +335,7 @@ RAMP_60 = """
   </worldbody>
 </mujoco>
 """
+DEFAULT_VIEWSIZE: tuple[int, int] = (96, 72)
 
 TEST_TILEMAP_EMPTY = jnp.array(
     [[[0, 0, 0, 0] for _ in range(2)] for _ in range(2)]
