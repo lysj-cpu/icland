@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt  # For plotting
 import psutil
 
 # Import the benchmark function (ensure benchmark_functions is in your PYTHONPATH)
-from benchmark_functions import ComplexStepMetrics, SampleWorldBenchmarkMetrics, SimpleStepMetrics, benchmark_complex_step_empty_world, benchmark_sample_world, benchmark_simple_step_empty_world, benchmark_simple_step_non_empty_world, benchmark_render_frame_empty_world, benchmark_render_frame_non_empty_world
+from benchmark_functions import ComplexStepMetrics, SampleWorldBenchmarkMetrics, SimpleStepMetrics, benchmark_complex_step_empty_world, benchmark_sample_world, benchmark_simple_step_empty_world, benchmark_simple_step_non_empty_world, benchmark_render_frame_empty_world, benchmark_render_frame_non_empty_world, benchmark_entire_step_non_empty_world
 from pylatex import Document, NoEscape
 
 
@@ -54,10 +54,10 @@ class BenchmarkScenario:
 
 
 BENCHMARKING_SCENARIOS: dict[str, BenchmarkScenario] = {
-    "render_frame_gpu_1_agent_8x8_100_steps": BenchmarkScenario(
+    "entire_step_gpu_1_agent_2x2_100_steps": BenchmarkScenario(
         description="Batched step performance",
-        function=partial(benchmark_render_frame_non_empty_world, width=8, agent_count=1, num_steps=100),
-        parameters=[2**i for i in range(0, 10)],
+        function=partial(benchmark_entire_step_non_empty_world, width=2, agent_count=1, num_steps=100),
+        parameters=[2**i for i in range(0, 5)],
     ),
 }
 
@@ -501,13 +501,9 @@ def output_json(json_filename: str) -> None:
     print(results)
     benchmark_results = {}
     for scenario_name, metrics_list in results.items():
-        for i in range(len(metrics_list)):
-            metrics_list[i] = tuple(map(asdict, metrics_list[i]))
-<<<<<<< HEAD
-
-=======
->>>>>>> 78738f3252151c0405f7feed452b2ee3ac68755a
-        benchmark_results[scenario_name] = metrics_list
+        # for i in range(len(metrics_list)):
+        #     metrics_list[i] = tuple(map(asdict, metrics_list[i]))
+        benchmark_results[scenario_name] = list(map(asdict, metrics_list))
 
     output_dir = "scripts/benchmarking/benchmark_output/raw_data"
     os.makedirs(output_dir, exist_ok=True)
@@ -658,6 +654,6 @@ if __name__ == "__main__":
 
     with jax.default_device(jax_devices[0]):
         print(jax_devices[0])
-        output_json('render_frame_gpu_1_agent_8x8_100_steps')
+        output_json('entire_step_gpu_1_agent_2x2_100_steps')
 
     # create_report('scripts/benchmark_output/raw_data/step_gpu_1_agent_complex.json')
