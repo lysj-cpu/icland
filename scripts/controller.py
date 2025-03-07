@@ -17,11 +17,12 @@ Controls:
 This script is based on video_generator but instead of writing a video file, it displays frames in real time.
 """
 
+import argparse
 import os
-import sys
 from typing import Any
 
 import imageio
+import pygame
 
 # N.B. These need to be set before the mujoco imports.
 os.environ["MUJOCO_GL"] = "egl"
@@ -34,7 +35,6 @@ os.environ["XLA_FLAGS"] = xla_flags
 import cv2  # For displaying frames and capturing window events.
 import jax
 import jax.numpy as jnp
-import keyboard  # For polling the state of multiple keys simultaneously.
 import mujoco
 import numpy as np
 from mujoco import mjx
@@ -47,11 +47,9 @@ from icland.types import *
 from icland.world_gen.model_editing import generate_base_model
 
 
-def interactive_simulation() -> None:
+def interactive_simulation(jax_key: jax.Array) -> None:
     """Runs an interactive simulation where you can change the agent's policy via keyboard input."""
     # Create the MuJoCo model from the .
-
-    jax_key = jax.random.PRNGKey(0)
     icland_params = icland.sample(jax_key)
     mjx_model, mj_model = generate_base_model(
         icland.DEFAULT_CONFIG.max_world_width,
@@ -82,61 +80,63 @@ def interactive_simulation() -> None:
 
     # Initialize the current policy (action) to NOOP_POLICY.
     current_policy = NOOP_POLICY
-    print("Starting interactive simulation.")
-
-    # Create a window using OpenCV.
     window_name = "Interactive Simulation"
-    cv2.namedWindow(window_name)
 
-    frame_rate = 30
+    window_size = (960, 720)
+    screen = pygame.display.set_mode(window_size)
+    pygame.display.set_caption(window_name)
+    print("Starting interactive simulation. Press 'q' to quit.")
+
+    framerate = 30
     frames: list[Any] = []
+    clock = pygame.time.Clock()
+
     controlling = 0
 
     # Create the renderer.
     with mujoco.Renderer(mj_model) as renderer:
         while True:
-            # Process any pending window events.
-            cv2.waitKey(1)
-
-            # Stop if simulation time exceeds the duration.
+            # Update mjx data
             mjx_data = icland_state.mjx_data
 
-            # Quit if 'q' is pressed.
-            if keyboard.is_pressed("q"):
-                print("Quitting simulation.")
+            # Quit if 'q' is pressed
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_q]:
                 break
 
-            # Build up the new policy by checking each key's state.
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    break
+
             new_policy = jnp.zeros_like(current_policy)
-            if keyboard.is_pressed("w"):
+            # Determine which image to display based on key combinations
+            if keys[pygame.K_w]:
                 new_policy += FORWARD_POLICY
-            if keyboard.is_pressed("s"):
-                new_policy += BACKWARD_POLICY
-            if keyboard.is_pressed("a"):
+            if keys[pygame.K_a]:
                 new_policy += LEFT_POLICY
-            if keyboard.is_pressed("d"):
+            if keys[pygame.K_s]:
+                new_policy += BACKWARD_POLICY
+            if keys[pygame.K_d]:
                 new_policy += RIGHT_POLICY
-            # Use the key names recognized by the keyboard module for arrow keys.
-            if keyboard.is_pressed("left"):
+            if keys[pygame.K_LEFT]:
                 new_policy += ANTI_CLOCKWISE_POLICY
-            if keyboard.is_pressed("right"):
+            if keys[pygame.K_RIGHT]:
                 new_policy += CLOCKWISE_POLICY
-            if keyboard.is_pressed("up"):
+            if keys[pygame.K_UP]:
                 new_policy += LOOK_UP_POLICY
-            if keyboard.is_pressed("down"):
+            if keys[pygame.K_DOWN]:
                 new_policy += LOOK_DOWN_POLICY
-            if keyboard.is_pressed("1"):
+            if keys[pygame.K_1]:
                 new_policy += TAG_AGENT_POLICY
-            if keyboard.is_pressed("0"):
-                controlling += 1
-                controlling = controlling % 2
-            if keyboard.is_pressed("2"):
+            if keys[pygame.K_0]:
+                controlling = (controlling + 1) % icland_params.agent_info.agent_count
+            if keys[pygame.K_2]:
                 new_policy += GRAB_AGENT_POLICY
 
             # Update the current policy if it has changed.
             if not jnp.array_equal(new_policy, current_policy):
                 current_policy = new_policy
-                print(f"Time {mjx_data.time:.2f}: {current_policy}")
+                print(f"Current policy updated: {current_policy}")
 
             # Step the simulation using the current_policy.
             icland_state, obs, rew = icland.step(
@@ -166,27 +166,36 @@ def interactive_simulation() -> None:
 
             # Render the frame.
             frame = renderer.render()
+            frame = (frame * 0xFF).astype(np.uint8)
             # Convert the frame from RGB to BGR for OpenCV.
             frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
-            if len(frames) < mjx_data.time * frame_rate:
-                frames.append(frame_bgr)
+            resized_frame = cv2.resize(
+                frame, window_size, interpolation=cv2.INTER_NEAREST
+            )
+            frame_bytes = resized_frame.tobytes()
+            screen.blit(
+                pygame.image.frombuffer(frame_bytes, resized_frame.shape[1::-1], "RGB"),
+                (0, 0),
+            )
+            pygame.display.flip()
 
-            # Display the frame.
-            cv2.imshow(window_name, frame_bgr)
+            clock.tick(framerate)
+
+            if len(frames) < icland_state.mjx_data.time * framerate:
+                frames.append(resized_frame)
 
     cv2.destroyWindow(window_name)
     print("Interactive simulation ended.")
     print(f"Exporting video: {'controller.mp4'} with {len(frames)} frames.")
     imageio.mimsave(
-        "scripts/video_output/controller.mp4", frames, fps=frame_rate, quality=8
+        "scripts/video_output/controller.mp4", frames, fps=framerate, quality=8
     )
 
 
-def sdfr_interactive_simulation() -> None:
+def sdfr_interactive_simulation(jax_key: jax.Array) -> None:
     """Runs an interactive SDF simulation using a generated world and SDF rendering."""
     # Set up the JAX random key.
-    jax_key = jax.random.PRNGKey(0)
     icland_params = icland.sample(jax_key)
 
     icland_state = icland.init(icland_params)
@@ -196,46 +205,50 @@ def sdfr_interactive_simulation() -> None:
 
     # Set up an OpenCV window.
     window_name = "SDF Interactive Simulation"
-    cv2.namedWindow(window_name)
+
+    window_size = (960, 720)
+    screen = pygame.display.set_mode(window_size)
+    pygame.display.set_caption(window_name)
     print("Starting SDF interactive simulation. Press 'q' to quit.")
 
     framerate = 30
     frames: list[Any] = []
+    clock = pygame.time.Clock()
 
     controlling = 0
-    while cv2.getWindowProperty(window_name, 0) >= 0:
-        # Process any pending OpenCV window events.
-        cv2.waitKey(1)
-
-        # Quit if 'q' is pressed.
-        if keyboard.is_pressed("q"):
-            print("Quitting simulation.")
+    while True:
+        # Quit if 'q' is pressed
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_q]:
             break
 
-        # Build the new policy based on keyboard input.
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                break
+
         new_policy = jnp.zeros_like(current_policy)
-        if keyboard.is_pressed("w"):
+        # Determine which image to display based on key combinations
+        if keys[pygame.K_w]:
             new_policy += FORWARD_POLICY
-        if keyboard.is_pressed("s"):
-            new_policy += BACKWARD_POLICY
-        if keyboard.is_pressed("a"):
+        if keys[pygame.K_a]:
             new_policy += LEFT_POLICY
-        if keyboard.is_pressed("d"):
+        if keys[pygame.K_s]:
+            new_policy += BACKWARD_POLICY
+        if keys[pygame.K_d]:
             new_policy += RIGHT_POLICY
-        if keyboard.is_pressed("left"):
+        if keys[pygame.K_LEFT]:
             new_policy += ANTI_CLOCKWISE_POLICY
-        if keyboard.is_pressed("right"):
+        if keys[pygame.K_RIGHT]:
             new_policy += CLOCKWISE_POLICY
-        if keyboard.is_pressed("up"):
+        if keys[pygame.K_UP]:
             new_policy += LOOK_UP_POLICY
-        if keyboard.is_pressed("down"):
+        if keys[pygame.K_DOWN]:
             new_policy += LOOK_DOWN_POLICY
-        if keyboard.is_pressed("1"):
+        if keys[pygame.K_1]:
             new_policy += TAG_AGENT_POLICY
-        if keyboard.is_pressed("0"):
-            controlling += 1
-            controlling = controlling % 2
-        if keyboard.is_pressed("2"):
+        if keys[pygame.K_0]:
+            controlling = (controlling + 1) % icland_params.agent_info.agent_count
+        if keys[pygame.K_2]:
             new_policy += GRAB_AGENT_POLICY
 
         # Update the current policy if it has changed.
@@ -259,16 +272,24 @@ def sdfr_interactive_simulation() -> None:
         # Frame is of shape (w, h, 3) with values in [0, 1].
         # We repace all NaN values with 0 for OpenCV compatibility
         frame = np.nan_to_num(frame)
-        resized_frame = cv2.resize(frame, (960, 720), interpolation=cv2.INTER_NEAREST)
+        frame = (frame * 0xFF).astype(np.uint8)
         # Convert the frame from RGB to BGR for OpenCV.
-        frame_bgr = cv2.cvtColor(resized_frame, cv2.COLOR_RGB2BGR)
+        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+        resized_frame = cv2.resize(frame, window_size, interpolation=cv2.INTER_NEAREST)
+        frame_bytes = resized_frame.tobytes()
+        screen.blit(
+            pygame.image.frombuffer(frame_bytes, resized_frame.shape[1::-1], "RGB"),
+            (0, 0),
+        )
+        pygame.display.flip()
+
+        clock.tick(framerate)
 
         if len(frames) < icland_state.mjx_data.time * framerate:
             frames.append(resized_frame)
 
-        cv2.imshow(window_name, frame_bgr)
-
-    cv2.destroyWindow(window_name)
+    pygame.quit()
     print("SDF interactive simulation ended.")
     print(f"Exporting video: {'controller.mp4'} number of frame {len(frames)}")
     imageio.mimsave(
@@ -277,7 +298,31 @@ def sdfr_interactive_simulation() -> None:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "-sdfr":
-        sdfr_interactive_simulation()
+    # Initialize the argument parser
+    parser = argparse.ArgumentParser(
+        description="Run interactive simulations with optional key number."
+    )
+
+    # Add optional argument for key seed with default value 0
+    parser.add_argument(
+        "--key", type=int, default=0, help="Specify the key seed (default is 0)."
+    )
+
+    # Add optional flag for SDFR simulation
+    parser.add_argument(
+        "-sdfr",
+        action="store_true",
+        help="Run the SDFR interactive simulation (default: run the Mujoco renderer).",
+    )
+
+    # Parse the command-line arguments
+    args = parser.parse_args()
+
+    # Generate the PRNG key using the specified key_no
+    key = jax.random.PRNGKey(args.key)
+
+    # Determine which simulation to run
+    if args.sdfr:
+        sdfr_interactive_simulation(key)
     else:
-        interactive_simulation()
+        interactive_simulation(key)

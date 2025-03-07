@@ -97,10 +97,10 @@ while state.mjx_data.time < TIME:
     # Build the new policy based on keyboard input.
 
     # Step the simulation using the current policy.
-    state = icland.step(state, icland_params, batched_action)
+    state, obs, rew = icland.step(state, icland_params, batched_action)
 
     # Render the frame using the SDF rendering callback.
-    frame = state.observation.render
+    frame = obs.render
     frame_rgb = np.nan_to_num(frame)
     frame_rgb_combined = __combine_frames(frame_rgb[:agent_count].astype("float32"))
     # Frame is of shape (w, h, 3) with values in [0, 1].

@@ -269,9 +269,9 @@ def step(
         >>> params = icland.sample(key)
         >>> state = icland.init(params)
         >>> actions = jnp.zeros((2, icland.constants.ACTION_SPACE_DIM))
-        >>> new_state = icland.step(state, params, actions)
+        >>> new_state, obs, rew = icland.step(state, params, actions)
         >>> new_state
-        (ICLandState(mjx_data=Data(...), agent_variables=ICLandAgentVariables(...), prop_variables=ICLandPropVariables(...)), ICLandObservation(...), Array(...))
+        ICLandState(mjx_data=Data(...), agent_variables=ICLandAgentVariables(...), prop_variables=ICLandPropVariables(...))
     """
     # Unpack state
     mjx_data = state.mjx_data
@@ -309,7 +309,7 @@ def step(
         mjx_data = mjx.step(params.mjx_model, mjx_data)
         return (mjx_data, agent_variables, prop_variables), None
 
-    # Scan over 5 iterations; we ignore the output per iteration (_)
+    # Scan over PHYS_PER_CTRL_STEP iterations; we ignore the output per iteration (_)
     (mjx_data, agent_variables, prop_variables), _ = jax.lax.scan(
         physics_step,
         (mjx_data, agent_variables, prop_variables),
