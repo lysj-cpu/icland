@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from icland.presets import TEST_TILEMAP_EMPTY, TEST_TILEMAP_FLAT
+from icland.presets import TEST_TILEMAP_EMPTY
 import jax
 import jax.numpy as jnp
 import mujoco
@@ -13,9 +13,7 @@ import psutil
 import pynvml
 
 import icland
-from icland.agent import collect_body_scene_info, create_agent
-from icland.constants import AGENT_OBSERVATION_DIM
-from icland.types import ICLandParams, ICLandState, PipelineState
+from icland.types import ICLandParams, ICLandState
 from icland.world_gen.JITModel import export, sample_world
 from icland.world_gen.model_editing import edit_model_data, generate_base_model
 from icland.world_gen.tile_data import TILECODES
