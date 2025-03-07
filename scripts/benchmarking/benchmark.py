@@ -503,7 +503,10 @@ def output_json(json_filename: str) -> None:
     for scenario_name, metrics_list in results.items():
         for i in range(len(metrics_list)):
             metrics_list[i] = tuple(map(asdict, metrics_list[i]))
+<<<<<<< HEAD
 
+=======
+>>>>>>> 78738f3252151c0405f7feed452b2ee3ac68755a
         benchmark_results[scenario_name] = metrics_list
 
     output_dir = "scripts/benchmarking/benchmark_output/raw_data"
