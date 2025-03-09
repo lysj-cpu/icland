@@ -114,7 +114,7 @@ def __process_ramp(
     h: Int[Array, ""],
     w: Int[Array, ""],
 ) -> Float[Array, ""]:
-    angle = -jnp.pi * rot / 2
+    angle = -jnp.pi * ((3 * rot + 2) % 4) / 2
     cos_t = jnp.cos(angle)
     sin_t = jnp.sin(angle)
     upright = jnp.array([[0, -1, 0, 1], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
